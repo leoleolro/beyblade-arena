@@ -5,15 +5,13 @@ import type { HitEvent } from '../sim/physics';
 import type { BeyState } from '../sim/types';
 import { buildBeyMesh } from './beyMesh';
 import { SparkBurst, Trail } from './effects';
-import { buildMarker } from './marker';
-import type { Marker } from './marker';
+import { skinById } from './skins';
+import type { Skin } from './skins';
 import { beyWorldPosition, buildStadium } from './stadium';
 
 interface BeyVisual {
   group: THREE.Group;
   trail: Trail;
-  /** Ownership marker: ring on the dish plus a pointer above. */
-  marker: Marker;
   /** Free-running precession phase, so wobble doesn't look mechanical. */
   wobblePhase: number;
 }
@@ -90,28 +88,29 @@ export class ArenaRenderer {
   }
 
   /**
-   * Rebuild the meshes for a new round. `playerId` gets the bright marker; two
-   * similarly-coloured tops on a dark dish are otherwise very easy to confuse.
+   * Rebuild the meshes for a new round.
+   *
+   * `skins` is keyed by bey id. The two skins are guaranteed to be far apart in
+   * hue (see pickContrastingSkin), which is what replaced the ownership markers:
+   * the tops are now told apart by what they *are* rather than by a ring drawn
+   * under one of them.
    */
-  setBeys(beys: BeyState[], playerId?: string): void {
+  setBeys(beys: BeyState[], skins: Record<string, string> = {}): void {
     for (const v of this.visuals.values()) {
       this.beyRoot.remove(v.group);
       this.beyRoot.remove(v.trail.line);
-      this.beyRoot.remove(v.marker.group);
     }
     this.visuals.clear();
 
     for (const b of beys) {
-      const group = buildBeyMesh(b.build);
-      const trail = new Trail(b.build.layer.colour);
-      const marker = buildMarker(b.id === playerId, b.stats.radius);
+      const skin: Skin = skinById(skins[b.id] ?? 'frost');
+      const group = buildBeyMesh(b.build, skin);
+      const trail = new Trail(skin.primary);
       this.beyRoot.add(group);
       this.beyRoot.add(trail.line);
-      this.beyRoot.add(marker.group);
       this.visuals.set(b.id, {
         group,
         trail,
-        marker,
         wobblePhase: Math.random() * Math.PI * 2,
       });
     }
@@ -130,7 +129,6 @@ export class ArenaRenderer {
         v.group.position.y -= dt * 1.6;
         v.group.rotation.z += dt * 4;
         v.trail.setVisible(false);
-        v.marker.group.visible = false;
         if (v.group.position.y < -1.5) v.group.visible = false;
         continue;
       }
@@ -138,9 +136,6 @@ export class ArenaRenderer {
       const p = beyWorldPosition(b.pos.x, b.pos.y);
       v.group.position.copy(p);
 
-      v.marker.group.visible = true;
-      v.marker.group.position.copy(p);
-      v.marker.update(dt, Math.hypot(b.pos.x, b.pos.y));
 
       // Spin about its own axis.
       v.group.rotation.y = b.angle;

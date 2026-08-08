@@ -772,3 +772,11 @@ button.primary.ghost:hover {
     bottom: 92px;
   }
 }
+
+/* Skin swatch in the garage picker — a touch larger than the part dots, since
+   the colour is the whole point of the choice. */
+.chip .skin-dot {
+  width: 13px;
+  height: 13px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.25), 0 0 10px currentColor;
+}

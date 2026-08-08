@@ -2,6 +2,7 @@ import type { Game } from './game';
 import type { Difficulty } from './ai';
 import { DISCS, DRIVERS, LAYERS, deriveStats } from './sim/parts';
 import * as C from './sim/constants';
+import { SKINS, skinById } from './render/skins';
 import type { BeyState, MoveKind } from './sim/types';
 
 const hex = (n: number): string => `#${n.toString(16).padStart(6, '0')}`;
@@ -193,13 +194,17 @@ export class Ui {
     el.className = 'card';
     const build = bey?.build ?? this.game.playerBuild;
     const spinLabel = spinDir === 1 ? '↻ right' : '↺ left';
-    // The swatch and the marker colour are the same on both sides, so the card
-    // and the top on the dish are linked without having to read anything.
-    const markerColour = isPlayer ? '#38bdf8' : '#f97316';
+    // The card is keyed to the *skin*, which is also what the top on the dish
+    // is wearing — so card and bey are linked by the same colour rather than by
+    // an ownership marker drawn on top of the scene.
+    const skin = skinById(
+      isPlayer ? this.game.playerSkinId : this.game.rivalSkinId,
+    );
+    const skinColour = hex(skin.primary);
     el.innerHTML = `
       <h3>
-        <span class="who" style="--marker:${markerColour}">
-          <i class="swatch" style="background:${hex(build.layer.colour)}"></i>${escapeHtml(title)}
+        <span class="who" style="--marker:${skinColour}">
+          <i class="swatch" style="background:${skinColour}"></i>${escapeHtml(title)}
         </span>
         <span class="spin-dir">${spinLabel}</span>
       </h3>
@@ -638,6 +643,35 @@ export class Ui {
       <span>Spin retention <b>${s.spinRetention.toFixed(2)}</b></span>
       <span>Aggression <b>${s.wander.toFixed(2)}</b></span>`;
     panel.appendChild(stat);
+
+    // Skins. Purely cosmetic — the rival is always forced to a contrasting hue,
+    // which is what makes the two tops readable without ownership markers.
+    const skinRow = document.createElement('div');
+    skinRow.className = 'slot';
+    skinRow.innerHTML =
+      '<h4>Finish — cosmetic only, never changes a stat</h4>';
+    const skinChips = document.createElement('div');
+    skinChips.className = 'chips';
+    for (const s of SKINS) {
+      const chip = document.createElement('button');
+      chip.className = 'chip' + (g.playerSkinId === s.id ? ' on' : '');
+      chip.innerHTML = `
+        <span class="dot skin-dot" style="background:${hex(s.primary)}"></span>
+        <span>${escapeHtml(s.name)}<br><small>${escapeHtml(s.finish)}</small></span>`;
+      chip.addEventListener('click', () => {
+        g.playerSkinId = s.id;
+        this.render();
+      });
+      skinChips.appendChild(chip);
+    }
+    skinRow.appendChild(skinChips);
+    const skinNote = document.createElement('p');
+    skinNote.className = 'sub';
+    skinNote.style.margin = '10px 0 0';
+    skinNote.textContent =
+      'Your rival is always given the most contrasting finish available, so the two tops stay easy to tell apart mid-battle.';
+    skinRow.appendChild(skinNote);
+    panel.appendChild(skinRow);
 
     // Spin direction. Measured, the two pairings play completely differently,
     // so this is a real decision rather than a cosmetic toggle.

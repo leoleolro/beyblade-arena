@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import type { BeyBuild } from '../sim/types';
+import { skinMaterial } from './skins';
+import type { Skin } from './skins';
 
 /**
  * Builds a top's mesh from its parts, so a build is readable at a glance:
@@ -8,9 +10,9 @@ import type { BeyBuild } from '../sim/types';
  * Returned as a group with the tip at local origin, so the renderer can place
  * it directly on the dish floor and lean the whole assembly for wobble.
  */
-export function buildBeyMesh(build: BeyBuild): THREE.Group {
+export function buildBeyMesh(build: BeyBuild, skin: Skin): THREE.Group {
   const group = new THREE.Group();
-  const { layer, disc } = build;
+  const { layer } = build;
   const r = layer.radius;
 
   // ---- driver: a slim cone that meets the floor at the group origin --------
@@ -43,11 +45,7 @@ export function buildBeyMesh(build: BeyBuild): THREE.Group {
   const discY = tipHeight + r * 0.36;
   const discMesh = new THREE.Mesh(
     new THREE.CylinderGeometry(r * 0.78, r * 0.88, discHeight, 24),
-    new THREE.MeshStandardMaterial({
-      color: disc.colour,
-      metalness: 0.9,
-      roughness: 0.3,
-    }),
+    skinMaterial(skin, skin.secondary),
   );
   discMesh.position.y = discY;
   discMesh.castShadow = true;
@@ -55,12 +53,9 @@ export function buildBeyMesh(build: BeyBuild): THREE.Group {
 
   // ---- layer: the contact ring, plus one blade per contact point ----------
   const layerY = discY + discHeight * 0.5 + r * 0.2;
-  const layerMat = new THREE.MeshStandardMaterial({
-    color: layer.colour,
-    metalness: 0.6,
-    roughness: 0.28,
-    emissive: new THREE.Color(layer.colour).multiplyScalar(0.18),
-  });
+  // The layer carries the skin's primary colour. Part identity is still
+  // readable from the blade count and silhouette, which the skin doesn't touch.
+  const layerMat = skinMaterial(skin, skin.primary);
 
   const core = new THREE.Mesh(
     new THREE.CylinderGeometry(r * 0.66, r * 0.78, r * 0.42, 24),
@@ -85,7 +80,7 @@ export function buildBeyMesh(build: BeyBuild): THREE.Group {
   const ring = new THREE.Mesh(
     new THREE.TorusGeometry(r, r * 0.05, 8, 40),
     new THREE.MeshBasicMaterial({
-      color: layer.colour,
+      color: skin.primary,
       transparent: true,
       opacity: 0.32,
     }),

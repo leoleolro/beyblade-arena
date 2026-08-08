@@ -2,6 +2,7 @@ import { AiController } from './ai';
 import { Audio } from './audio';
 import type { Difficulty } from './ai';
 import { ArenaRenderer } from './render/arena';
+import { pickContrastingSkin, skinById } from './render/skins';
 import { Battle } from './sim/battle';
 import type { Fighter } from './sim/battle';
 import * as C from './sim/constants';
@@ -37,6 +38,10 @@ export class Game {
   playerBuild: BeyBuild = DEFAULT_BUILD();
   /** +1 = right spin, -1 = left spin. A real strategic choice, see ai.ts. */
   playerSpinDir: 1 | -1 = 1;
+  /** Cosmetic only — skins never touch a stat. */
+  playerSkinId = 'frost';
+  /** Chosen to contrast with the player's, so the two tops can't be confused. */
+  rivalSkinId = 'ember';
   aiName = 'Rival';
   difficulty: Difficulty = 'blader';
 
@@ -91,6 +96,9 @@ export class Game {
   startMatch(): void {
     const pick = this.ai.chooseBuild(this.playerBuild);
     this.aiName = pick.name;
+    // Force a contrasting rival skin every match, so identification never
+    // depends on the player having picked sensibly.
+    this.rivalSkinId = pickContrastingSkin(skinById(this.playerSkinId)).id;
     this.battle = this.makeBattle(this.playerBuild, pick.build);
     this.toLaunch();
   }
@@ -123,7 +131,10 @@ export class Game {
     const aiLaunch = this.ai.chooseLaunch(aiBuild, playerAngle);
 
     this.battle.startRound({ [PLAYER_ID]: playerLaunch, [AI_ID]: aiLaunch });
-    this.renderer.setBeys(this.battle.beys, PLAYER_ID);
+    this.renderer.setBeys(this.battle.beys, {
+      [PLAYER_ID]: this.playerSkinId,
+      [AI_ID]: this.rivalSkinId,
+    });
     this.audio.resume();
     this.audio.launch(this.lockedPower);
     this.setScreen('battle');

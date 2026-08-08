@@ -192,20 +192,38 @@ The deeper lesson: rounds are decided by *contacts*, not by holding costs. An
 attrition model that ignored collisions predicted ~23 spin/s when the real
 figure was 120–260/s.
 
-## Telling the tops apart
+## Skins, and telling the tops apart
 
 Two similarly-coloured tops circling a dark dish at speed are genuinely hard to
 distinguish, and a player who loses track of their own top can't make any of the
-decisions the rest of the game is built on. Layer colour alone isn't enough,
-because both sides can pick similar layers.
+decisions the rest of the game is built on.
 
-Ownership therefore gets its own visual language, independent of the build:
+This was first solved with ownership markers — a bright ring drawn under your
+top. That worked, but it was a crutch: it told you which top was yours without
+the top itself being recognisable. Skins fix the underlying problem, so the
+markers are gone.
 
-- a **bright cyan ring and pulsing halo** on the dish under your top, plus a
-  floating chevron above it that lifts higher near the rim so it clears the wall
-- a **dim orange ring** for the rival — visible, but not competing for attention
-- the same two colours as a bar on the left of each HUD card, so card and top
-  are linked without reading anything
+Six skins, each a distinct hue and material finish:
+
+| Skin | Finish | Look |
+| --- | --- | --- |
+| Frost | glass | translucent, light refracts through it |
+| Ember | chrome | mirror-polished metal |
+| Venom | neon | strongly self-illuminated, readable in shadow |
+| Void | carbon | dark and matte with an inner glow |
+| Solar | chrome | polished gold |
+| Rose | matte | flat, no specular highlight |
+
+Skins are **purely cosmetic and never touch a stat**. A skin that changed
+gameplay would turn "which top do I like" into "which top wins", and the part
+triangle is where that decision is supposed to live.
+
+The part that actually replaces the markers is `pickContrastingSkin`: the rival
+is always given the skin furthest in hue from yours, so the two tops are
+guaranteed to be different colour families. Picking Venom (hue 145°) forces the
+rival to Rose (hue 330°) — a 175° separation out of a possible 180. Identification
+never depends on the player having chosen sensibly. The HUD cards are keyed to
+the same skin colour, so card and top are linked without reading anything.
 
 ## Sound
 
@@ -248,10 +266,8 @@ variance here creates *drama*, and is never attached to money, a purchase, or a
 
 ## Known gaps
 
-- **The ownership markers are a stopgap.** A fixed cyan ring is a crutch, not a
-  visual identity — the real answer is distinctive skins and silhouettes so tops
-  are told apart by what they *are*. The markers should not survive to launch in
-  their current form.
+- Skins vary colour and material but not **silhouette**. Blade count already
+  differs per layer; distinct shapes per skin would push identification further.
 - The AI reads moves but does not bluff, so a patient player can bait it.
 - The tutorial is explanatory, not interactive. A scripted round that forces
   each situation in turn would teach the triangle faster than reading it.
