@@ -74,6 +74,7 @@ function makeBey(f: Fighter, launch: LaunchParams): BeyState {
     hitFlash: 0,
     meter: 0,
     boost: 0,
+    age: 0,
   };
 }
 

@@ -42,6 +42,15 @@ function slopeAccel(r: number): number {
   return a;
 }
 
+/**
+ * How much collision damage a top can take yet, in [0, 1]. Ramps in over
+ * SETTLE_TIME with a smoothstep so the transition isn't a hard edge.
+ */
+export function settleScale(b: BeyState): number {
+  const t = clamp(b.age / C.SETTLE_TIME, 0, 1);
+  return t * t * (3 - 2 * t);
+}
+
 /** Normalised remaining spin in [0, 1]. */
 export const spinNorm = (b: BeyState): number =>
   clamp(Math.abs(b.spin) / C.SPIN_REF, 0, 1);
@@ -95,6 +104,7 @@ function integrate(b: BeyState, dt: number): void {
   b.tilt = clamp(speed * 0.06 + (1 - sn) * 0.22, 0, 0.42);
   b.burst = Math.max(0, b.burst - C.BURST_RECOVERY * dt);
   b.hitFlash = Math.max(0, b.hitFlash - dt * 3.5);
+  b.age += dt;
   b.boost = Math.max(0, b.boost - dt);
   b.meter = clamp(b.meter + C.METER_GAIN_PER_SEC * dt, 0, 1);
 }
@@ -212,18 +222,21 @@ function resolvePair(a: BeyState, b: BeyState): HitEvent | null {
   // Smash attack: spin biting at the contact point throws the other top
   // sideways. Each top pushes the other along the tangent, in the direction
   // its own spin is turning. This is what converts attack into ring-outs.
+  // Neither top can be hurt until both have settled. Taking the minimum means
+  // a top that has only just launched cannot be deleted by one that has been
+  // circling for a while.
+  const settle = Math.min(settleScale(a), settleScale(b));
+
   // A boosted top hits harder for as long as the boost lasts.
   const atkA = a.stats.attack * (a.boost > 0 ? C.BOOST_ATTACK_MUL : 1);
   const atkB = b.stats.attack * (b.boost > 0 ? C.BOOST_ATTACK_MUL : 1);
 
-  const smashA = Math.min(
-    C.SMASH_MAX,
-    C.SMASH_COEFF * spinNorm(a) * atkA * impact * invMassB,
-  );
-  const smashB = Math.min(
-    C.SMASH_MAX,
-    C.SMASH_COEFF * spinNorm(b) * atkB * impact * invMassA,
-  );
+  const smashA =
+    Math.min(C.SMASH_MAX, C.SMASH_COEFF * spinNorm(a) * atkA * impact * invMassB) *
+    settle;
+  const smashB =
+    Math.min(C.SMASH_MAX, C.SMASH_COEFF * spinNorm(b) * atkB * impact * invMassA) *
+    settle;
   b.vel.x += t.x * smashA * dirA;
   b.vel.y += t.y * smashA * dirA;
   a.vel.x -= t.x * smashB * dirB;
@@ -258,14 +271,14 @@ function resolvePair(a: BeyState, b: BeyState): HitEvent | null {
   // below the finish threshold on the same step and the round is a draw.
   const capA = a.spinAtLaunch * C.MAX_SPIN_LOSS_PER_HIT;
   const capB = b.spinAtLaunch * C.MAX_SPIN_LOSS_PER_HIT;
-  const lossA = Math.min(capA, drainOnA + recoilA);
-  const lossB = Math.min(capB, drainOnB + recoilB);
+  const lossA = Math.min(capA, drainOnA + recoilA) * settle;
+  const lossB = Math.min(capB, drainOnB + recoilB) * settle;
 
   a.spin = Math.max(0, Math.abs(a.spin) - lossA) * (dirA || 1);
   b.spin = Math.max(0, Math.abs(b.spin) - lossB) * (dirB || 1);
 
-  a.burst += (impact * C.BURST_PER_HIT * atkB * aggrB) / a.stats.burstResist;
-  b.burst += (impact * C.BURST_PER_HIT * atkA * aggrA) / b.stats.burstResist;
+  a.burst += ((impact * C.BURST_PER_HIT * atkB * aggrB) / a.stats.burstResist) * settle;
+  b.burst += ((impact * C.BURST_PER_HIT * atkA * aggrA) / b.stats.burstResist) * settle;
 
   // Landing a clash banks meter for both sides, weighted to the aggressor.
   a.meter = clamp(a.meter + C.METER_GAIN_PER_HIT * shareA, 0, 1);

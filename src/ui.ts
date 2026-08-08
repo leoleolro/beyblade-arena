@@ -133,8 +133,8 @@ export class Ui {
     const wrap = document.createElement('div');
     wrap.className = 'fighters';
 
-    const player = this.card('Your Bey', g.player, true);
-    const rival = this.card(g.aiName, g.rival, false);
+    const player = this.card('Your Bey', g.player, true, g.playerSpinDir);
+    const rival = this.card(g.aiName, g.rival, false, g.rivalSpinDir);
     this.live.playerCard = player;
     this.live.rivalCard = rival;
 
@@ -143,12 +143,18 @@ export class Ui {
     return wrap;
   }
 
-  private card(title: string, bey: BeyState | null, isPlayer: boolean): HTMLElement {
+  private card(
+    title: string,
+    bey: BeyState | null,
+    isPlayer: boolean,
+    spinDir: 1 | -1,
+  ): HTMLElement {
     const el = document.createElement('div');
     el.className = 'card';
     const build = bey?.build ?? this.game.playerBuild;
+    const spinLabel = spinDir === 1 ? '↻ right' : '↺ left';
     el.innerHTML = `
-      <h3>${escapeHtml(title)}</h3>
+      <h3>${escapeHtml(title)}<span class="spin-dir">${spinLabel}</span></h3>
       <p class="parts">${escapeHtml(build.layer.name)} · ${escapeHtml(build.disc.name)} · ${escapeHtml(build.driver.name)}</p>
       <div class="bar-label"><span>Spin</span><span class="spin-val">100%</span></div>
       <div class="bar"><i class="fill-spin" style="width:100%"></i></div>
@@ -301,6 +307,37 @@ export class Ui {
       <span>Spin retention <b>${s.spinRetention.toFixed(2)}</b></span>
       <span>Aggression <b>${s.wander.toFixed(2)}</b></span>`;
     panel.appendChild(stat);
+
+    // Spin direction. Measured, the two pairings play completely differently,
+    // so this is a real decision rather than a cosmetic toggle.
+    const spinRow = document.createElement('div');
+    spinRow.className = 'slot';
+    spinRow.innerHTML = '<h4>Spin direction — decides what kind of fight you get</h4>';
+    const spinChips = document.createElement('div');
+    spinChips.className = 'chips';
+    const spins: [1 | -1, string, string][] = [
+      [1, 'Right spin', 'clockwise'],
+      [-1, 'Left spin', 'counter-clockwise'],
+    ];
+    for (const [dir, label, note] of spins) {
+      const chip = document.createElement('button');
+      chip.className = 'chip' + (g.playerSpinDir === dir ? ' on' : '');
+      chip.innerHTML = `<span>${escapeHtml(label)}<br><small>${escapeHtml(note)}</small></span>`;
+      chip.addEventListener('click', () => {
+        g.playerSpinDir = dir;
+        this.render();
+      });
+      spinChips.appendChild(chip);
+    }
+    spinRow.appendChild(spinChips);
+    const spinNote = document.createElement('p');
+    spinNote.className = 'sub';
+    spinNote.style.margin = '10px 0 0';
+    spinNote.textContent =
+      'Match your rival’s spin for a quieter attrition race that stamina wins. ' +
+      'Oppose it for a longer run of violent exchanges where attack pays off.';
+    spinRow.appendChild(spinNote);
+    panel.appendChild(spinRow);
 
     const diffRow = document.createElement('div');
     diffRow.className = 'slot';

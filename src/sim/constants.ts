@@ -89,7 +89,7 @@ export const HIT_SPIN_RECOIL = 5.5;
  * Multiplier applied to spin loss when the two tops spin in opposite
  * directions. Opposite-spin clashes are violently draining in the real game.
  */
-export const OPPOSITE_SPIN_DRAIN = 1.6;
+export const OPPOSITE_SPIN_DRAIN = 2.2;
 /**
  * Ceiling on the spin a single clash can remove, as a fraction of launch spin.
  * Uncapped, one violent head-on in an opposite-spin matchup drains both tops
@@ -100,7 +100,7 @@ export const MAX_SPIN_LOSS_PER_HIT = 0.2;
  * Fraction of the attacker's spin converted into tangential launch force —
  * this is the "smash attack" that flings a defender across the stadium.
  */
-export const SMASH_COEFF = 0.7;
+export const SMASH_COEFF = 1.1;
 /**
  * Hard cap on the sideways velocity a single smash can impart. The smash scales
  * with impact speed, and without a ceiling one big head-on hit applies a
@@ -137,3 +137,17 @@ export const METER_GAIN_PER_HIT = 0.11;
 export const BOOST_DURATION = 2.2;
 export const BOOST_WANDER_MUL = 2.4;
 export const BOOST_ATTACK_MUL = 1.4;
+
+// ----------------------------------------------------------------- settle ---
+
+/**
+ * Seconds over which a freshly launched top ramps from taking no collision
+ * damage to taking full damage.
+ *
+ * Opposite-spin tops orbit in opposite directions, so they meet head-on within
+ * half an orbit at maximum closing speed. Measured without this ramp, the median
+ * round was 1.2s and 57% of rounds ended inside two seconds — the round was over
+ * before the player had read the board. The ramp lets both tops establish their
+ * orbits first; the first real clash still lands at full strength.
+ */
+export const SETTLE_TIME = 1.25;

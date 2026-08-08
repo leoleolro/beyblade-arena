@@ -109,6 +109,8 @@ export interface BeyState {
   meter: number;
   /** Seconds of boost remaining. Above 0 the top hunts and hits harder. */
   boost: number;
+  /** Seconds since this top was launched. Drives the settle ramp. */
+  age: number;
 }
 
 /** How a round ended. */

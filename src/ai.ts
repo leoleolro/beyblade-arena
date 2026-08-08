@@ -62,6 +62,22 @@ export class AiController {
   }
 
   /**
+   * Choose which way to spin.
+   *
+   * Measured, the two pairings play completely differently: same-spin runs
+   * ~8s and is decided by stamina, opposite-spin runs ~14s of repeated violent
+   * exchanges. Aggressive builds want the exchanges; stamina builds want the
+   * quiet attrition race they win by default.
+   */
+  chooseSpinDir(build: BeyBuild, playerSpinDir: 1 | -1): 1 | -1 {
+    const archetype = buildArchetype(build);
+    const wantOpposite =
+      archetype === 'attack' ? 0.85 : archetype === 'stamina' ? 0.15 : 0.5;
+    const opposite = this.rng() < wantOpposite;
+    return (opposite ? -playerSpinDir : playerSpinDir) as 1 | -1;
+  }
+
+  /**
    * Choose a launch. Aggressive builds want power above 1.0x orbital so they
    * ride the ridge; stamina builds want a slow launch that settles into the
    * safe centre.

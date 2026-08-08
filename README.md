@@ -77,6 +77,13 @@ a named constant in `src/sim/constants.ts`:
   top below orbital velocity, so they all dived to the centre and collided
   within a second. Launch power now controls orbit *shape*, which makes it a
   real decision rather than "more is better".
+- **`SETTLE_TIME`** — the worst defect found so far, and only visible once match
+  *pacing* was measured rather than round balance. The game forced every match
+  to be opposite-spin while the balance harness ran opposite-spin half the time,
+  so the harness reported a 9s median while players actually got **1.2s**, with
+  57% of rounds finished inside two seconds. Ramping collision damage in over
+  the first 1.25s lets both tops establish an orbit before anything can be
+  decided. Under-2s rounds fell to 8.6% and matches went from 2.6 to 4.3 rounds.
 
 ## Balance
 
@@ -93,9 +100,19 @@ and win rates:
 npx vitest run tuning --silent=false --disable-console-intercept
 ```
 
-Current spread across the six presets is roughly 31%–69%, with all four finish
+Current spread across the six presets is roughly 33%–63%, with all four finish
 types represented. `sim.test.ts` asserts no build exceeds 72% or falls below
 25%, so a balance regression fails the suite.
+
+`src/sim/pacing.test.ts` measures the other axis — how long a player actually
+sits in a match, which is not the same question as whether builds are balanced:
+
+```bash
+npx vitest run pacing --silent=false --disable-console-intercept
+```
+
+It reports round length by spin pairing, rounds per match, and total match time.
+Balance can look healthy while pacing is broken; that is exactly what happened.
 
 ## Layout
 
@@ -115,13 +132,26 @@ src/
 `sim/` has no dependency on `render/`, which is what makes the balance sweep
 possible: thousands of matches run headlessly in about a second.
 
+## Spin direction
+
+Spin direction is a real strategic choice, not a cosmetic one, because the two
+pairings measure completely differently:
+
+| Pairing | Median round | Rounds under 2s | Plays like |
+| --- | --- | --- | --- |
+| Same direction | 8.1s | 0.0% | quiet attrition race, stamina favoured |
+| Opposite direction | 14.2s | 8.6% | repeated violent exchanges, attack favoured |
+
+The rival picks its own direction from its archetype — aggressive builds seek
+the exchanges, stamina builds seek the attrition race — so the matchup is worth
+reading before you commit.
+
 ## Known gaps
 
-- Roughly a fifth of rounds end inside two seconds. These are genuine fast
-  knockouts in opposite-spin matchups — true to the real game — but a launch
-  grace period would soften the extremes if they feel abrupt.
-- Every match is deliberately an opposite-spin matchup (you spin right, the
-  rival spins left), because it's the most dramatic version of the model.
-  Same-spin matchups are supported by the sim but not currently reachable in the
-  UI.
+- The battle has one verb. Charge exists; a defensive counter and a repositioning
+  move would turn the round into a real-time contest rather than a cooldown.
+- No audio at all, which is likely the largest available gain in perceived
+  quality for the effort.
+- A round ends with its outcome but not its cause, so there is little to learn
+  from a loss.
 - Bundle is ~558 kB (143 kB gzipped), almost entirely Three.js.

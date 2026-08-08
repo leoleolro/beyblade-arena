@@ -27,6 +27,8 @@ export class Game {
   screen: Screen = 'garage';
 
   playerBuild: BeyBuild = DEFAULT_BUILD();
+  /** +1 = right spin, -1 = left spin. A real strategic choice, see ai.ts. */
+  playerSpinDir: 1 | -1 = 1;
   aiName = 'Rival';
   difficulty: Difficulty = 'blader';
 
@@ -34,6 +36,9 @@ export class Game {
   launchMeter = 0;
   /** Power the player locked in. */
   lockedPower = 0.8;
+
+  /** The rival's spin for this match, shown in the HUD. */
+  rivalSpinDir: 1 | -1 = -1;
 
   private ai = new AiController(AI_ID, 'blader');
   private renderer: ArenaRenderer;
@@ -51,11 +56,14 @@ export class Game {
   }
 
   private makeBattle(playerBuild: BeyBuild, aiBuild: BeyBuild): Battle {
+    // Both directions used to be hardcoded opposite. That guaranteed a head-on
+    // inside half an orbit and made the median round 1.2 seconds; now each side
+    // chooses, and the pairing is a genuine strategic dial.
+    const aiSpin = this.ai.chooseSpinDir(aiBuild, this.playerSpinDir);
+    this.rivalSpinDir = aiSpin;
     const fighters: Fighter[] = [
-      { id: PLAYER_ID, name: 'You', build: playerBuild, spinDir: 1 },
-      // The rival spins the other way, so every match is an opposite-spin
-      // matchup: fast, violent, and the most fun version of the model.
-      { id: AI_ID, name: this.aiName, build: aiBuild, spinDir: -1 },
+      { id: PLAYER_ID, name: 'You', build: playerBuild, spinDir: this.playerSpinDir },
+      { id: AI_ID, name: this.aiName, build: aiBuild, spinDir: aiSpin },
     ];
     return new Battle(fighters, { seed: (Math.random() * 2 ** 31) | 0 });
   }
