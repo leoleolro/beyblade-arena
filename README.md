@@ -187,9 +187,38 @@ The deeper lesson: rounds are decided by *contacts*, not by holding costs. An
 attrition model that ignored collisions predicted ~23 spin/s when the real
 figure was 120–260/s.
 
+## Telling the tops apart
+
+Two similarly-coloured tops circling a dark dish at speed are genuinely hard to
+distinguish, and a player who loses track of their own top can't make any of the
+decisions the rest of the game is built on. Layer colour alone isn't enough,
+because both sides can pick similar layers.
+
+Ownership therefore gets its own visual language, independent of the build:
+
+- a **bright cyan ring and pulsing halo** on the dish under your top, plus a
+  floating chevron above it that lifts higher near the rim so it clears the wall
+- a **dim orange ring** for the rival — visible, but not competing for attention
+- the same two colours as a bar on the left of each HUD card, so card and top
+  are linked without reading anything
+
+## Sound
+
+All synthesized in WebAudio (`src/audio.ts`) — no asset pipeline, nothing to
+download, and a hit's pitch tracks its actual impact strength rather than
+picking from a handful of samples. Launch rip, metal-on-metal impact, a
+continuous spin whine whose frequency follows remaining spin so the arena
+audibly winds down, a distinct cue per move so you can *hear* what your rival
+committed to, and round-end stings.
+
+Browsers refuse to start an AudioContext before a user gesture, so it resumes on
+the first real key press or click rather than at construction. Toggle it in the
+garage.
+
 ## Known gaps
 
-- No audio at all, which is likely the largest available gain in perceived
-  quality for the effort.
+- **No tutorial or home page.** The move names (Charge / Anchor / Slip) are not
+  self-explanatory, and nothing currently teaches the triangle or what beats
+  what. This is the biggest remaining onboarding gap.
 - The AI reads moves but does not bluff, so a patient player can bait it.
-- Bundle is ~558 kB (143 kB gzipped), almost entirely Three.js.
+- Bundle is ~570 kB (147 kB gzipped), almost entirely Three.js.

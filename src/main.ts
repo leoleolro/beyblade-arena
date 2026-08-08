@@ -27,6 +27,8 @@ const MOVE_KEYS: Record<string, MoveKind> = {
 
 window.addEventListener('keydown', (e) => {
   if (e.repeat) return;
+  // Any real key press counts as the gesture that unblocks audio.
+  game.audio.resume();
 
   if (e.code === 'Space' && game.screen === 'launch') {
     e.preventDefault();

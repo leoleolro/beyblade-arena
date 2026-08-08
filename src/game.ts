@@ -1,4 +1,5 @@
 import { AiController } from './ai';
+import { Audio } from './audio';
 import type { Difficulty } from './ai';
 import { ArenaRenderer } from './render/arena';
 import { Battle } from './sim/battle';
@@ -46,6 +47,15 @@ export class Game {
   private meterDir = 1;
   /** Seconds of hitstop freeze remaining. */
   private hitstop = 0;
+  /**
+   * Seconds left holding on the stadium after a round is decided, before the
+   * result panel covers it. The sim has already stopped by then, so this is not
+   * slow motion of the sim — the *renderer* is stepped at a reduced rate so the
+   * sparks and camera drift through the moment the player cares about.
+   */
+  private finishHold = 0;
+
+  readonly audio = new Audio();
   private running = false;
 
   private events: GameEvents;
@@ -84,6 +94,7 @@ export class Game {
   }
 
   private toLaunch(): void {
+    this.finishHold = 0;
     this.launchMeter = 0;
     this.meterDir = 1;
     this.setScreen('launch');
@@ -105,14 +116,19 @@ export class Game {
     const aiLaunch = this.ai.chooseLaunch(aiBuild, playerAngle);
 
     this.battle.startRound({ [PLAYER_ID]: playerLaunch, [AI_ID]: aiLaunch });
-    this.renderer.setBeys(this.battle.beys);
+    this.renderer.setBeys(this.battle.beys, PLAYER_ID);
+    this.audio.resume();
+    this.audio.launch(this.lockedPower);
     this.setScreen('battle');
   }
 
   /** Player used a move. Returns false if it couldn't be afforded. */
   useMove(kind: MoveKind): boolean {
     if (this.screen !== 'battle') return false;
-    return this.battle.activateMove(PLAYER_ID, kind);
+    const ok = this.battle.activateMove(PLAYER_ID, kind);
+    if (ok) this.audio.move(kind);
+    else this.audio.reject();
+    return ok;
   }
 
   /** Advance to the next round, or back to the garage if the match is done. */
@@ -175,18 +191,44 @@ export class Game {
       if (this.hitstop > 0) {
         this.hitstop = Math.max(0, this.hitstop - dt);
       } else {
+        const rivalMoveBefore = this.rival?.move ?? null;
         this.battle.update(dt);
         this.ai.update(this.battle, dt);
+
+        // Announce the rival's move so it can be heard as well as seen.
+        const rivalMoveAfter = this.rival?.move ?? null;
+        if (rivalMoveAfter && rivalMoveAfter !== rivalMoveBefore) {
+          this.audio.move(rivalMoveAfter);
+        }
+
         for (const h of this.battle.hits) {
+          this.audio.impact(h.strength, h.opposite);
           if (h.strength >= C.HITSTOP_THRESHOLD) this.hitstop = C.HITSTOP_DURATION;
         }
+        for (const b of this.battle.beys) {
+          this.audio.updateWhine(b.id, Math.abs(b.spin) / C.SPIN_REF, b.alive);
+        }
       }
-      if (this.battle.phase === 'round-over') this.setScreen('round-over');
-      else if (this.battle.phase === 'match-over') this.setScreen('match-over');
+
+      // The round is decided, but hold on the stadium for a beat first.
+      if (this.battle.phase !== 'battle' && this.finishHold <= 0) {
+        this.finishHold = C.FINISH_HOLD_TIME;
+        this.audio.roundEnd(this.battle.lastRound?.winnerId === PLAYER_ID);
+      }
+    }
+
+    if (this.finishHold > 0) {
+      this.finishHold = Math.max(0, this.finishHold - dt);
+      if (this.finishHold === 0) {
+        if (this.battle.phase === 'round-over') this.setScreen('round-over');
+        else if (this.battle.phase === 'match-over') this.setScreen('match-over');
+      }
     }
 
     // Keep drawing on every screen so the stadium is never a dead frame.
-    this.renderer.update(this.battle.beys, this.battle.hits, dt);
+    // During the finish hold the renderer runs slow; that is what sells it.
+    const renderDt = this.finishHold > 0 ? dt * C.FINISH_RENDER_SCALE : dt;
+    this.renderer.update(this.battle.beys, this.battle.hits, renderDt);
     this.events.onFrame();
     requestAnimationFrame(this.tick);
   };

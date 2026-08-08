@@ -179,8 +179,16 @@ export class Ui {
     el.className = 'card';
     const build = bey?.build ?? this.game.playerBuild;
     const spinLabel = spinDir === 1 ? '↻ right' : '↺ left';
+    // The swatch and the marker colour are the same on both sides, so the card
+    // and the top on the dish are linked without having to read anything.
+    const markerColour = isPlayer ? '#38bdf8' : '#f97316';
     el.innerHTML = `
-      <h3>${escapeHtml(title)}<span class="spin-dir">${spinLabel}</span></h3>
+      <h3>
+        <span class="who" style="--marker:${markerColour}">
+          <i class="swatch" style="background:${hex(build.layer.colour)}"></i>${escapeHtml(title)}
+        </span>
+        <span class="spin-dir">${spinLabel}</span>
+      </h3>
       <p class="parts">${escapeHtml(build.layer.name)} · ${escapeHtml(build.disc.name)} · ${escapeHtml(build.driver.name)}</p>
       <div class="bar-label"><span>Spin</span><span class="spin-val">100%</span></div>
       <div class="bar"><i class="fill-spin" style="width:100%"></i></div>
@@ -449,8 +457,23 @@ export class Ui {
     const go = document.createElement('button');
     go.className = 'primary';
     go.textContent = 'Enter the arena';
-    go.addEventListener('click', () => g.startMatch());
+    go.addEventListener('click', () => {
+      // First real gesture: browsers won't start an AudioContext before one.
+      g.audio.resume();
+      g.startMatch();
+    });
     row.appendChild(go);
+
+    const sound = document.createElement('button');
+    sound.className = 'chip';
+    const label = (): string => (g.audio.isMuted ? 'Sound off' : 'Sound on');
+    sound.innerHTML = `<span>${label()}</span>`;
+    sound.addEventListener('click', () => {
+      g.audio.resume();
+      g.audio.setMuted(!g.audio.isMuted);
+      sound.innerHTML = `<span>${label()}</span>`;
+    });
+    row.appendChild(sound);
     panel.appendChild(row);
 
     overlay.appendChild(panel);

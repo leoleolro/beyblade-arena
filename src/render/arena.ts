@@ -5,11 +5,15 @@ import type { HitEvent } from '../sim/physics';
 import type { BeyState } from '../sim/types';
 import { buildBeyMesh } from './beyMesh';
 import { SparkBurst, Trail } from './effects';
+import { buildMarker } from './marker';
+import type { Marker } from './marker';
 import { beyWorldPosition, buildStadium } from './stadium';
 
 interface BeyVisual {
   group: THREE.Group;
   trail: Trail;
+  /** Ownership marker: ring on the dish plus a pointer above. */
+  marker: Marker;
   /** Free-running precession phase, so wobble doesn't look mechanical. */
   wobblePhase: number;
 }
@@ -85,20 +89,31 @@ export class ArenaRenderer {
     this.scene.add(rimB);
   }
 
-  /** Rebuild the meshes for a new round. */
-  setBeys(beys: BeyState[]): void {
+  /**
+   * Rebuild the meshes for a new round. `playerId` gets the bright marker; two
+   * similarly-coloured tops on a dark dish are otherwise very easy to confuse.
+   */
+  setBeys(beys: BeyState[], playerId?: string): void {
     for (const v of this.visuals.values()) {
       this.beyRoot.remove(v.group);
       this.beyRoot.remove(v.trail.line);
+      this.beyRoot.remove(v.marker.group);
     }
     this.visuals.clear();
 
     for (const b of beys) {
       const group = buildBeyMesh(b.build);
       const trail = new Trail(b.build.layer.colour);
+      const marker = buildMarker(b.id === playerId, b.stats.radius);
       this.beyRoot.add(group);
       this.beyRoot.add(trail.line);
-      this.visuals.set(b.id, { group, trail, wobblePhase: Math.random() * Math.PI * 2 });
+      this.beyRoot.add(marker.group);
+      this.visuals.set(b.id, {
+        group,
+        trail,
+        marker,
+        wobblePhase: Math.random() * Math.PI * 2,
+      });
     }
   }
 
@@ -115,12 +130,17 @@ export class ArenaRenderer {
         v.group.position.y -= dt * 1.6;
         v.group.rotation.z += dt * 4;
         v.trail.setVisible(false);
+        v.marker.group.visible = false;
         if (v.group.position.y < -1.5) v.group.visible = false;
         continue;
       }
 
       const p = beyWorldPosition(b.pos.x, b.pos.y);
       v.group.position.copy(p);
+
+      v.marker.group.visible = true;
+      v.marker.group.position.copy(p);
+      v.marker.update(dt, Math.hypot(b.pos.x, b.pos.y));
 
       // Spin about its own axis.
       v.group.rotation.y = b.angle;

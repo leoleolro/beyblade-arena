@@ -267,3 +267,11 @@ export const HITSTOP_DURATION = 0.09;
  * orbits first; the first real clash still lands at full strength.
  */
 export const SETTLE_TIME = 1.25;
+
+/**
+ * The finish. When a round is decided the result panel used to appear on the
+ * same frame, covering the stadium before the player saw the blow that ended
+ * it. Hold on the arena first, with the renderer stepped slowly.
+ */
+export const FINISH_HOLD_TIME = 1.15;
+export const FINISH_RENDER_SCALE = 0.35;
