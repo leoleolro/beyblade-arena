@@ -5,7 +5,7 @@ import { Battle } from './sim/battle';
 import type { Fighter } from './sim/battle';
 import * as C from './sim/constants';
 import { DEFAULT_BUILD } from './sim/parts';
-import type { BeyBuild, LaunchParams } from './sim/types';
+import type { BeyBuild, LaunchParams, MoveKind } from './sim/types';
 
 /** Screens the player moves through. */
 export type Screen = 'garage' | 'launch' | 'battle' | 'round-over' | 'match-over';
@@ -44,6 +44,8 @@ export class Game {
   private renderer: ArenaRenderer;
   private lastTime = 0;
   private meterDir = 1;
+  /** Seconds of hitstop freeze remaining. */
+  private hitstop = 0;
   private running = false;
 
   private events: GameEvents;
@@ -107,10 +109,10 @@ export class Game {
     this.setScreen('battle');
   }
 
-  /** Player pressed the boost key. */
-  boost(): boolean {
+  /** Player used a move. Returns false if it couldn't be afforded. */
+  useMove(kind: MoveKind): boolean {
     if (this.screen !== 'battle') return false;
-    return this.battle.activateBoost(PLAYER_ID);
+    return this.battle.activateMove(PLAYER_ID, kind);
   }
 
   /** Advance to the next round, or back to the garage if the match is done. */
@@ -167,8 +169,18 @@ export class Game {
     }
 
     if (this.screen === 'battle') {
-      this.battle.update(dt);
-      this.ai.update(this.battle);
+      // Hitstop: freeze the simulation for a beat on a heavy clash. This lives
+      // here rather than in the sim so the sim stays deterministic — a replay
+      // re-simulates without it and reaches the same result.
+      if (this.hitstop > 0) {
+        this.hitstop = Math.max(0, this.hitstop - dt);
+      } else {
+        this.battle.update(dt);
+        this.ai.update(this.battle, dt);
+        for (const h of this.battle.hits) {
+          if (h.strength >= C.HITSTOP_THRESHOLD) this.hitstop = C.HITSTOP_DURATION;
+        }
+      }
       if (this.battle.phase === 'round-over') this.setScreen('round-over');
       else if (this.battle.phase === 'match-over') this.setScreen('match-over');
     }

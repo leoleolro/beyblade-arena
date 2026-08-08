@@ -123,20 +123,136 @@ export const POINTS_TO_WIN = 4;
 /** A round is declared a draw after this many seconds. */
 export const ROUND_TIME_LIMIT = 75;
 
-// ------------------------------------------------------------------ boost ---
+// ------------------------------------------------------------------ moves ---
 
 /**
- * The launch is the only decision in a real Beyblade match, which makes for a
- * poor game. The boost meter gives the player something to do while the round
- * plays out: bank charge, then spend it to drive your top at the opponent.
+ * The battle move set.
+ *
+ * The launch used to be the only decision in a round, which made the battle
+ * something you watched rather than played. These three moves give the player a
+ * real-time layer, and they beat each other in a triangle:
+ *
+ *   Charge beats Slip   — a slipping top can't outrun a seeking one, and its
+ *                         raised knockback means it gets flung toward a pocket
+ *   Anchor beats Charge — the charger is committed and takes the recoil, while
+ *                         the anchor barely moves and shrugs off burst charge
+ *   Slip   beats Anchor — an anchor can't catch anything and bleeds spin fast,
+ *                         so refusing the engagement wins by denial
+ *
+ * Nothing here special-cases a matchup. The triangle is a *consequence* of the
+ * modifiers below, which means it also holds against builds and situations we
+ * never explicitly considered.
  */
+export interface MoveProfile {
+  /** Seconds the move stays active. */
+  duration: number;
+  /** Meter spent, out of a full 1.0. */
+  cost: number;
+  /** Multiplier on the driver's self-propulsion — how hard it seeks. */
+  wander: number;
+  /** Multiplier on tip friction. */
+  friction: number;
+  /** Multiplier on damage dealt. */
+  attack: number;
+  /** Multiplier on defense, so higher means less damage taken. */
+  defense: number;
+  /** Multiplier on burst resistance. */
+  burstResist: number;
+  /** Multiplier on the collision impulse received. */
+  knockback: number;
+  /** Extra spin lost per second while active — the cost of holding the move. */
+  spinDrain: number;
+  /** One-off tangential speed added the instant the move fires. */
+  speedKick: number;
+  /**
+   * Multiplier on spin retention while the move is active.
+   *
+   * A free-running tip genuinely scrubs the floor less and holds its spin
+   * longer. Without this, fleeing always cost more spin than sitting still, so
+   * Slip could never win an attrition race against Anchor by denial.
+   */
+  spinRetention: number;
+  /**
+   * Fraction of incoming spin damage returned to the attacker.
+   *
+   * Without this, blocking costs the blocker everything and the attacker
+   * nothing, so Anchor could never beat Charge and the triangle collapsed into
+   * a strict ordering. A rigid, low-knockback target genuinely does return more
+   * energy to whatever hits it.
+   */
+  reflect: number;
+}
+
+export const MOVES: Record<'charge' | 'anchor' | 'slip', MoveProfile> = {
+  charge: {
+    duration: 2.2,
+    cost: 1.0,
+    wander: 2.4,
+    friction: 1.0,
+    attack: 1.45,
+    defense: 0.7,
+    burstResist: 0.8,
+    knockback: 1.0,
+    spinDrain: 4,
+    speedKick: 0,
+    spinRetention: 0.95,
+    reflect: 0,
+  },
+  anchor: {
+    duration: 2.0,
+    cost: 0.65,
+    wander: 0.08,
+    friction: 2.2,
+    attack: 0.35,
+    defense: 2.4,
+    burstResist: 2.2,
+    knockback: 0.35,
+    spinDrain: 19,
+    speedKick: 0,
+    spinRetention: 1.0,
+    reflect: 1.9,
+  },
+  slip: {
+    duration: 1.6,
+    cost: 0.45,
+    wander: 0.5,
+    friction: 0.45,
+    attack: 0.4,
+    defense: 2.0,
+    burstResist: 1.3,
+    knockback: 1.1,
+    spinDrain: 0,
+    speedKick: 1.6,
+    spinRetention: 2.0,
+    reflect: 0,
+  },
+};
+
+/** Meter gained per second of the round. */
 export const METER_GAIN_PER_SEC = 0.145;
 /** Landing a clash banks extra charge, rewarding aggression. */
 export const METER_GAIN_PER_HIT = 0.11;
-/** Seconds a boost lasts once spent. */
-export const BOOST_DURATION = 2.2;
-export const BOOST_WANDER_MUL = 2.4;
-export const BOOST_ATTACK_MUL = 1.4;
+
+/**
+ * Ceiling on speed immediately after Slip's kick, and how much of that kick is
+ * aimed at the stadium centre rather than straight ahead.
+ *
+ * Measured without these, a repeatedly-slipping top accelerated until it either
+ * hammered the wall or flew out a pocket — a third of all Slip losses were
+ * self-inflicted knockouts. Disengaging should mean retreating to safety, not
+ * rocketing forward.
+ */
+export const SLIP_MAX_SPEED = 3.6;
+export const SLIP_INWARD_BIAS = 0.55;
+/** How much of the escape aims directly away from the opponent. */
+export const SLIP_AWAY_BIAS = 0.6;
+/** Past this radius the escape is redirected inward instead of outward. */
+export const SLIP_SAFE_RADIUS = 0.72;
+
+/** Impact strength above which the presentation layer freezes for hitstop. */
+export const HITSTOP_THRESHOLD = 1.6;
+/** Seconds of freeze on a heavy clash. */
+export const HITSTOP_DURATION = 0.09;
 
 // ----------------------------------------------------------------- settle ---
 

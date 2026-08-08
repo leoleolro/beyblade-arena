@@ -7,6 +7,7 @@ import type {
   BeyBuild,
   BeyState,
   Defeat,
+  MoveKind,
   LaunchParams,
   Phase,
   RoundResult,
@@ -73,8 +74,13 @@ function makeBey(f: Fighter, launch: LaunchParams): BeyState {
     defeat: null,
     hitFlash: 0,
     meter: 0,
-    boost: 0,
+    move: null,
+    moveTime: 0,
     age: 0,
+    hitsLanded: 0,
+    spinDealt: 0,
+    biggestHit: 0,
+    movesUsed: 0,
   };
 }
 
@@ -201,15 +207,68 @@ export class Battle {
   }
 
   /**
-   * Spend a full meter to boost a top. Returns false if the meter wasn't full,
-   * so the UI can play a rejection cue rather than silently eating the input.
+   * Spend meter on a move. Returns false when it can't be afforded or another
+   * move is already running, so the UI can play a rejection cue rather than
+   * silently eating the input.
    */
-  activateBoost(id: string): boolean {
+  activateMove(id: string, kind: MoveKind): boolean {
     const bey = this.beys.find((b) => b.id === id);
-    if (!bey || !bey.alive || bey.meter < 1 || bey.boost > 0) return false;
-    bey.meter = 0;
-    bey.boost = C.BOOST_DURATION;
+    if (!bey || !bey.alive || bey.moveTime > 0) return false;
+
+    const profile = C.MOVES[kind];
+    if (bey.meter < profile.cost) return false;
+
+    bey.meter -= profile.cost;
+    bey.move = kind;
+    bey.moveTime = profile.duration;
+    bey.movesUsed += 1;
+
+    if (profile.speedKick > 0) this.applyEscapeKick(bey, profile.speedKick);
     return true;
+  }
+
+  /**
+   * Slip's disengage. The kick is aimed away from the nearest opponent, not
+   * simply forward and not toward the centre — an anchored top *sits* in the
+   * centre, so biasing inward drove the escaping top straight back into it.
+   *
+   * Near the rim the direction is blended inward instead, because an uncapped
+   * outward escape rang the top out on its own kick.
+   */
+  private applyEscapeKick(bey: BeyState, kick: number): void {
+    const speed = Math.hypot(bey.vel.x, bey.vel.y);
+    let dx = speed > 1e-6 ? bey.vel.x / speed : 1;
+    let dy = speed > 1e-6 ? bey.vel.y / speed : 0;
+
+    const foe = this.beys.find((o) => o !== bey && o.alive);
+    if (foe) {
+      const ax = bey.pos.x - foe.pos.x;
+      const ay = bey.pos.y - foe.pos.y;
+      const alen = Math.hypot(ax, ay);
+      if (alen > 1e-6) {
+        const k = C.SLIP_AWAY_BIAS;
+        dx = dx * (1 - k) + (ax / alen) * k;
+        dy = dy * (1 - k) + (ay / alen) * k;
+      }
+    }
+
+    // Don't escape into a pocket.
+    const r = Math.hypot(bey.pos.x, bey.pos.y);
+    if (r > C.SLIP_SAFE_RADIUS) {
+      const k = C.SLIP_INWARD_BIAS;
+      dx = dx * (1 - k) + (-bey.pos.x / r) * k;
+      dy = dy * (1 - k) + (-bey.pos.y / r) * k;
+    }
+
+    const dlen = Math.hypot(dx, dy) || 1;
+    bey.vel.x += (dx / dlen) * kick;
+    bey.vel.y += (dy / dlen) * kick;
+
+    const after = Math.hypot(bey.vel.x, bey.vel.y);
+    if (after > C.SLIP_MAX_SPEED) {
+      bey.vel.x = (bey.vel.x / after) * C.SLIP_MAX_SPEED;
+      bey.vel.y = (bey.vel.y / after) * C.SLIP_MAX_SPEED;
+    }
   }
 
   /** Retire any top that has been knocked out, burst, or run out of spin. */

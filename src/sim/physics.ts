@@ -42,6 +42,26 @@ function slopeAccel(r: number): number {
   return a;
 }
 
+/** The modifiers for a top's active move, or neutral values if it has none. */
+export function moveProfile(b: BeyState): C.MoveProfile {
+  return b.move ? C.MOVES[b.move] : NEUTRAL_MOVE;
+}
+
+const NEUTRAL_MOVE: C.MoveProfile = {
+  duration: 0,
+  cost: 0,
+  wander: 1,
+  friction: 1,
+  attack: 1,
+  defense: 1,
+  burstResist: 1,
+  knockback: 1,
+  spinDrain: 0,
+  speedKick: 0,
+  spinRetention: 1,
+  reflect: 0,
+};
+
 /**
  * How much collision damage a top can take yet, in [0, 1]. Ramps in over
  * SETTLE_TIME with a smoothstep so the transition isn't a hard edge.
@@ -65,10 +85,10 @@ function integrate(b: BeyState, dt: number): void {
   const accel = vec(outward.x * slopeAccel(r), outward.y * slopeAccel(r));
 
   // 3. driver self-propulsion: aggressive tips climb outward toward the ridge
-  //    and lose that push as they run out of spin. A spent boost multiplies it,
-  //    which is what makes the top visibly charge at its opponent.
-  const boosting = b.boost > 0;
-  const drive = b.stats.wander * sn * sn * 2.6 * (boosting ? C.BOOST_WANDER_MUL : 1);
+  //    and lose that push as they run out of spin. The active move scales this,
+  //    which is what makes a charging top visibly hunt and an anchored one sit.
+  const mv = moveProfile(b);
+  const drive = b.stats.wander * sn * sn * 2.6 * mv.wander;
   accel.x += outward.x * drive;
   accel.y += outward.y * drive;
 
@@ -83,7 +103,7 @@ function integrate(b: BeyState, dt: number): void {
   b.vel.y = rotated.y;
 
   // 4. drag from the tip scrubbing the floor
-  const drag = C.DRAG_BASE * b.stats.friction;
+  const drag = C.DRAG_BASE * b.stats.friction * mv.friction;
   const damp = Math.exp(-drag * dt);
   b.vel.x *= damp;
   b.vel.y *= damp;
@@ -93,9 +113,16 @@ function integrate(b: BeyState, dt: number): void {
 
   // spin decay: passive loss plus loss from moving across the floor
   const speed = len(b.vel);
+  // Holding a move costs spin. Anchor's high cost is exactly why refusing the
+  // engagement (Slip) beats it: it bleeds itself dry waiting for contact.
+  // The move's friction scales the scrubbing term as well as the drag. Missing
+  // this made Slip's free-running tip lose *more* spin than an anchored one,
+  // which is backwards and broke the triangle.
   const loss =
-    (C.SPIN_DECAY_BASE + C.SPIN_DECAY_MOTION * speed * b.stats.friction) /
-    b.stats.spinRetention;
+    (C.SPIN_DECAY_BASE +
+      C.SPIN_DECAY_MOTION * speed * b.stats.friction * mv.friction) /
+      (b.stats.spinRetention * mv.spinRetention) +
+    mv.spinDrain;
   const mag = Math.max(0, Math.abs(b.spin) - loss * dt);
   b.spin = mag * Math.sign(b.spin);
 
@@ -105,8 +132,11 @@ function integrate(b: BeyState, dt: number): void {
   b.burst = Math.max(0, b.burst - C.BURST_RECOVERY * dt);
   b.hitFlash = Math.max(0, b.hitFlash - dt * 3.5);
   b.age += dt;
-  b.boost = Math.max(0, b.boost - dt);
   b.meter = clamp(b.meter + C.METER_GAIN_PER_SEC * dt, 0, 1);
+  if (b.moveTime > 0) {
+    b.moveTime = Math.max(0, b.moveTime - dt);
+    if (b.moveTime === 0) b.move = null;
+  }
 }
 
 /** Angular centre of each exit pocket, radians. */
@@ -204,11 +234,15 @@ function resolvePair(a: BeyState, b: BeyState): HitEvent | null {
   // Normal impulse.
   const invMassA = 1 / a.stats.mass;
   const invMassB = 1 / b.stats.mass;
+  // Knockback resistance is per-move: an anchored top barely moves, which is
+  // what lets it absorb a charge instead of being flung by it.
+  const mvA = moveProfile(a);
+  const mvB = moveProfile(b);
   const j = (-(1 + C.RESTITUTION) * vn) / (invMassA + invMassB);
-  a.vel.x -= j * invMassA * n.x;
-  a.vel.y -= j * invMassA * n.y;
-  b.vel.x += j * invMassB * n.x;
-  b.vel.y += j * invMassB * n.y;
+  a.vel.x -= j * invMassA * n.x * mvA.knockback;
+  a.vel.y -= j * invMassA * n.y * mvA.knockback;
+  b.vel.x += j * invMassB * n.x * mvB.knockback;
+  b.vel.y += j * invMassB * n.y * mvB.knockback;
 
   const impact = Math.abs(vn);
   const dirA = Math.sign(a.spin);
@@ -227,16 +261,20 @@ function resolvePair(a: BeyState, b: BeyState): HitEvent | null {
   // circling for a while.
   const settle = Math.min(settleScale(a), settleScale(b));
 
-  // A boosted top hits harder for as long as the boost lasts.
-  const atkA = a.stats.attack * (a.boost > 0 ? C.BOOST_ATTACK_MUL : 1);
-  const atkB = b.stats.attack * (b.boost > 0 ? C.BOOST_ATTACK_MUL : 1);
+  // Moves scale what each side deals and absorbs.
+  const atkA = a.stats.attack * mvA.attack;
+  const atkB = b.stats.attack * mvB.attack;
+  const burstResA = a.stats.burstResist * mvA.burstResist;
+  const burstResB = b.stats.burstResist * mvB.burstResist;
 
   const smashA =
     Math.min(C.SMASH_MAX, C.SMASH_COEFF * spinNorm(a) * atkA * impact * invMassB) *
-    settle;
+    settle *
+    mvB.knockback;
   const smashB =
     Math.min(C.SMASH_MAX, C.SMASH_COEFF * spinNorm(b) * atkB * impact * invMassA) *
-    settle;
+    settle *
+    mvA.knockback;
   b.vel.x += t.x * smashA * dirA;
   b.vel.y += t.y * smashA * dirA;
   a.vel.x -= t.x * smashB * dirB;
@@ -260,6 +298,9 @@ function resolvePair(a: BeyState, b: BeyState): HitEvent | null {
   const aggrA = 0.5 + shareA;
   const aggrB = 0.5 + shareB;
 
+  // Raw drain uses the *build's* defense only. The move's defensive multiplier
+  // is applied after the per-hit cap below — applied before it, a big hit blew
+  // past the ceiling anyway and a full-meter Anchor bought a 9% reduction.
   const drainOnB =
     ((impact * C.HIT_SPIN_LOSS * atkA * aggrA) / b.stats.defense) * oppMul;
   const drainOnA =
@@ -271,18 +312,41 @@ function resolvePair(a: BeyState, b: BeyState): HitEvent | null {
   // below the finish threshold on the same step and the round is a draw.
   const capA = a.spinAtLaunch * C.MAX_SPIN_LOSS_PER_HIT;
   const capB = b.spinAtLaunch * C.MAX_SPIN_LOSS_PER_HIT;
-  const lossA = Math.min(capA, drainOnA + recoilA) * settle;
-  const lossB = Math.min(capB, drainOnB + recoilB) * settle;
+  // Cap the raw exchange, then let the defensive move mitigate what's left.
+  const rawA = Math.min(capA, drainOnA + recoilA) * settle;
+  const rawB = Math.min(capB, drainOnB + recoilB) * settle;
+  const lossA = rawA / mvA.defense;
+  const lossB = rawB / mvB.defense;
 
-  a.spin = Math.max(0, Math.abs(a.spin) - lossA) * (dirA || 1);
-  b.spin = Math.max(0, Math.abs(b.spin) - lossB) * (dirB || 1);
+  // Anchored tops return part of the hit to whoever threw it — but only in
+  // proportion to how much that top was actually charging in. Applying it flat
+  // punished a disengaging top for being bumped, which is what stopped Slip
+  // from ever beating Anchor.
+  // Reflect scales off the hit the *blocker absorbed*, not off the damage the
+  // attacker happened to take — an anchored top deals almost nothing, so
+  // measuring it the other way round made the punish vanish. Scaled by the
+  // attacker's own aggression, so only a top that charged in gets stung.
+  const reflectToA = rawB * mvB.reflect * shareA;
+  const reflectToB = rawA * mvA.reflect * shareB;
 
-  a.burst += ((impact * C.BURST_PER_HIT * atkB * aggrB) / a.stats.burstResist) * settle;
-  b.burst += ((impact * C.BURST_PER_HIT * atkA * aggrA) / b.stats.burstResist) * settle;
+  a.spin = Math.max(0, Math.abs(a.spin) - lossA - reflectToA) * (dirA || 1);
+  b.spin = Math.max(0, Math.abs(b.spin) - lossB - reflectToB) * (dirB || 1);
+
+  a.burst += ((impact * C.BURST_PER_HIT * atkB * aggrB) / burstResA) * settle;
+  b.burst += ((impact * C.BURST_PER_HIT * atkA * aggrA) / burstResB) * settle;
 
   // Landing a clash banks meter for both sides, weighted to the aggressor.
   a.meter = clamp(a.meter + C.METER_GAIN_PER_HIT * shareA, 0, 1);
   b.meter = clamp(b.meter + C.METER_GAIN_PER_HIT * shareB, 0, 1);
+
+  // Round-breakdown bookkeeping: the aggressor is credited with the hit, and
+  // each side is credited with the spin it actually removed.
+  a.spinDealt += lossB;
+  b.spinDealt += lossA;
+  if (shareA >= 0.5) a.hitsLanded += 1;
+  else b.hitsLanded += 1;
+  a.biggestHit = Math.max(a.biggestHit, impact);
+  b.biggestHit = Math.max(b.biggestHit, impact);
 
   a.hitFlash = 1;
   b.hitFlash = 1;

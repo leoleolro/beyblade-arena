@@ -24,9 +24,11 @@ npx vitest run
 
 | Screen | Key | Action |
 | --- | --- | --- |
-| Garage | mouse | pick parts and rival difficulty |
+| Garage | mouse | pick parts, spin direction, and rival difficulty |
 | Launch | `Space` | stop the meter — green zone is the widest, most aggressive orbit |
-| Battle | `Space` | spend a full boost meter to charge your rival |
+| Battle | `Space` | **Charge** — hunt and hit hard (costs a full meter) |
+| Battle | `A` | **Anchor** — absorb a hit and punish the attacker (65%) |
+| Battle | `S` | **Slip** — break away and conserve spin (45%) |
 
 Rounds are won by ring-out or burst (2 points) or by outlasting your rival
 (1 point). First to 4 takes the match.
@@ -146,12 +148,48 @@ The rival picks its own direction from its archetype — aggressive builds seek
 the exchanges, stamina builds seek the attrition race — so the matchup is worth
 reading before you commit.
 
+## The move triangle
+
+The three battle moves beat each other in a cycle, and that cycle is a
+*consequence* of physical modifiers rather than a special-cased lookup — which
+means it also holds against builds and situations never explicitly considered.
+
+| Matchup | Win rate | Why |
+| --- | --- | --- |
+| Charge beats Slip | 62.3% | a fleeing top can't outrun a seeking one |
+| Anchor beats Charge | 57.9% | the charger is committed and eats the reflected hit |
+| Slip beats Anchor | 56.7% | an anchor can't catch anything and bleeds spin waiting |
+
+`src/sim/moves.test.ts` measures every leg with identical builds on both sides,
+so any difference is down to the moves alone, and fails if a leg inverts.
+
+Getting this to hold surfaced four real bugs, all of which are now named
+constants or comments in the source:
+
+- **The per-hit damage cap was neutering defense.** `MAX_SPIN_LOSS_PER_HIT`
+  clamps a hit to 20% of launch spin, and big hits blew past that ceiling
+  *before* defense applied — so a full-meter Anchor bought a 9% reduction. The
+  cap is now a limit on the raw exchange, with the defensive move mitigating on
+  top of it.
+- **Reflected damage scaled off the wrong number** — the damage the attacker
+  took rather than the hit the blocker absorbed. Since an anchored top deals
+  almost nothing, the punish vanished.
+- **Reflect punished the wrong top.** Applied flat, it hurt anyone who touched
+  an anchor, including a disengaging top that got bumped. It now scales with the
+  attacker's own aggression: you only get hurt by a wall if you ran into it.
+- **Slip was killing itself.** Its escape kick fired forward with almost no drag
+  to remove it, so a repeatedly-slipping top accelerated until it hit the wall
+  or flew out a pocket — a third of all Slip losses were self-inflicted
+  knockouts. The kick now aims away from the opponent, is redirected inward near
+  the rim, and is speed-capped.
+
+The deeper lesson: rounds are decided by *contacts*, not by holding costs. An
+attrition model that ignored collisions predicted ~23 spin/s when the real
+figure was 120–260/s.
+
 ## Known gaps
 
-- The battle has one verb. Charge exists; a defensive counter and a repositioning
-  move would turn the round into a real-time contest rather than a cooldown.
 - No audio at all, which is likely the largest available gain in perceived
   quality for the effort.
-- A round ends with its outcome but not its cause, so there is little to learn
-  from a loss.
+- The AI reads moves but does not bluff, so a patient player can bait it.
 - Bundle is ~558 kB (143 kB gzipped), almost entirely Three.js.

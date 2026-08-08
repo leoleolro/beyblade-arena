@@ -187,22 +187,172 @@ button,
   opacity: 0.45;
 }
 
-.boost-hint {
-  margin-top: 4px;
+/* What the rival is doing right now — you can't counter what you can't see. */
+.rival-move {
+  margin-top: 6px;
+  height: 16px;
   font-size: 11px;
-  letter-spacing: 0.06em;
-  color: var(--dim);
+  font-weight: 700;
+  letter-spacing: 0.14em;
   text-align: center;
+  color: transparent;
+  transition: color 90ms linear;
 }
 
-.boost-hint.ready {
-  color: #fde047;
+.rival-move.on.charge { color: var(--danger); }
+.rival-move.on.anchor { color: var(--accent); }
+.rival-move.on.slip { color: var(--good); }
+
+/* ------------------------------------------------------------------ moves */
+
+.moves {
+  position: absolute;
+  left: 50%;
+  bottom: 26px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+}
+
+.move {
+  position: relative;
+  width: 146px;
+  padding: 9px 12px 11px;
+  border-radius: 11px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  backdrop-filter: blur(8px);
+  color: var(--dim);
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas:
+    'key name'
+    'key blurb';
+  gap: 0 9px;
+  text-align: left;
+  transition: all 110ms ease;
+}
+
+.move-key {
+  grid-area: key;
+  align-self: center;
+  font-family: ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  padding: 3px 6px;
+  border-radius: 5px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.move-name {
+  grid-area: name;
+  font-size: 13px;
   font-weight: 700;
+  color: var(--text);
 }
 
-.boost-hint.active {
+.move-blurb {
+  grid-area: blurb;
+  font-size: 10px;
+  letter-spacing: 0.02em;
+}
+
+/* Cost sits top-right as a small numeric badge. */
+.move-cost {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+  color: var(--dim);
+  opacity: 0.7;
+}
+
+.move-timer {
+  position: absolute;
+  bottom: 4px;
+  right: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
   color: var(--good);
-  font-weight: 700;
+}
+
+.move.ready {
+  border-color: rgba(250, 204, 21, 0.55);
+  color: var(--text);
+}
+
+.move.ready:hover {
+  background: rgba(250, 204, 21, 0.12);
+}
+
+.move.locked {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.move.busy {
+  opacity: 0.5;
+}
+
+.move.active {
+  border-color: var(--good);
+  background: rgba(34, 197, 94, 0.16);
+  color: var(--text);
+  box-shadow: 0 0 16px rgba(34, 197, 94, 0.3);
+}
+
+/* Fires when a move is pressed but can't be afforded, so the input isn't
+   silently swallowed. */
+.move.reject {
+  animation: reject 260ms ease;
+}
+
+@keyframes reject {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); border-color: var(--danger); }
+  75% { transform: translateX(4px); border-color: var(--danger); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .move.reject { animation: none; border-color: var(--danger); }
+}
+
+/* -------------------------------------------------------------- breakdown */
+
+.breakdown {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 4px 0 20px;
+  font-size: 13px;
+}
+
+.breakdown th {
+  text-align: right;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--dim);
+  font-weight: 400;
+  padding-bottom: 7px;
+  border-bottom: 1px solid var(--line);
+}
+
+.breakdown th:first-child { text-align: left; }
+
+.breakdown td {
+  padding: 6px 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  border-bottom: 1px solid rgba(120, 160, 220, 0.09);
+}
+
+.breakdown td:first-child {
+  text-align: left;
+  color: var(--dim);
 }
 
 /* ------------------------------------------------------------ launch meter */
@@ -210,7 +360,7 @@ button,
 .launch {
   position: absolute;
   left: 50%;
-  bottom: 150px;
+  bottom: 160px;
   transform: translateX(-50%);
   width: min(520px, 82vw);
   text-align: center;
@@ -428,4 +578,14 @@ button.primary:hover {
   .launch {
     bottom: 300px;
   }
+  .moves {
+    bottom: 8px;
+    gap: 6px;
+  }
+  .move {
+    width: auto;
+    flex: 1 1 0;
+    padding: 7px 8px 9px;
+  }
+  .move-blurb { display: none; }
 }

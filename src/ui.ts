@@ -2,7 +2,7 @@ import type { Game } from './game';
 import type { Difficulty } from './ai';
 import { DISCS, DRIVERS, LAYERS, deriveStats } from './sim/parts';
 import * as C from './sim/constants';
-import type { BeyState } from './sim/types';
+import type { BeyState, MoveKind } from './sim/types';
 
 const hex = (n: number): string => `#${n.toString(16).padStart(6, '0')}`;
 const pct = (n: number): string => `${Math.round(Math.max(0, Math.min(1, n)) * 100)}%`;
@@ -25,10 +25,11 @@ export class Ui {
     playerCard?: HTMLElement;
     rivalCard?: HTMLElement;
     needle?: HTMLElement;
-    boostHint?: HTMLElement;
     playerPts?: HTMLElement;
     rivalPts?: HTMLElement;
-  } = {};
+    rivalMove?: HTMLElement;
+    moveButtons: Map<MoveKind, HTMLElement>;
+  } = { moveButtons: new Map() };
 
   private game: Game;
 
@@ -40,7 +41,7 @@ export class Ui {
   render(): void {
     const g = this.game;
     this.root.innerHTML = '';
-    this.live = {};
+    this.live = { moveButtons: new Map() };
 
     if (g.screen === 'garage') {
       this.root.appendChild(this.garage());
@@ -50,6 +51,7 @@ export class Ui {
     this.root.appendChild(this.scoreboard());
     this.root.appendChild(this.fighters());
 
+    if (g.screen === 'battle') this.root.appendChild(this.moveBar());
     if (g.screen === 'launch') this.root.appendChild(this.launchBar());
     if (g.screen === 'round-over' || g.screen === 'match-over') {
       this.root.appendChild(this.result());
@@ -70,20 +72,44 @@ export class Ui {
     if (this.live.playerPts) this.live.playerPts.textContent = String(g.playerScore);
     if (this.live.rivalPts) this.live.rivalPts.textContent = String(g.rivalScore);
 
-    const hint = this.live.boostHint;
+    // Move buttons: affordable, active, or too expensive right now.
     const p = g.player;
-    if (hint && p) {
-      if (p.boost > 0) {
-        hint.className = 'boost-hint active';
-        hint.textContent = `BOOST ACTIVE — ${p.boost.toFixed(1)}s`;
-      } else if (p.meter >= 1) {
-        hint.className = 'boost-hint ready';
-        hint.textContent = 'BOOST READY — press SPACE';
-      } else {
-        hint.className = 'boost-hint';
-        hint.textContent = 'Charging boost…';
+    if (p) {
+      for (const [kind, el] of this.live.moveButtons) {
+        const cost = C.MOVES[kind].cost;
+        const active = p.move === kind && p.moveTime > 0;
+        const busy = p.moveTime > 0;
+        el.classList.toggle('active', active);
+        el.classList.toggle('ready', !busy && p.meter >= cost);
+        el.classList.toggle('locked', !busy && p.meter < cost);
+        el.classList.toggle('busy', busy && !active);
+        const timer = el.querySelector<HTMLElement>('.move-timer');
+        if (timer) timer.textContent = active ? `${p.moveTime.toFixed(1)}s` : '';
       }
     }
+
+    // Show what the rival is doing — you can't counter what you can't see.
+    const rivalMove = this.live.rivalMove;
+    const r = g.rival;
+    if (rivalMove) {
+      if (r && r.move && r.moveTime > 0) {
+        rivalMove.textContent = r.move.toUpperCase();
+        rivalMove.className = `rival-move on ${r.move}`;
+      } else {
+        rivalMove.textContent = '';
+        rivalMove.className = 'rival-move';
+      }
+    }
+  }
+
+  /** Flash a move button that the player couldn't afford. */
+  rejectMove(kind: MoveKind): void {
+    const el = this.live.moveButtons.get(kind);
+    if (!el) return;
+    el.classList.remove('reject');
+    // Force a reflow so the animation restarts on repeated presses.
+    void el.offsetWidth;
+    el.classList.add('reject');
   }
 
   private updateCard(card: HTMLElement, bey: BeyState | null): void {
@@ -160,11 +186,44 @@ export class Ui {
       <div class="bar"><i class="fill-spin" style="width:100%"></i></div>
       <div class="bar-label"><span>Burst</span><span></span></div>
       <div class="bar"><i class="fill-burst" style="width:0%"></i></div>
-      <div class="bar-label"><span>Boost</span><span></span></div>
+      <div class="bar-label"><span>Meter</span><span></span></div>
       <div class="bar"><i class="fill-meter" style="width:0%"></i></div>
-      ${isPlayer ? '<div class="boost-hint">Charging boost…</div>' : ''}`;
-    if (isPlayer) {
-      this.live.boostHint = el.querySelector('.boost-hint') as HTMLElement;
+      ${isPlayer ? '' : '<div class="rival-move"></div>'}`;
+    if (!isPlayer) {
+      this.live.rivalMove = el.querySelector('.rival-move') as HTMLElement;
+    }
+    return el;
+  }
+
+  /**
+   * The three moves. Each shows its key, its meter cost, and what it is for —
+   * a player who can't see why to press a button won't press it.
+   */
+  private moveBar(): HTMLElement {
+    const el = document.createElement('div');
+    el.className = 'moves';
+
+    const defs: [MoveKind, string, string, string][] = [
+      ['charge', 'SPACE', 'Charge', 'hunt & smash'],
+      ['anchor', 'A', 'Anchor', 'absorb a hit'],
+      ['slip', 'S', 'Slip', 'break away'],
+    ];
+
+    for (const [kind, key, label, blurb] of defs) {
+      const btn = document.createElement('button');
+      btn.className = 'move';
+      btn.dataset.move = kind;
+      btn.innerHTML = `
+        <span class="move-key">${key}</span>
+        <span class="move-name">${label}</span>
+        <span class="move-blurb">${blurb}</span>
+        <span class="move-cost">${Math.round(C.MOVES[kind].cost * 100)}</span>
+        <span class="move-timer"></span>`;
+      btn.addEventListener('click', () => {
+        if (!this.game.useMove(kind)) this.rejectMove(kind);
+      });
+      this.live.moveButtons.set(kind, btn);
+      el.appendChild(btn);
     }
     return el;
   }
@@ -207,10 +266,33 @@ export class Ui {
     const panel = document.createElement('div');
     panel.className = 'panel';
     panel.style.width = 'min(520px, 92vw)';
+    // A round that only reports its outcome teaches nothing. The breakdown is
+    // what lets a player work out *why* they lost and change something.
+    const you = g.player;
+    const them = g.rival;
+    const breakdown =
+      you && them
+        ? `
+      <table class="breakdown">
+        <thead>
+          <tr><th></th><th>You</th><th>${escapeHtml(g.aiName)}</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Spin left</td><td>${pct(Math.abs(you.spin) / you.spinAtLaunch)}</td><td>${pct(Math.abs(them.spin) / them.spinAtLaunch)}</td></tr>
+          <tr><td>Hits landed</td><td>${you.hitsLanded}</td><td>${them.hitsLanded}</td></tr>
+          <tr><td>Spin drained</td><td>${Math.round(you.spinDealt)}</td><td>${Math.round(them.spinDealt)}</td></tr>
+          <tr><td>Biggest hit</td><td>${you.biggestHit.toFixed(1)}</td><td>${them.biggestHit.toFixed(1)}</td></tr>
+          <tr><td>Moves used</td><td>${you.movesUsed}</td><td>${them.movesUsed}</td></tr>
+          <tr><td>Burst charge</td><td>${pct(you.burst)}</td><td>${pct(them.burst)}</td></tr>
+        </tbody>
+      </table>`
+        : '';
+
     panel.innerHTML = `
       <p class="result-title ${cls}">${title}</p>
       <p class="result-reason">${escapeHtml(REASON_TEXT[r?.reason ?? 'timeout'] ?? '')}</p>
       <p class="sub">You ${g.playerScore} — ${g.rivalScore} ${escapeHtml(g.aiName)}</p>
+      ${breakdown}
       <div class="row">
         <button class="primary" data-next>${matchOver ? 'Back to garage' : 'Next round'}</button>
       </div>`;

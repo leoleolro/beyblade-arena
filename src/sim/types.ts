@@ -79,6 +79,9 @@ export interface BeyStats {
   wander: number;
 }
 
+/** The three battle moves. See MOVES in constants.ts for the triangle. */
+export type MoveKind = 'charge' | 'anchor' | 'slip';
+
 /** How a top left the round. */
 export type Defeat = 'knockout' | 'burst' | 'spin-finish';
 
@@ -105,12 +108,22 @@ export interface BeyState {
   defeat: Defeat | null;
   /** Set on the frame a collision happens, for spark effects. Decays to 0. */
   hitFlash: number;
-  /** Boost charge in [0, 1]. At 1 the player may spend it. */
+  /** Move charge in [0, 1]. Each move costs a different slice of it. */
   meter: number;
-  /** Seconds of boost remaining. Above 0 the top hunts and hits harder. */
-  boost: number;
+  /** The move currently active, or null. */
+  move: MoveKind | null;
+  /** Seconds of the active move remaining. */
+  moveTime: number;
   /** Seconds since this top was launched. Drives the settle ramp. */
   age: number;
+  /** Clashes this top was the aggressor in — shown in the round breakdown. */
+  hitsLanded: number;
+  /** Total spin this top has drained from opponents. */
+  spinDealt: number;
+  /** Hardest impact this top was involved in. */
+  biggestHit: number;
+  /** Moves spent this round. */
+  movesUsed: number;
 }
 
 /** How a round ended. */

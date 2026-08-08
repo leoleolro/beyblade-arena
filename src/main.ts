@@ -1,6 +1,7 @@
 import './style.css';
 import { Game } from './game';
 import { Ui } from './ui';
+import type { MoveKind } from './sim/types';
 
 const canvas = document.getElementById('arena') as HTMLCanvasElement;
 const uiRoot = document.getElementById('ui') as HTMLElement;
@@ -16,12 +17,28 @@ ui = new Ui(uiRoot, game);
 ui.render();
 game.start();
 
-// Space does the right thing per screen: lock the launch meter, then boost.
+// Space locks the launch meter, then becomes Charge. A and S are the other two
+// moves, sitting under the same hand.
+const MOVE_KEYS: Record<string, MoveKind> = {
+  Space: 'charge',
+  KeyA: 'anchor',
+  KeyS: 'slip',
+};
+
 window.addEventListener('keydown', (e) => {
-  if (e.code !== 'Space') return;
-  e.preventDefault();
-  if (game.screen === 'launch') game.launch();
-  else if (game.screen === 'battle') game.boost();
+  if (e.repeat) return;
+
+  if (e.code === 'Space' && game.screen === 'launch') {
+    e.preventDefault();
+    game.launch();
+    return;
+  }
+
+  const move = MOVE_KEYS[e.code];
+  if (move && game.screen === 'battle') {
+    e.preventDefault();
+    if (!game.useMove(move)) ui.rejectMove(move);
+  }
 });
 
 // Expose for debugging in the console.
