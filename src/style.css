@@ -1,0 +1,416 @@
+:root {
+  --bg: #070a12;
+  --panel: rgba(13, 18, 30, 0.88);
+  --line: rgba(120, 160, 220, 0.18);
+  --text: #dce6f7;
+  --dim: #7f8ea8;
+  --accent: #38bdf8;
+  --warn: #f97316;
+  --danger: #ef4444;
+  --good: #22c55e;
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+}
+
+#arena {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+#ui {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* Anything the player can actually click re-enables pointer events. */
+button,
+.panel,
+.chip {
+  pointer-events: auto;
+}
+
+/* ------------------------------------------------------------- scoreboard */
+
+.scoreboard {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 10px 20px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  backdrop-filter: blur(8px);
+}
+
+.scoreboard .side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 120px;
+}
+
+.scoreboard .name {
+  font-size: 12px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+.scoreboard .pts {
+  font-size: 30px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.scoreboard .vs {
+  font-size: 12px;
+  color: var(--dim);
+  letter-spacing: 0.14em;
+}
+
+.scoreboard .round {
+  font-size: 11px;
+  color: var(--dim);
+  letter-spacing: 0.08em;
+}
+
+/* ----------------------------------------------------------- fighter cards */
+
+.fighters {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 22px;
+  display: flex;
+  justify-content: space-between;
+  padding: 0 22px;
+  gap: 16px;
+}
+
+.card {
+  width: 250px;
+  padding: 12px 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  backdrop-filter: blur(8px);
+}
+
+.card h3 {
+  margin: 0 0 2px;
+  font-size: 14px;
+  letter-spacing: 0.03em;
+}
+
+.card .parts {
+  margin: 0 0 9px;
+  font-size: 11px;
+  color: var(--dim);
+}
+
+.bar {
+  height: 7px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.bar > i {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  transition: width 90ms linear;
+}
+
+.bar-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin-bottom: 3px;
+}
+
+.fill-spin {
+  background: linear-gradient(90deg, #0ea5e9, #38bdf8);
+}
+.fill-burst {
+  background: linear-gradient(90deg, #f97316, #ef4444);
+}
+.fill-meter {
+  background: linear-gradient(90deg, #a855f7, #e879f9);
+}
+.fill-meter.ready {
+  background: linear-gradient(90deg, #facc15, #fde047);
+  box-shadow: 0 0 12px rgba(250, 204, 21, 0.7);
+}
+
+.card.out {
+  opacity: 0.45;
+}
+
+.boost-hint {
+  margin-top: 4px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--dim);
+  text-align: center;
+}
+
+.boost-hint.ready {
+  color: #fde047;
+  font-weight: 700;
+}
+
+.boost-hint.active {
+  color: var(--good);
+  font-weight: 700;
+}
+
+/* ------------------------------------------------------------ launch meter */
+
+.launch {
+  position: absolute;
+  left: 50%;
+  bottom: 150px;
+  transform: translateX(-50%);
+  width: min(520px, 82vw);
+  text-align: center;
+}
+
+.launch .track {
+  position: relative;
+  height: 26px;
+  border-radius: 13px;
+  border: 1px solid var(--line);
+  background: rgba(8, 12, 20, 0.85);
+  overflow: hidden;
+}
+
+/* The sweet spot: stopping the needle here gives the widest, most aggressive
+   orbit without overshooting into the exit pockets. */
+.launch .sweet {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 72%;
+  width: 18%;
+  background: rgba(34, 197, 94, 0.28);
+  border-left: 1px solid rgba(34, 197, 94, 0.6);
+  border-right: 1px solid rgba(34, 197, 94, 0.6);
+}
+
+.launch .needle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: #fde047;
+  box-shadow: 0 0 10px rgba(253, 224, 71, 0.9);
+}
+
+.launch p {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: var(--dim);
+  letter-spacing: 0.05em;
+}
+
+kbd {
+  padding: 2px 7px;
+  border-radius: 5px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.07);
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  color: var(--text);
+}
+
+/* ------------------------------------------------------------------ panels */
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(4, 7, 14, 0.72);
+  backdrop-filter: blur(6px);
+  pointer-events: auto;
+}
+
+.panel {
+  width: min(880px, 92vw);
+  max-height: 88vh;
+  overflow-y: auto;
+  padding: 26px 30px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+}
+
+.panel h1 {
+  margin: 0 0 4px;
+  font-size: 26px;
+  letter-spacing: 0.02em;
+}
+
+.panel .sub {
+  margin: 0 0 20px;
+  color: var(--dim);
+  font-size: 13px;
+}
+
+.slot {
+  margin-bottom: 18px;
+}
+
+.slot h4 {
+  margin: 0 0 8px;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  padding: 8px 13px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 120ms ease;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.chip:hover {
+  border-color: rgba(120, 200, 255, 0.5);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.chip.on {
+  border-color: var(--accent);
+  background: rgba(56, 189, 248, 0.16);
+  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.35) inset;
+}
+
+.chip .dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+.chip small {
+  color: var(--dim);
+  font-size: 11px;
+}
+
+.statline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 22px;
+  margin: 6px 0 20px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line);
+  font-size: 12px;
+}
+
+.statline span b {
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+button.primary {
+  padding: 12px 26px;
+  border-radius: 11px;
+  border: 1px solid rgba(56, 189, 248, 0.55);
+  background: linear-gradient(180deg, rgba(56, 189, 248, 0.28), rgba(56, 189, 248, 0.12));
+  color: #eaf6ff;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+}
+
+button.primary:hover {
+  background: linear-gradient(180deg, rgba(56, 189, 248, 0.42), rgba(56, 189, 248, 0.2));
+}
+
+.result-reason {
+  font-size: 15px;
+  color: var(--dim);
+  margin: 0 0 18px;
+}
+
+.result-title {
+  font-size: 34px;
+  font-weight: 800;
+  margin: 0 0 6px;
+  letter-spacing: 0.02em;
+}
+
+.win {
+  color: var(--good);
+}
+.lose {
+  color: var(--danger);
+}
+.tie {
+  color: var(--warn);
+}
+
+@media (max-width: 760px) {
+  .fighters {
+    flex-direction: column;
+    align-items: stretch;
+    bottom: 12px;
+  }
+  .card {
+    width: auto;
+  }
+  .launch {
+    bottom: 300px;
+  }
+}
