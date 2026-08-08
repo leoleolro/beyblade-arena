@@ -44,7 +44,12 @@ function makeBey(f: Fighter, launch: LaunchParams): BeyState {
   const a = launch.entryAngle;
 
   const power = clamp(launch.power, 0, 1);
-  const spin = C.SPIN_REF * (0.55 + 0.45 * power);
+  // The launch meter's green band was previously decoration. Landing in it now
+  // actually grants spin, so the launch minigame has stakes.
+  const perfect =
+    power >= C.PERFECT_LAUNCH_MIN && power <= C.PERFECT_LAUNCH_MAX;
+  const spin =
+    C.SPIN_REF * (0.55 + 0.45 * power) * (perfect ? 1 + C.PERFECT_LAUNCH_SPIN_BONUS : 1);
 
   // Launch tangentially, in the direction the top will precess, at a speed
   // derived from the actual circular-orbit velocity for this radius. Guessing a
@@ -77,6 +82,7 @@ function makeBey(f: Fighter, launch: LaunchParams): BeyState {
     move: null,
     moveTime: 0,
     age: 0,
+    perfectLaunch: perfect,
     hitsLanded: 0,
     spinDealt: 0,
     biggestHit: 0,
@@ -191,7 +197,7 @@ export class Battle {
 
     let steps = 0;
     while (this.accumulator >= C.FIXED_DT && steps < C.MAX_SUBSTEPS) {
-      const hits = step(this.beys, C.FIXED_DT);
+      const hits = step(this.beys, C.FIXED_DT, this.rng);
       if (hits.length) this.hits.push(...hits);
       this.accumulator -= C.FIXED_DT;
       this.roundTime += C.FIXED_DT;
@@ -228,8 +234,8 @@ export class Battle {
   }
 
   /**
-   * Slip's disengage. The kick is aimed away from the nearest opponent, not
-   * simply forward and not toward the centre — an anchored top *sits* in the
+   * Dodge's disengage. The kick is aimed away from the nearest opponent, not
+   * simply forward and not toward the centre — an blocking top *sits* in the
    * centre, so biasing inward drove the escaping top straight back into it.
    *
    * Near the rim the direction is blended inward instead, because an uncapped
@@ -246,7 +252,7 @@ export class Battle {
       const ay = bey.pos.y - foe.pos.y;
       const alen = Math.hypot(ax, ay);
       if (alen > 1e-6) {
-        const k = C.SLIP_AWAY_BIAS;
+        const k = C.DODGE_AWAY_BIAS;
         dx = dx * (1 - k) + (ax / alen) * k;
         dy = dy * (1 - k) + (ay / alen) * k;
       }
@@ -254,8 +260,8 @@ export class Battle {
 
     // Don't escape into a pocket.
     const r = Math.hypot(bey.pos.x, bey.pos.y);
-    if (r > C.SLIP_SAFE_RADIUS) {
-      const k = C.SLIP_INWARD_BIAS;
+    if (r > C.DODGE_SAFE_RADIUS) {
+      const k = C.DODGE_INWARD_BIAS;
       dx = dx * (1 - k) + (-bey.pos.x / r) * k;
       dy = dy * (1 - k) + (-bey.pos.y / r) * k;
     }
@@ -265,9 +271,9 @@ export class Battle {
     bey.vel.y += (dy / dlen) * kick;
 
     const after = Math.hypot(bey.vel.x, bey.vel.y);
-    if (after > C.SLIP_MAX_SPEED) {
-      bey.vel.x = (bey.vel.x / after) * C.SLIP_MAX_SPEED;
-      bey.vel.y = (bey.vel.y / after) * C.SLIP_MAX_SPEED;
+    if (after > C.DODGE_MAX_SPEED) {
+      bey.vel.x = (bey.vel.x / after) * C.DODGE_MAX_SPEED;
+      bey.vel.y = (bey.vel.y / after) * C.DODGE_MAX_SPEED;
     }
   }
 

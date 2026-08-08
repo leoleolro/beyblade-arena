@@ -21,8 +21,8 @@ game.start();
 // moves, sitting under the same hand.
 const MOVE_KEYS: Record<string, MoveKind> = {
   Space: 'charge',
-  KeyA: 'anchor',
-  KeyS: 'slip',
+  KeyA: 'block',
+  KeyS: 'dodge',
 };
 
 window.addEventListener('keydown', (e) => {

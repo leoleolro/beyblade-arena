@@ -86,7 +86,7 @@ function integrate(b: BeyState, dt: number): void {
 
   // 3. driver self-propulsion: aggressive tips climb outward toward the ridge
   //    and lose that push as they run out of spin. The active move scales this,
-  //    which is what makes a charging top visibly hunt and an anchored one sit.
+  //    which is what makes a charging top visibly hunt and an blocking one sit.
   const mv = moveProfile(b);
   const drive = b.stats.wander * sn * sn * 2.6 * mv.wander;
   accel.x += outward.x * drive;
@@ -113,10 +113,10 @@ function integrate(b: BeyState, dt: number): void {
 
   // spin decay: passive loss plus loss from moving across the floor
   const speed = len(b.vel);
-  // Holding a move costs spin. Anchor's high cost is exactly why refusing the
-  // engagement (Slip) beats it: it bleeds itself dry waiting for contact.
+  // Holding a move costs spin. Block's high cost is exactly why refusing the
+  // engagement (Dodge) beats it: it bleeds itself dry waiting for contact.
   // The move's friction scales the scrubbing term as well as the drag. Missing
-  // this made Slip's free-running tip lose *more* spin than an anchored one,
+  // this made Dodge's free-running tip lose *more* spin than an blocking one,
   // which is backwards and broke the triangle.
   const loss =
     (C.SPIN_DECAY_BASE +
@@ -137,6 +137,13 @@ function integrate(b: BeyState, dt: number): void {
     b.moveTime = Math.max(0, b.moveTime - dt);
     if (b.moveTime === 0) b.move = null;
   }
+}
+
+/** True if this top blocked within the perfect-timing window. */
+function isPerfectBlock(b: BeyState): boolean {
+  if (b.move !== 'block') return false;
+  const elapsed = C.MOVES.block.duration - b.moveTime;
+  return elapsed <= C.PERFECT_BLOCK_WINDOW;
 }
 
 /** Angular centre of each exit pocket, radians. */
@@ -197,6 +204,10 @@ export interface HitEvent {
   strength: number;
   /** True when the two tops spin in opposite directions. */
   opposite: boolean;
+  /** A critical clash: amplified, and allowed past the normal per-hit cap. */
+  crit: boolean;
+  /** Someone blocked on the read and punished the attacker hard. */
+  perfectBlock: boolean;
 }
 
 /**
@@ -209,7 +220,7 @@ export interface HitEvent {
  *     sideways, scaled by attack vs. mass — this is what causes ring-outs
  *   - spin drain and burst charge, scaled by attack vs. defense/burstResist
  */
-function resolvePair(a: BeyState, b: BeyState): HitEvent | null {
+function resolvePair(a: BeyState, b: BeyState, rng: () => number): HitEvent | null {
   const d = dist(a.pos, b.pos);
   const minDist = a.stats.radius + b.stats.radius;
   if (d >= minDist || d < 1e-9) return null;
@@ -234,7 +245,7 @@ function resolvePair(a: BeyState, b: BeyState): HitEvent | null {
   // Normal impulse.
   const invMassA = 1 / a.stats.mass;
   const invMassB = 1 / b.stats.mass;
-  // Knockback resistance is per-move: an anchored top barely moves, which is
+  // Knockback resistance is per-move: an blocking top barely moves, which is
   // what lets it absorb a charge instead of being flung by it.
   const mvA = moveProfile(a);
   const mvB = moveProfile(b);
@@ -300,7 +311,7 @@ function resolvePair(a: BeyState, b: BeyState): HitEvent | null {
 
   // Raw drain uses the *build's* defense only. The move's defensive multiplier
   // is applied after the per-hit cap below — applied before it, a big hit blew
-  // past the ceiling anyway and a full-meter Anchor bought a 9% reduction.
+  // past the ceiling anyway and a full-meter Block bought a 9% reduction.
   const drainOnB =
     ((impact * C.HIT_SPIN_LOSS * atkA * aggrA) / b.stats.defense) * oppMul;
   const drainOnA =
@@ -310,24 +321,35 @@ function resolvePair(a: BeyState, b: BeyState): HitEvent | null {
 
   // No single clash may erase a top — otherwise a violent head-on takes both
   // below the finish threshold on the same step and the round is a draw.
-  const capA = a.spinAtLaunch * C.MAX_SPIN_LOSS_PER_HIT;
-  const capB = b.spinAtLaunch * C.MAX_SPIN_LOSS_PER_HIT;
+  // A critical amplifies the exchange *and* lifts the per-hit ceiling. Without
+  // lifting the ceiling the normal cap clamps a critical straight back down to
+  // an ordinary hit and the player never sees it.
+  const crit = rng() < C.CRIT_CHANCE;
+  const critMult = crit ? C.CRIT_MULT : 1;
+  const capFrac = crit ? C.CRIT_SPIN_CAP : C.MAX_SPIN_LOSS_PER_HIT;
+  const critCapA = a.spinAtLaunch * capFrac;
+  const critCapB = b.spinAtLaunch * capFrac;
+
   // Cap the raw exchange, then let the defensive move mitigate what's left.
-  const rawA = Math.min(capA, drainOnA + recoilA) * settle;
-  const rawB = Math.min(capB, drainOnB + recoilB) * settle;
+  const rawA = Math.min(critCapA, (drainOnA + recoilA) * critMult) * settle;
+  const rawB = Math.min(critCapB, (drainOnB + recoilB) * critMult) * settle;
   const lossA = rawA / mvA.defense;
   const lossB = rawB / mvB.defense;
 
   // Anchored tops return part of the hit to whoever threw it — but only in
   // proportion to how much that top was actually charging in. Applying it flat
-  // punished a disengaging top for being bumped, which is what stopped Slip
-  // from ever beating Anchor.
+  // punished a disengaging top for being bumped, which is what stopped Dodge
+  // from ever beating Block.
   // Reflect scales off the hit the *blocker absorbed*, not off the damage the
-  // attacker happened to take — an anchored top deals almost nothing, so
+  // attacker happened to take — an blocking top deals almost nothing, so
   // measuring it the other way round made the punish vanish. Scaled by the
   // attacker's own aggression, so only a top that charged in gets stung.
-  const reflectToA = rawB * mvB.reflect * shareA;
-  const reflectToB = rawA * mvA.reflect * shareB;
+  // Blocking on the read — contact landing just after the block starts — turns
+  // a survivable exchange into a punish that can end a round outright.
+  const perfectA = isPerfectBlock(a);
+  const perfectB = isPerfectBlock(b);
+  const reflectToA = rawB * mvB.reflect * shareA * (perfectB ? C.PERFECT_BLOCK_REFLECT_MULT : 1);
+  const reflectToB = rawA * mvA.reflect * shareB * (perfectA ? C.PERFECT_BLOCK_REFLECT_MULT : 1);
 
   a.spin = Math.max(0, Math.abs(a.spin) - lossA - reflectToA) * (dirA || 1);
   b.spin = Math.max(0, Math.abs(b.spin) - lossB - reflectToB) * (dirB || 1);
@@ -357,6 +379,8 @@ function resolvePair(a: BeyState, b: BeyState): HitEvent | null {
     at: vec((a.pos.x + b.pos.x) / 2, (a.pos.y + b.pos.y) / 2),
     strength: impact,
     opposite,
+    crit,
+    perfectBlock: perfectA || perfectB,
   };
 }
 
@@ -364,7 +388,11 @@ function resolvePair(a: BeyState, b: BeyState): HitEvent | null {
  * Advance the whole field by one fixed step. Returns collision events for the
  * renderer to turn into sparks and shake.
  */
-export function step(beys: BeyState[], dt: number): HitEvent[] {
+export function step(
+  beys: BeyState[],
+  dt: number,
+  rng: () => number = Math.random,
+): HitEvent[] {
   const hits: HitEvent[] = [];
 
   for (const b of beys) {
@@ -378,7 +406,7 @@ export function step(beys: BeyState[], dt: number): HitEvent[] {
       const a = beys[i];
       const b = beys[k];
       if (!a.alive || !b.alive) continue;
-      const hit = resolvePair(a, b);
+      const hit = resolvePair(a, b, rng);
       if (hit) hits.push(hit);
     }
   }

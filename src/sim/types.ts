@@ -80,7 +80,7 @@ export interface BeyStats {
 }
 
 /** The three battle moves. See MOVES in constants.ts for the triangle. */
-export type MoveKind = 'charge' | 'anchor' | 'slip';
+export type MoveKind = 'charge' | 'block' | 'dodge';
 
 /** How a top left the round. */
 export type Defeat = 'knockout' | 'burst' | 'spin-finish';
@@ -116,6 +116,8 @@ export interface BeyState {
   moveTime: number;
   /** Seconds since this top was launched. Drives the settle ramp. */
   age: number;
+  /** Whether this top's launch landed in the perfect band. */
+  perfectLaunch: boolean;
   /** Clashes this top was the aggressor in — shown in the round breakdown. */
   hitsLanded: number;
   /** Total spin this top has drained from opponents. */

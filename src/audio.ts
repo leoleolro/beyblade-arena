@@ -11,7 +11,7 @@
  * construction.
  */
 
-export type MoveSound = 'charge' | 'anchor' | 'slip';
+export type MoveSound = 'charge' | 'block' | 'dodge';
 
 export class Audio {
   private ctx: AudioContext | null = null;
@@ -176,7 +176,7 @@ export class Audio {
     if (!this.ctx) return;
     if (kind === 'charge') {
       this.tone({ freq: 220, duration: 0.26, gain: 0.3, type: 'sawtooth', sweepTo: 720 });
-    } else if (kind === 'anchor') {
+    } else if (kind === 'block') {
       this.tone({ freq: 520, duration: 0.3, gain: 0.26, type: 'square', sweepTo: 130 });
     } else {
       this.tone({ freq: 680, duration: 0.2, gain: 0.24, type: 'sine', sweepTo: 1500 });

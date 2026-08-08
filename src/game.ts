@@ -9,7 +9,14 @@ import { DEFAULT_BUILD } from './sim/parts';
 import type { BeyBuild, LaunchParams, MoveKind } from './sim/types';
 
 /** Screens the player moves through. */
-export type Screen = 'garage' | 'launch' | 'battle' | 'round-over' | 'match-over';
+export type Screen =
+  | 'home'
+  | 'howto'
+  | 'garage'
+  | 'launch'
+  | 'battle'
+  | 'round-over'
+  | 'match-over';
 
 export interface GameEvents {
   onScreen(screen: Screen): void;
@@ -25,7 +32,7 @@ const AI_ID = 'ai';
  */
 export class Game {
   battle: Battle;
-  screen: Screen = 'garage';
+  screen: Screen = 'home';
 
   playerBuild: BeyBuild = DEFAULT_BUILD();
   /** +1 = right spin, -1 = left spin. A real strategic choice, see ai.ts. */
@@ -131,9 +138,22 @@ export class Game {
     return ok;
   }
 
+  /** Move between the non-battle screens. */
+  goTo(screen: 'home' | 'howto' | 'garage'): void {
+    this.audio.resume();
+    this.setScreen(screen);
+  }
+
+  /**
+   * How many battles the player has finished. Coaching prompts only appear in
+   * the first couple of matches — a tutorial that never stops is a nag.
+   */
+  battlesPlayed = 0;
+
   /** Advance to the next round, or back to the garage if the match is done. */
   next(): void {
     if (this.battle.phase === 'match-over') {
+      this.battlesPlayed += 1;
       this.setScreen('garage');
     } else {
       this.toLaunch();

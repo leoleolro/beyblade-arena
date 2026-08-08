@@ -27,8 +27,13 @@ npx vitest run
 | Garage | mouse | pick parts, spin direction, and rival difficulty |
 | Launch | `Space` | stop the meter — green zone is the widest, most aggressive orbit |
 | Battle | `Space` | **Charge** — hunt and hit hard (costs a full meter) |
-| Battle | `A` | **Anchor** — absorb a hit and punish the attacker (65%) |
-| Battle | `S` | **Slip** — break away and conserve spin (45%) |
+| Battle | `A` | **Block** — absorb a hit and punish the attacker (65%) |
+| Battle | `S` | **Dodge** — break away and conserve spin (45%) |
+
+Every input is a **single tap** — nothing is held down. The move buttons are also
+clickable. Moves were originally called Anchor and Slip: accurate, but playtesters
+couldn't guess what they did, and a move nobody understands is a move nobody
+presses.
 
 Rounds are won by ring-out or burst (2 points) or by outlasting your rival
 (1 point). First to 4 takes the match.
@@ -156,9 +161,9 @@ means it also holds against builds and situations never explicitly considered.
 
 | Matchup | Win rate | Why |
 | --- | --- | --- |
-| Charge beats Slip | 62.3% | a fleeing top can't outrun a seeking one |
-| Anchor beats Charge | 57.9% | the charger is committed and eats the reflected hit |
-| Slip beats Anchor | 56.7% | an anchor can't catch anything and bleeds spin waiting |
+| Charge beats Dodge | 60.9% | a fleeing top can't outrun a seeking one |
+| Block beats Charge | 50.4% | the charger is committed and eats the reflected hit |
+| Dodge beats Block | 55.0% | a blocking top can't catch anything and bleeds spin waiting |
 
 `src/sim/moves.test.ts` measures every leg with identical builds on both sides,
 so any difference is down to the moves alone, and fails if a leg inverts.
@@ -215,10 +220,39 @@ Browsers refuse to start an AudioContext before a user gesture, so it resumes on
 the first real key press or click rather than at construction. Toggle it in the
 garage.
 
+## Variance, on purpose
+
+Fixing the pacing removed the coin-flip rounds — but it also flattened the
+emotional range, and a distribution with no tail has no moments worth retelling.
+Three systems put the spikes back, and the constraint was that they be *earned
+or survivable* rather than arbitrary:
+
+- **Perfect launch** — stopping the meter in the green band grants bonus spin.
+  The band was previously decoration with no mechanical effect at all.
+- **Perfect block** — blocking within 0.3s of contact multiplies the reflected
+  damage 2.2x. Blocking early is safe and ordinary; blocking *on the read* is
+  what earns the big punish and can end a round outright.
+- **Critical clash** — a 7% chance to amplify a hit and raise the per-hit spin
+  cap from 20% to 38%. Without lifting the cap a critical is invisible, because
+  the normal ceiling clamps it straight back to an ordinary hit.
+
+Two of the three are pure skill; only the critical is chance, and it is capped
+so it swings a round rather than deciding one outright from full spin. Knockouts
+rose from 15.5% to 18.8% and sub-2s rounds held at ~10%.
+
+Note on the underlying psychology, since it's the obvious next step: variable
+rewards are genuinely the strongest engagement mechanism known, which is exactly
+why the manipulative versions are regulated. The line worth holding is that
+variance here creates *drama*, and is never attached to money, a purchase, or a
+"just one more" prompt.
+
 ## Known gaps
 
-- **No tutorial or home page.** The move names (Charge / Anchor / Slip) are not
-  self-explanatory, and nothing currently teaches the triangle or what beats
-  what. This is the biggest remaining onboarding gap.
+- **The ownership markers are a stopgap.** A fixed cyan ring is a crutch, not a
+  visual identity — the real answer is distinctive skins and silhouettes so tops
+  are told apart by what they *are*. The markers should not survive to launch in
+  their current form.
 - The AI reads moves but does not bluff, so a patient player can bait it.
+- The tutorial is explanatory, not interactive. A scripted round that forces
+  each situation in turn would teach the triangle faster than reading it.
 - Bundle is ~570 kB (147 kB gzipped), almost entirely Three.js.

@@ -75,15 +75,15 @@ function winRate(aMove: MoveKind, bMove: MoveKind): number {
 }
 
 describe('move triangle', () => {
-  it('charge beats slip, anchor beats charge, slip beats anchor', () => {
-    const chargeVsSlip = winRate('charge', 'slip');
-    const anchorVsCharge = winRate('anchor', 'charge');
-    const slipVsAnchor = winRate('slip', 'anchor');
+  it('charge beats dodge, block beats charge, dodge beats block', () => {
+    const chargeVsSlip = winRate('charge', 'dodge');
+    const anchorVsCharge = winRate('block', 'charge');
+    const slipVsAnchor = winRate('dodge', 'block');
 
     console.log('\n=== move matchups (win rate for the first move) ===');
-    console.log(`  charge vs slip   ${(chargeVsSlip * 100).toFixed(1)}%`);
-    console.log(`  anchor vs charge ${(anchorVsCharge * 100).toFixed(1)}%`);
-    console.log(`  slip   vs anchor ${(slipVsAnchor * 100).toFixed(1)}%`);
+    console.log(`  charge vs dodge   ${(chargeVsSlip * 100).toFixed(1)}%`);
+    console.log(`  block vs charge ${(anchorVsCharge * 100).toFixed(1)}%`);
+    console.log(`  dodge   vs block ${(slipVsAnchor * 100).toFixed(1)}%`);
 
     // Each leg of the triangle must favour the counter. The margin is
     // deliberately loose: a hard counter would make the read the whole game.
@@ -93,7 +93,7 @@ describe('move triangle', () => {
   });
 
   it('keeps every move costed and time-limited', () => {
-    for (const kind of ['charge', 'anchor', 'slip'] as MoveKind[]) {
+    for (const kind of ['charge', 'block', 'dodge'] as MoveKind[]) {
       const m = C.MOVES[kind];
       expect(m.cost).toBeGreaterThan(0);
       expect(m.cost).toBeLessThanOrEqual(1);
@@ -119,6 +119,6 @@ describe('move triangle', () => {
     expect(a.meter).toBeCloseTo(0, 5);
     // Already committed: a second move can't interrupt the first.
     a.meter = 1;
-    expect(battle.activateMove('a', 'slip')).toBe(false);
+    expect(battle.activateMove('a', 'dodge')).toBe(false);
   });
 });

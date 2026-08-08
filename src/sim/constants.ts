@@ -132,11 +132,11 @@ export const ROUND_TIME_LIMIT = 75;
  * something you watched rather than played. These three moves give the player a
  * real-time layer, and they beat each other in a triangle:
  *
- *   Charge beats Slip   — a slipping top can't outrun a seeking one, and its
+ *   Charge beats Dodge   — a dodging top can't outrun a seeking one, and its
  *                         raised knockback means it gets flung toward a pocket
- *   Anchor beats Charge — the charger is committed and takes the recoil, while
- *                         the anchor barely moves and shrugs off burst charge
- *   Slip   beats Anchor — an anchor can't catch anything and bleeds spin fast,
+ *   Block beats Charge — the charger is committed and takes the recoil, while
+ *                         the block barely moves and shrugs off burst charge
+ *   Dodge   beats Block — an block can't catch anything and bleeds spin fast,
  *                         so refusing the engagement wins by denial
  *
  * Nothing here special-cases a matchup. The triangle is a *consequence* of the
@@ -169,21 +169,21 @@ export interface MoveProfile {
    *
    * A free-running tip genuinely scrubs the floor less and holds its spin
    * longer. Without this, fleeing always cost more spin than sitting still, so
-   * Slip could never win an attrition race against Anchor by denial.
+   * Dodge could never win an attrition race against Block by denial.
    */
   spinRetention: number;
   /**
    * Fraction of incoming spin damage returned to the attacker.
    *
    * Without this, blocking costs the blocker everything and the attacker
-   * nothing, so Anchor could never beat Charge and the triangle collapsed into
+   * nothing, so Block could never beat Charge and the triangle collapsed into
    * a strict ordering. A rigid, low-knockback target genuinely does return more
    * energy to whatever hits it.
    */
   reflect: number;
 }
 
-export const MOVES: Record<'charge' | 'anchor' | 'slip', MoveProfile> = {
+export const MOVES: Record<'charge' | 'block' | 'dodge', MoveProfile> = {
   charge: {
     duration: 2.2,
     cost: 1.0,
@@ -198,7 +198,7 @@ export const MOVES: Record<'charge' | 'anchor' | 'slip', MoveProfile> = {
     spinRetention: 0.95,
     reflect: 0,
   },
-  anchor: {
+  block: {
     duration: 2.0,
     cost: 0.65,
     wander: 0.08,
@@ -210,9 +210,9 @@ export const MOVES: Record<'charge' | 'anchor' | 'slip', MoveProfile> = {
     spinDrain: 19,
     speedKick: 0,
     spinRetention: 1.0,
-    reflect: 1.9,
+    reflect: 1.7,
   },
-  slip: {
+  dodge: {
     duration: 1.6,
     cost: 0.45,
     wander: 0.5,
@@ -234,20 +234,20 @@ export const METER_GAIN_PER_SEC = 0.145;
 export const METER_GAIN_PER_HIT = 0.11;
 
 /**
- * Ceiling on speed immediately after Slip's kick, and how much of that kick is
+ * Ceiling on speed immediately after Dodge's kick, and how much of that kick is
  * aimed at the stadium centre rather than straight ahead.
  *
- * Measured without these, a repeatedly-slipping top accelerated until it either
- * hammered the wall or flew out a pocket — a third of all Slip losses were
+ * Measured without these, a repeatedly-dodging top accelerated until it either
+ * hammered the wall or flew out a pocket — a third of all Dodge losses were
  * self-inflicted knockouts. Disengaging should mean retreating to safety, not
  * rocketing forward.
  */
-export const SLIP_MAX_SPEED = 3.6;
-export const SLIP_INWARD_BIAS = 0.55;
+export const DODGE_MAX_SPEED = 3.6;
+export const DODGE_INWARD_BIAS = 0.55;
 /** How much of the escape aims directly away from the opponent. */
-export const SLIP_AWAY_BIAS = 0.6;
+export const DODGE_AWAY_BIAS = 0.6;
 /** Past this radius the escape is redirected inward instead of outward. */
-export const SLIP_SAFE_RADIUS = 0.72;
+export const DODGE_SAFE_RADIUS = 0.72;
 
 /** Impact strength above which the presentation layer freezes for hitstop. */
 export const HITSTOP_THRESHOLD = 1.6;
@@ -275,3 +275,44 @@ export const SETTLE_TIME = 1.25;
  */
 export const FINISH_HOLD_TIME = 1.15;
 export const FINISH_RENDER_SCALE = 0.35;
+
+// ------------------------------------------------------------------ drama ---
+
+/**
+ * Variance, deliberately reintroduced.
+ *
+ * Fixing the pacing defect removed the coin-flip rounds, but it also flattened
+ * the emotional range: every round became a steady grind and nothing ever went
+ * spectacularly right or wrong. A game with no tail on the distribution has no
+ * moments worth retelling.
+ *
+ * The design constraint is that the spikes must be *earned or survivable*, not
+ * arbitrary. Two of the three below are pure skill (launch timing, block
+ * timing); only the critical clash is chance, and even that is capped so it
+ * swings a round rather than instantly deciding one from full spin.
+ */
+
+/** Probability that a clash lands as a critical. */
+export const CRIT_CHANCE = 0.07;
+/** Damage and smash multiplier on a critical. */
+export const CRIT_MULT = 1.9;
+/**
+ * A critical raises the per-hit spin cap from MAX_SPIN_LOSS_PER_HIT to this.
+ * Without lifting the cap a critical is invisible — the normal ceiling clamps
+ * it back down to an ordinary hit.
+ */
+export const CRIT_SPIN_CAP = 0.38;
+
+/**
+ * Block counts as "perfect" if contact happens within this many seconds of it
+ * being activated. Blocking early is safe but ordinary; blocking on the read,
+ * just as the charge lands, is what earns the big punish.
+ */
+export const PERFECT_BLOCK_WINDOW = 0.3;
+export const PERFECT_BLOCK_REFLECT_MULT = 2.2;
+
+/** Launch power inside this band is a perfect launch. Matches the UI's band. */
+export const PERFECT_LAUNCH_MIN = 0.72;
+export const PERFECT_LAUNCH_MAX = 0.9;
+/** Extra spin and speed granted for nailing it. */
+export const PERFECT_LAUNCH_SPIN_BONUS = 0.14;

@@ -161,7 +161,7 @@ export class AiController {
 
   /**
    * Counter what the opponent is doing, falling back to a read of the board.
-   * Charge beats Slip, Anchor beats Charge, Slip beats Anchor.
+   * Charge beats Dodge, Block beats Charge, Dodge beats Block.
    */
   private pickMove(
     me: BeyState,
@@ -181,7 +181,7 @@ export class AiController {
     const losing = Math.abs(me.spin) < Math.abs(foe.spin) * 0.75;
     const nearlyBurst = me.burst > 0.6;
 
-    if ((losing || nearlyBurst) && afford('slip')) return 'slip';
+    if ((losing || nearlyBurst) && afford('dodge')) return 'dodge';
     if (distance < p.engageRange && afford('charge') && this.worthIt(me, foe)) {
       return 'charge';
     }
@@ -190,7 +190,7 @@ export class AiController {
   }
 
   private randomMove(): MoveKind {
-    const all: MoveKind[] = ['charge', 'anchor', 'slip'];
+    const all: MoveKind[] = ['charge', 'block', 'dodge'];
     return all[Math.floor(this.rng() * all.length)];
   }
 
@@ -204,9 +204,9 @@ export class AiController {
 
 /** What beats what. Mirrors the triangle documented on MOVES in constants.ts. */
 const MOVE_COUNTERS: Record<MoveKind, MoveKind> = {
-  charge: 'anchor',
-  anchor: 'slip',
-  slip: 'charge',
+  charge: 'block',
+  block: 'dodge',
+  dodge: 'charge',
 };
 
 const clamp01 = (n: number): number => (n < 0 ? 0 : n > 1 ? 1 : n);
