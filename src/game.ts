@@ -7,6 +7,7 @@ import type { Difficulty } from './ai';
 import { ArenaRenderer } from './render/arena';
 import { pickContrastingSkin, skinById } from './render/skins';
 import { loadThemeId, saveThemeId } from './render/theme';
+import { arenaById, ARENAS } from './sim/arena';
 import { Battle } from './sim/battle';
 import type { Fighter } from './sim/battle';
 import * as C from './sim/constants';
@@ -55,6 +56,16 @@ export class Game {
   readonly progress = new Progress();
   /** Visual theme id. Cosmetic only; 'arena' is the untouched original look. */
   themeId = loadThemeId();
+  /**
+   * Gameplay arena. Unlike skins and themes this changes the physics, so it is
+   * a match setting the player picks — never something that could be sold.
+   */
+  arenaId = loadArenaId();
+
+  setArena(id: string): void {
+    this.arenaId = id;
+    saveArenaId(id);
+  }
 
   setTheme(id: string): void {
     this.themeId = id;
@@ -121,7 +132,10 @@ export class Game {
       { id: PLAYER_ID, name: 'You', build: playerBuild, spinDir: this.playerSpinDir },
       { id: AI_ID, name: this.aiName, build: aiBuild, spinDir: aiSpin },
     ];
-    return new Battle(fighters, { seed: (Math.random() * 2 ** 31) | 0 });
+    return new Battle(fighters, {
+      seed: (Math.random() * 2 ** 31) | 0,
+      arena: arenaById(this.arenaId),
+    });
   }
 
   /**
@@ -180,6 +194,7 @@ export class Game {
       [PLAYER_ID]: this.playerSkinId,
       [AI_ID]: this.rivalSkinId,
     });
+    this.renderer.setArena(arenaById(this.arenaId));
     this.audio.resume();
     this.audio.launch(this.lockedPower);
     this.setScreen('battle');
@@ -335,4 +350,22 @@ export class Game {
   };
 }
 
-export { PLAYER_ID, AI_ID, C, LADDER };
+export { PLAYER_ID, AI_ID, C, LADDER, ARENAS };
+
+const ARENA_KEY = 'beyblade-arena.arena.v1';
+
+function loadArenaId(): string {
+  try {
+    return localStorage.getItem(ARENA_KEY) ?? 'standard';
+  } catch {
+    return 'standard';
+  }
+}
+
+function saveArenaId(id: string): void {
+  try {
+    localStorage.setItem(ARENA_KEY, id);
+  } catch {
+    // Storage unavailable; the choice still applies for this session.
+  }
+}

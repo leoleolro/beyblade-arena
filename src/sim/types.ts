@@ -128,6 +128,12 @@ export interface BeyState {
   moveTime: number;
   /** Seconds since this top was launched. Drives the settle ramp. */
   age: number;
+  /** Seconds left locked into the X-Rail, if the arena has one. */
+  railTime: number;
+  /** Seconds before this top may engage the rail again. */
+  railCooldown: number;
+  /** Rail engagements this round — shown in the breakdown. */
+  railRides: number;
   /** Whether this top's launch landed in the perfect band. */
   perfectLaunch: boolean;
   /** Clashes this top was the aggressor in — shown in the round breakdown. */

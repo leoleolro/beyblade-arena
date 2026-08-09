@@ -3,6 +3,8 @@ import { clamp, len, makeRng, vec } from './math';
 import { deriveStats } from './parts';
 import { step } from './physics';
 import type { HitEvent } from './physics';
+import { STANDARD } from './arena';
+import type { ArenaSpec } from './arena';
 import type {
   BeyBuild,
   BeyState,
@@ -24,6 +26,8 @@ export interface Fighter {
 export interface BattleOptions {
   seed?: number;
   pointsToWin?: number;
+  /** Gameplay arena. Changes the physics, unlike skins and themes. */
+  arena?: ArenaSpec;
 }
 
 /** Everything the renderer and HUD need to draw a frame. */
@@ -82,6 +86,9 @@ function makeBey(f: Fighter, launch: LaunchParams): BeyState {
     move: null,
     moveTime: 0,
     age: 0,
+    railTime: 0,
+    railCooldown: 0,
+    railRides: 0,
     perfectLaunch: perfect,
     hitsLanded: 0,
     spinDealt: 0,
@@ -101,6 +108,7 @@ function makeBey(f: Fighter, launch: LaunchParams): BeyState {
 export class Battle {
   readonly fighters: Fighter[];
   readonly pointsToWin: number;
+  readonly arena: ArenaSpec;
 
   phase: Phase = 'launch';
   beys: BeyState[] = [];
@@ -120,6 +128,7 @@ export class Battle {
     if (fighters.length < 2) throw new Error('A battle needs at least two fighters');
     this.fighters = fighters;
     this.pointsToWin = opts.pointsToWin ?? C.POINTS_TO_WIN;
+    this.arena = opts.arena ?? STANDARD;
     this.rng = makeRng(opts.seed ?? 0x5eed);
     for (const f of fighters) this.scores[f.id] = 0;
   }
@@ -202,7 +211,7 @@ export class Battle {
 
     let steps = 0;
     while (this.accumulator >= C.FIXED_DT && steps < C.MAX_SUBSTEPS) {
-      const hits = step(this.beys, C.FIXED_DT, this.rng);
+      const hits = step(this.beys, C.FIXED_DT, this.rng, this.arena);
       if (hits.length) this.hits.push(...hits);
       this.accumulator -= C.FIXED_DT;
       this.roundTime += C.FIXED_DT;

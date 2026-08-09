@@ -2,6 +2,8 @@ import * as C from './constants';
 import { clamp, dist, dot, len, norm, perp, rotate, vec } from './math';
 import type { Vec2 } from './math';
 import type { BeyState } from './types';
+import type { ArenaSpec, RailSpec } from './arena';
+import { STANDARD } from './arena';
 
 /**
  * The physics model.
@@ -75,8 +77,77 @@ export function settleScale(b: BeyState): number {
 export const spinNorm = (b: BeyState): number =>
   clamp(Math.abs(b.spin) / C.SPIN_REF, 0, 1);
 
+/**
+ * The X-Rail.
+ *
+ * Three phases, all driven off state already on the top:
+ *
+ *  1. **Engage** — inside the band, moving tangentially fast enough, off
+ *     cooldown. A top that merely drifts across the rail is not carrying enough
+ *     speed for the teeth to bite, which is what makes riding it a choice.
+ *  2. **Hold** — radial velocity is cancelled so it tracks the band, and
+ *     tangential speed is driven up to the ceiling.
+ *  3. **Release** — the exit velocity is rotated toward the centre. The
+ *     slingshot is the point; the speed is just how hard it arrives.
+ */
+function updateRail(b: BeyState, rail: RailSpec, dt: number): void {
+  b.railCooldown = Math.max(0, b.railCooldown - dt);
+
+  const r = len(b.pos);
+  if (r < 1e-6) return;
+
+  const outX = b.pos.x / r;
+  const outY = b.pos.y / r;
+  // Tangential direction, matching the way this top is already going round.
+  const spinSign = Math.sign(b.spin) || 1;
+  const tanX = -outY * spinSign;
+  const tanY = outX * spinSign;
+  const tangential = b.vel.x * tanX + b.vel.y * tanY;
+
+  if (b.railTime > 0) {
+    b.railTime = Math.max(0, b.railTime - dt);
+
+    // Cancel radial drift so the top tracks the band instead of spiralling off.
+    const radial = b.vel.x * outX + b.vel.y * outY;
+    b.vel.x -= outX * radial;
+    b.vel.y -= outY * radial;
+
+    // Drive it along the rail, up to the ceiling.
+    const speed = Math.hypot(b.vel.x, b.vel.y);
+    if (speed < rail.maxSpeed) {
+      b.vel.x += tanX * rail.accel * dt;
+      b.vel.y += tanY * rail.accel * dt;
+    }
+
+    // Hold it on the band itself.
+    b.pos.x = outX * rail.radius;
+    b.pos.y = outY * rail.radius;
+
+    if (b.railTime === 0) {
+      // Release: rotate the exit velocity inward. This is the slingshot.
+      const sp = Math.hypot(b.vel.x, b.vel.y);
+      const k = rail.releaseInward;
+      let dx = tanX * (1 - k) + -outX * k;
+      let dy = tanY * (1 - k) + -outY * k;
+      const dl = Math.hypot(dx, dy) || 1;
+      dx /= dl;
+      dy /= dl;
+      b.vel.x = dx * sp;
+      b.vel.y = dy * sp;
+      b.railCooldown = rail.cooldown;
+    }
+    return;
+  }
+
+  const inBand = Math.abs(r - rail.radius) <= rail.halfWidth;
+  if (inBand && b.railCooldown === 0 && tangential >= rail.engageSpeed) {
+    b.railTime = rail.duration;
+    b.railRides += 1;
+  }
+}
+
 /** Advance one top by dt, ignoring collisions. */
-function integrate(b: BeyState, dt: number): void {
+function integrate(b: BeyState, dt: number, arena: ArenaSpec): void {
   const r = len(b.pos);
   const outward = r < 1e-6 ? vec(1, 0) : vec(b.pos.x / r, b.pos.y / r);
   const sn = spinNorm(b);
@@ -133,6 +204,8 @@ function integrate(b: BeyState, dt: number): void {
   b.hitFlash = Math.max(0, b.hitFlash - dt * 3.5);
   b.age += dt;
   b.meter = clamp(b.meter + C.METER_GAIN_PER_SEC * dt, 0, 1);
+
+  if (arena.rail) updateRail(b, arena.rail, dt);
   if (b.moveTime > 0) {
     b.moveTime = Math.max(0, b.moveTime - dt);
     if (b.moveTime === 0) b.move = null;
@@ -416,12 +489,13 @@ export function step(
   beys: BeyState[],
   dt: number,
   rng: () => number = Math.random,
+  arena: ArenaSpec = STANDARD,
 ): HitEvent[] {
   const hits: HitEvent[] = [];
 
   for (const b of beys) {
     if (!b.alive) continue;
-    integrate(b, dt);
+    integrate(b, dt, arena);
   }
 
   // Pairwise — with 2-8 tops this is trivially cheap and exact.

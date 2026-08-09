@@ -6,6 +6,7 @@ import type { Channel } from './audio';
 import { THEMES } from './render/theme';
 import { GarageView } from './render/garageView';
 import { LADDER } from './ladder';
+import { ARENAS } from './sim/arena';
 import type { BeyState, MoveKind } from './sim/types';
 
 const hex = (n: number): string => `#${n.toString(16).padStart(6, '0')}`;
@@ -851,6 +852,26 @@ export class Ui {
       'Your rival is always given the most contrasting finish available, so the two tops stay easy to tell apart mid-battle.';
     skinRow.appendChild(skinNote);
     panel.appendChild(skinRow);
+
+    // Arena. Unlike skins and themes this changes the physics, so it is
+    // labelled as a match setting rather than sitting with the cosmetics.
+    const arenaRow = document.createElement('div');
+    arenaRow.className = 'slot';
+    arenaRow.innerHTML = '<h4>Arena — changes how the match plays</h4>';
+    const arenaChips = document.createElement('div');
+    arenaChips.className = 'chips';
+    for (const a of ARENAS) {
+      const chip = document.createElement('button');
+      chip.className = 'chip' + (g.arenaId === a.id ? ' on' : '');
+      chip.innerHTML = `<span>${escapeHtml(a.name)}<br><small>${escapeHtml(a.blurb)}</small></span>`;
+      chip.addEventListener('click', () => {
+        g.setArena(a.id);
+        this.render();
+      });
+      arenaChips.appendChild(chip);
+    }
+    arenaRow.appendChild(arenaChips);
+    panel.appendChild(arenaRow);
 
     // Visual theme. Cosmetic and fully reversible — 'Arena' is the original
     // look, reproduced exactly.

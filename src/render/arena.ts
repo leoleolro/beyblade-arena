@@ -15,6 +15,8 @@ import type { StadiumHandles } from './stadium';
 import { ARENA, themeById } from './theme';
 import type { Theme } from './theme';
 import { Shockwave } from './shockwave';
+import type { ArenaSpec } from '../sim/arena';
+import { buildRail } from './rail';
 
 interface BeyVisual {
   group: THREE.Group;
@@ -60,6 +62,8 @@ export class ArenaRenderer {
   private bloom: UnrealBloomPass | null = null;
   /** Seconds left of the decisive-blow blackout, when the theme uses one. */
   private blackout = 0;
+  /** The X-Rail ring, present only in arenas that have one. */
+  private rail: THREE.Group | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -148,6 +152,18 @@ export class ArenaRenderer {
     this.bloom = new UnrealBloomPass(new THREE.Vector2(w, h), 0.9, 0.55, 0.62);
     this.composer.addPass(this.bloom);
     this.composer.setSize(w, h);
+  }
+
+  /**
+   * Show or hide the arena's rail. Built once on first use and then toggled —
+   * a round can start in either arena and rebuilding each time would leak.
+   */
+  setArena(arena: ArenaSpec): void {
+    if (arena.rail && !this.rail) {
+      this.rail = buildRail(arena.rail.radius);
+      this.scene.add(this.rail);
+    }
+    if (this.rail) this.rail.visible = !!arena.rail;
   }
 
   /**
