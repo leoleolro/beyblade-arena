@@ -85,6 +85,7 @@ function makeBey(f: Fighter, launch: LaunchParams): BeyState {
     perfectLaunch: perfect,
     hitsLanded: 0,
     spinDealt: 0,
+    spinStolen: 0,
     biggestHit: 0,
     movesUsed: 0,
   };

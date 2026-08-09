@@ -46,27 +46,58 @@ export function buildBeyMesh(build: BeyBuild, skin: Skin): THREE.Group {
   tip.rotation.x = Math.PI; // point downward
   driverGroup.add(tip);
 
+  const driverMat = new THREE.MeshStandardMaterial({
+    color: 0x3d4450,
+    metalness: 0.7,
+    roughness: 0.45,
+  });
   const shaft = new THREE.Mesh(
     new THREE.CylinderGeometry(r * 0.3, r * 0.3, r * 0.4, 16),
-    new THREE.MeshStandardMaterial({
-      color: 0x3d4450,
-      metalness: 0.7,
-      roughness: 0.45,
-    }),
+    driverMat,
   );
   shaft.position.y = tipHeight + r * 0.1;
   driverGroup.add(shaft);
 
+  // Fins on the shaft. A plain cylinder is rotationally symmetric, so spinning
+  // it produces no visible change at all — the driver looked frozen while it
+  // was in fact turning faster than anything else on the top.
+  const finGeo = new THREE.BoxGeometry(r * 0.26, r * 0.3, r * 0.07);
+  for (let i = 0; i < 4; i++) {
+    const angle = (i / 4) * Math.PI * 2;
+    const fin = new THREE.Mesh(finGeo, driverMat);
+    fin.position.set(
+      Math.cos(angle) * r * 0.3,
+      tipHeight + r * 0.1,
+      Math.sin(angle) * r * 0.3,
+    );
+    fin.rotation.y = -angle;
+    driverGroup.add(fin);
+  }
+
   // ---- disc: the heavy middle ---------------------------------------------
   const discHeight = r * 0.46;
   const discY = tipHeight + r * 0.36;
+  // Six radial segments rather than 24: the flat faces catch the light
+  // differently as it turns, which is what makes the rotation readable.
+  const discMat = skinMaterial(skin, skin.secondary);
   const discMesh = new THREE.Mesh(
-    new THREE.CylinderGeometry(r * 0.78, r * 0.88, discHeight, 24),
-    skinMaterial(skin, skin.secondary),
+    new THREE.CylinderGeometry(r * 0.78, r * 0.88, discHeight, 6),
+    discMat,
   );
   discMesh.position.y = discY;
   discMesh.castShadow = true;
   discGroup.add(discMesh);
+
+  // Weight blocks around the rim, the disc's equivalent of the layer's blades.
+  const weightGeo = new THREE.BoxGeometry(r * 0.2, discHeight * 1.15, r * 0.16);
+  for (let i = 0; i < 3; i++) {
+    const angle = (i / 3) * Math.PI * 2 + Math.PI / 6;
+    const w = new THREE.Mesh(weightGeo, discMat);
+    w.position.set(Math.cos(angle) * r * 0.8, discY, Math.sin(angle) * r * 0.8);
+    w.rotation.y = -angle;
+    w.castShadow = true;
+    discGroup.add(w);
+  }
 
   // ---- layer: the contact ring, plus one blade per contact point ----------
   const layerY = discY + discHeight * 0.5 + r * 0.2;

@@ -24,15 +24,15 @@ import type {
 
 export const LAYERS: LayerPart[] = [
   // Attack: hits hard, folds fast.
-  { id: 'valtryek',  name: 'Valtryek',  kind: 'layer', archetype: 'attack',  mass: 0.42, radius: 0.1066, attack: 1.42, defense: 0.80, burstResist: 0.88, blades: 3, colour: 0x3b82f6 },
-  { id: 'ragnaruk',  name: 'Ragnaruk',  kind: 'layer', archetype: 'attack',  mass: 0.50, radius: 0.1144, attack: 1.58, defense: 0.68, burstResist: 0.92, blades: 2, colour: 0xf59e0b },
+  { id: 'valtryek',  name: 'Valtryek',  kind: 'layer', archetype: 'attack',  mass: 0.42, radius: 0.1066, attack: 1.42, defense: 0.80, burstResist: 0.88, spinSteal: 0.0, blades: 3, colour: 0x3b82f6 },
+  { id: 'ragnaruk',  name: 'Ragnaruk',  kind: 'layer', archetype: 'attack',  mass: 0.50, radius: 0.1144, attack: 1.58, defense: 0.68, burstResist: 1.02, spinSteal: 0.0, blades: 2, colour: 0xf59e0b },
   // Balance: no strong edge, no glaring hole.
-  { id: 'spryzen',   name: 'Spryzen',   kind: 'layer', archetype: 'balance', mass: 0.46, radius: 0.1027, attack: 1.10, defense: 0.98, burstResist: 0.95, blades: 4, colour: 0xef4444 },
-  { id: 'luinor',    name: 'Luinor',    kind: 'layer', archetype: 'balance', mass: 0.48, radius: 0.1053, attack: 1.18, defense: 0.94, burstResist: 0.96, blades: 5, colour: 0x06b6d4 },
+  { id: 'spryzen',   name: 'Spryzen',   kind: 'layer', archetype: 'balance', mass: 0.46, radius: 0.1027, attack: 1.10, defense: 0.98, burstResist: 0.95, spinSteal: 0.0, blades: 4, colour: 0xef4444 },
+  { id: 'luinor',    name: 'Luinor',    kind: 'layer', archetype: 'balance', mass: 0.48, radius: 0.1053, attack: 1.18, defense: 0.94, burstResist: 0.96, spinSteal: 0.12, blades: 5, colour: 0x06b6d4 },
   // Stamina: outlasts everything, but light and soft — attackers eat it.
-  { id: 'fafnir',    name: 'Fafnir',    kind: 'layer', archetype: 'stamina', mass: 0.40, radius: 0.0988, attack: 0.74, defense: 1.00, burstResist: 1.18, blades: 6, colour: 0x22c55e },
+  { id: 'fafnir',    name: 'Fafnir',    kind: 'layer', archetype: 'stamina', mass: 0.40, radius: 0.0988, attack: 0.74, defense: 1.00, burstResist: 1.18, spinSteal: 0.62, blades: 6, colour: 0x22c55e },
   // Defense: a wall that cannot finish anyone.
-  { id: 'aegis',     name: 'Aegis',     kind: 'layer', archetype: 'defense', mass: 0.54, radius: 0.1092, attack: 0.68, defense: 1.55, burstResist: 1.26, blades: 8, colour: 0xa855f7 },
+  { id: 'aegis',     name: 'Aegis',     kind: 'layer', archetype: 'defense', mass: 0.54, radius: 0.1092, attack: 0.68, defense: 1.55, burstResist: 1.26, spinSteal: 0.0, blades: 8, colour: 0xa855f7 },
 ];
 
 export const DISCS: DiscPart[] = [
@@ -45,7 +45,7 @@ export const DISCS: DiscPart[] = [
 
 export const DRIVERS: DriverPart[] = [
   { id: 'xtreme',   name: 'Xtreme',   kind: 'driver', archetype: 'attack',  mass: 0.20, friction: 0.55, spinRetention: 0.85, wander: 1.55, burstResist: 0.92 },
-  { id: 'volcanic', name: 'Volcanic', kind: 'driver', archetype: 'attack',  mass: 0.18, friction: 0.42, spinRetention: 0.88, wander: 1.85, burstResist: 0.85 },
+  { id: 'volcanic', name: 'Volcanic', kind: 'driver', archetype: 'attack',  mass: 0.18, friction: 0.42, spinRetention: 0.95, wander: 1.85, burstResist: 0.85 },
   { id: 'atomic',   name: 'Atomic',   kind: 'driver', archetype: 'balance', mass: 0.24, friction: 0.82, spinRetention: 1.02, wander: 0.55, burstResist: 0.95 },
   { id: 'orbit',    name: 'Orbit',    kind: 'driver', archetype: 'stamina', mass: 0.22, friction: 0.70, spinRetention: 1.35, wander: 0.18, burstResist: 0.82 },
   { id: 'needle',   name: 'Needle',   kind: 'driver', archetype: 'stamina', mass: 0.19, friction: 0.50, spinRetention: 1.42, wander: 0.06, burstResist: 1.15 },
@@ -75,6 +75,7 @@ export function deriveStats(build: BeyBuild): BeyStats {
     attack: l.attack,
     defense: l.defense * d.stability,
     burstResist: l.burstResist * dr.burstResist,
+    spinSteal: l.spinSteal,
     friction: dr.friction,
     spinRetention: dr.spinRetention * d.spinRetention,
     stability: d.stability,

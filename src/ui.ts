@@ -414,6 +414,11 @@ export class Ui {
           <tr><td>Spin left</td><td>${pct(Math.abs(you.spin) / you.spinAtLaunch)}</td><td>${pct(Math.abs(them.spin) / them.spinAtLaunch)}</td></tr>
           <tr><td>Hits landed</td><td>${you.hitsLanded}</td><td>${them.hitsLanded}</td></tr>
           <tr><td>Spin drained</td><td>${Math.round(you.spinDealt)}</td><td>${Math.round(them.spinDealt)}</td></tr>
+          ${
+            you.spinStolen > 0 || them.spinStolen > 0
+              ? `<tr><td>Spin absorbed</td><td>${Math.round(you.spinStolen)}</td><td>${Math.round(them.spinStolen)}</td></tr>`
+              : ''
+          }
           <tr><td>Biggest hit</td><td>${you.biggestHit.toFixed(1)}</td><td>${them.biggestHit.toFixed(1)}</td></tr>
           <tr><td>Moves used</td><td>${you.movesUsed}</td><td>${them.movesUsed}</td></tr>
           <tr><td>Burst charge</td><td>${pct(you.burst)}</td><td>${pct(them.burst)}</td></tr>
@@ -740,7 +745,9 @@ export class Ui {
           id: l.id,
           name: l.name,
           colour: l.colour,
-          note: `${l.archetype} · atk ${l.attack} · def ${l.defense}`,
+          note:
+            `${l.archetype} · atk ${l.attack} · def ${l.defense}` +
+            (l.spinSteal > 0 ? ` · absorbs ${Math.round(l.spinSteal * 100)}%` : ''),
         })),
         'layer',
       ],

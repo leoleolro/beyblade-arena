@@ -21,6 +21,17 @@ export interface LayerPart {
   defense: number;
   /** Divides burst charge accumulated on contact. */
   burstResist: number;
+  /**
+   * Spin absorption, 0–1. A rubber-bladed layer bites into an opponent turning
+   * the *other* way and converts part of that contact back into its own
+   * rotation, so it can visibly recover spin over a long exchange.
+   *
+   * Only works in opposite-spin matchups — against a same-spin opponent the
+   * blades are travelling the same way at the contact point and there is
+   * nothing to grab. That restriction is what stops it being a free stat and
+   * makes the spin-direction choice matter.
+   */
+  spinSteal: number;
   /** Number of contact blades — purely visual. */
   blades: number;
   colour: number;
@@ -73,6 +84,7 @@ export interface BeyStats {
   attack: number;
   defense: number;
   burstResist: number;
+  spinSteal: number;
   friction: number;
   spinRetention: number;
   stability: number;
@@ -122,6 +134,8 @@ export interface BeyState {
   hitsLanded: number;
   /** Total spin this top has drained from opponents. */
   spinDealt: number;
+  /** Total spin this top has absorbed back from opponents. */
+  spinStolen: number;
   /** Hardest impact this top was involved in. */
   biggestHit: number;
   /** Moves spent this round. */

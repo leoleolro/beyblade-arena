@@ -153,6 +153,30 @@ The rival picks its own direction from its archetype — aggressive builds seek
 the exchanges, stamina builds seek the attrition race — so the matchup is worth
 reading before you commit.
 
+## Spin absorption
+
+The rubber-blade mechanic from the series: a layer with `spinSteal` bites into an
+opponent turning the *other* way and converts part of that contact back into its
+own rotation. The top looks like it's dying, then climbs back with every further
+clash — Fafnir absorbs 62%, Luinor 12%, everything else nothing.
+
+It **only works in opposite-spin matchups**. Against a same-spin opponent the
+blades travel together at the contact point and there is nothing to bite into.
+That restriction is what stops it being a free stat, and it gives the
+spin-direction choice real weight: an absorber *wants* the pairing that would
+destroy anything else. Measured, the absorber survives **14.7s in opposite-spin
+against 7.4s in same-spin**.
+
+Stolen spin is capped at launch spin. Uncapped, a long absorbing exchange
+ratchets upward and the round never ends. `src/sim/steal.test.ts` pins all four
+invariants: it works, it's inert in same-spin, it never exceeds launch spin, and
+a non-absorbing layer absorbs nothing.
+
+Adding it fixed the game's chronically weakest build — Endless Coil went from
+32% to 47% — and needed one compensating buff to Ragnaruk, whose fast
+opposite-spin kills the mechanic was designed to blunt. Preset spread is now
+**33%–63%**, the tightest it has been.
+
 ## The move triangle
 
 The three battle moves beat each other in a cycle, and that cycle is a

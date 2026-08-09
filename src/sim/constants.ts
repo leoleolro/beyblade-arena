@@ -316,3 +316,25 @@ export const PERFECT_LAUNCH_MIN = 0.72;
 export const PERFECT_LAUNCH_MAX = 0.9;
 /** Extra spin and speed granted for nailing it. */
 export const PERFECT_LAUNCH_SPIN_BONUS = 0.14;
+
+// ------------------------------------------------------------- spin steal ---
+
+/**
+ * Spin absorption, the rubber-blade mechanic.
+ *
+ * A layer with `spinSteal` bites into an opponent turning the *other* way and
+ * converts part of that contact back into its own rotation — the top looks like
+ * it is dying, then climbs back with every further clash. It only works in
+ * opposite-spin matchups, which is what stops it being a free stat and gives
+ * the spin-direction choice real weight.
+ */
+
+/** Fraction of the damage dealt that the absorber converts into its own spin. */
+export const SPIN_STEAL_GAIN = 0.85;
+/** How much of the absorber's *own* loss is negated while absorbing. */
+export const SPIN_STEAL_MITIGATION = 0.55;
+/**
+ * Ceiling on stolen spin, as a fraction of launch spin. Without it a long
+ * absorbing exchange ratchets upward without limit and the round never ends.
+ */
+export const SPIN_STEAL_CAP = 1.0;

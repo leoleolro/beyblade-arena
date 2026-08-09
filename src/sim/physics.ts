@@ -351,8 +351,32 @@ function resolvePair(a: BeyState, b: BeyState, rng: () => number): HitEvent | nu
   const reflectToA = rawB * mvB.reflect * shareA * (perfectB ? C.PERFECT_BLOCK_REFLECT_MULT : 1);
   const reflectToB = rawA * mvA.reflect * shareB * (perfectA ? C.PERFECT_BLOCK_REFLECT_MULT : 1);
 
-  a.spin = Math.max(0, Math.abs(a.spin) - lossA - reflectToA) * (dirA || 1);
-  b.spin = Math.max(0, Math.abs(b.spin) - lossB - reflectToB) * (dirB || 1);
+  // Spin absorption. Only against an opponent turning the other way: in a
+  // same-spin clash the blades travel together at the contact point and there
+  // is nothing to bite into.
+  const stealA = opposite ? a.stats.spinSteal : 0;
+  const stealB = opposite ? b.stats.spinSteal : 0;
+
+  // The absorber both takes less and converts part of what it dealt into its
+  // own rotation — the signature "it was nearly dead and it's climbing back".
+  const netLossA = (lossA + reflectToA) * (1 - stealA * C.SPIN_STEAL_MITIGATION);
+  const netLossB = (lossB + reflectToB) * (1 - stealB * C.SPIN_STEAL_MITIGATION);
+  const gainA = lossB * stealA * C.SPIN_STEAL_GAIN;
+  const gainB = lossA * stealB * C.SPIN_STEAL_GAIN;
+
+  // Capped at launch spin: a top can recover, but never end up faster than it
+  // was launched, or a long absorbing exchange ratchets upward forever.
+  const stealCapA = a.spinAtLaunch * C.SPIN_STEAL_CAP;
+  const stealCapB = b.spinAtLaunch * C.SPIN_STEAL_CAP;
+
+  a.spin =
+    Math.min(stealCapA, Math.max(0, Math.abs(a.spin) - netLossA + gainA)) * (dirA || 1);
+  b.spin =
+    Math.min(stealCapB, Math.max(0, Math.abs(b.spin) - netLossB + gainB)) * (dirB || 1);
+
+  // Surfaced so the round breakdown can show absorption happening.
+  a.spinStolen += gainA;
+  b.spinStolen += gainB;
 
   a.burst += ((impact * C.BURST_PER_HIT * atkB * aggrB) / burstResA) * settle;
   b.burst += ((impact * C.BURST_PER_HIT * atkA * aggrA) / burstResB) * settle;
