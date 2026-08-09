@@ -11,6 +11,7 @@ let ui: Ui;
 const game = new Game(canvas, {
   onScreen: () => ui.render(),
   onFrame: () => ui.tick(),
+  onFinish: (reason, won) => ui.showFinisher(reason, won),
 });
 
 ui = new Ui(uiRoot, game);

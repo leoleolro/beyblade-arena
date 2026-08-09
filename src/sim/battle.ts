@@ -190,10 +190,14 @@ export class Battle {
    * steps; leftover time carries to the next call.
    */
   update(deltaSeconds: number): void {
+    // Clear before the early return, not after it. Leaving stale events in
+    // `hits` meant the renderer kept re-spawning sparks and re-adding camera
+    // shake from the round's final clash on every frame of the result screen,
+    // the garage and the home screen, until the next launch reset it.
+    this.hits = [];
     if (this.phase !== 'battle') return;
 
     this.accumulator += Math.min(deltaSeconds, 0.25);
-    this.hits = [];
 
     let steps = 0;
     while (this.accumulator >= C.FIXED_DT && steps < C.MAX_SUBSTEPS) {

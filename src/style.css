@@ -937,3 +937,81 @@ button.primary.ghost:hover {
   font-size: 11.5px;
   color: var(--dim);
 }
+
+/* ------------------------------------------------------------- finisher */
+
+/* Letterbox title card over the 1.15s finish hold. Pure CSS over the canvas,
+   so it costs the renderer nothing and can't break the 3D path. */
+.finisher {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  display: grid;
+  align-content: space-between;
+  justify-items: center;
+}
+
+.finisher-bar {
+  width: 100%;
+  height: 14vh;
+  background: #000;
+  transform-origin: center;
+  animation: bar-in 180ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
+}
+
+.finisher-bar.bottom {
+  animation-delay: 40ms;
+}
+
+@keyframes bar-in {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+
+.finisher-word {
+  align-self: center;
+  font-size: clamp(30px, 8vw, 78px);
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  line-height: 1;
+  text-align: center;
+  color: #fff;
+  text-shadow:
+    0 0 24px rgba(255, 255, 255, 0.55),
+    0 0 60px currentColor;
+  animation: word-in 320ms cubic-bezier(0.15, 1.2, 0.3, 1) both;
+  animation-delay: 90ms;
+}
+
+.finisher.win .finisher-word { color: #38f39a; }
+.finisher.lose .finisher-word { color: #ff3d6e; }
+
+@keyframes word-in {
+  from { opacity: 0; transform: scale(1.6) skewX(-9deg); letter-spacing: 0.5em; }
+  to { opacity: 1; transform: scale(1) skewX(-9deg); letter-spacing: 0.16em; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .finisher-bar,
+  .finisher-word {
+    animation: none;
+  }
+}
+
+/* The anime theme pushes the DOM overlay harder too: heavier weights, sharper
+   accents. The default theme is untouched. */
+body.theme-beam .scoreboard,
+body.theme-beam .card,
+body.theme-beam .move {
+  border-color: rgba(120, 220, 255, 0.3);
+  background: rgba(4, 8, 20, 0.82);
+}
+
+body.theme-beam .scoreboard .pts {
+  text-shadow: 0 0 18px rgba(103, 232, 249, 0.7);
+}
+
+body.theme-beam .fill-spin {
+  background: linear-gradient(90deg, #22d3ee, #a5f3fc);
+  box-shadow: 0 0 10px rgba(34, 211, 238, 0.6);
+}

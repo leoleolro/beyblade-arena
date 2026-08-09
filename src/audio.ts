@@ -13,25 +13,84 @@
 
 export type MoveSound = 'charge' | 'block' | 'dodge';
 
+/** The separately controllable audio channels. */
+export type Channel = 'master' | 'effects' | 'drone';
+
+export interface AudioSettings {
+  master: boolean;
+  /** Impacts, launches, move cues, stings. Short and transient. */
+  effects: boolean;
+  /**
+   * The continuous spin drone. Default OFF.
+   *
+   * A sustained tone that never resolves is fatiguing in a way short effects
+   * are not — a playtester described it as a headache and assumed it was
+   * background music. It is genuinely informative (pitch tracks remaining
+   * spin), so it stays available, but opting *in* is the right default.
+   */
+  drone: boolean;
+}
+
+const SETTINGS_KEY = 'beyblade-arena.audio.v1';
+
+const DEFAULT_SETTINGS: AudioSettings = {
+  master: true,
+  effects: true,
+  drone: false,
+};
+
 export class Audio {
   private ctx: AudioContext | null = null;
+  /** master -> destination. Everything routes through here. */
   private master: GainNode | null = null;
+  /** Transient sounds. */
+  private fx: GainNode | null = null;
+  /** The sustained spin drone, on its own bus so it can be silenced alone. */
+  private droneBus: GainNode | null = null;
   private noiseBuffer: AudioBuffer | null = null;
 
   /** The continuous spin whine, one per top. */
   private whines = new Map<string, { osc: OscillatorNode; gain: GainNode }>();
 
-  private muted = false;
+  settings: AudioSettings = Audio.loadSettings();
 
-  get isMuted(): boolean {
-    return this.muted;
+  private static loadSettings(): AudioSettings {
+    try {
+      const raw = localStorage.getItem(SETTINGS_KEY);
+      if (!raw) return { ...DEFAULT_SETTINGS };
+      return { ...DEFAULT_SETTINGS, ...(JSON.parse(raw) as Partial<AudioSettings>) };
+    } catch {
+      return { ...DEFAULT_SETTINGS };
+    }
   }
 
-  setMuted(m: boolean): void {
-    this.muted = m;
-    if (this.master && this.ctx) {
-      this.master.gain.setTargetAtTime(m ? 0 : 0.9, this.ctx.currentTime, 0.05);
+  private saveSettings(): void {
+    try {
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(this.settings));
+    } catch {
+      // Storage unavailable; the setting still applies for this session.
     }
+  }
+
+  isOn(channel: Channel): boolean {
+    return this.settings[channel];
+  }
+
+  setChannel(channel: Channel, on: boolean): void {
+    this.settings[channel] = on;
+    this.saveSettings();
+    this.applyGains();
+    // Silencing the drone should stop it immediately, not wait for the round.
+    if (channel === 'drone' && !on) this.stopWhines();
+  }
+
+  private applyGains(): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.master || !this.fx || !this.droneBus) return;
+    const t = ctx.currentTime;
+    this.master.gain.setTargetAtTime(this.settings.master ? 0.9 : 0, t, 0.05);
+    this.fx.gain.setTargetAtTime(this.settings.effects ? 1 : 0, t, 0.05);
+    this.droneBus.gain.setTargetAtTime(this.settings.drone ? 1 : 0, t, 0.05);
   }
 
   /** Safe to call repeatedly; only the first call does anything. */
@@ -45,9 +104,16 @@ export class Audio {
       if (!Ctor) return;
       this.ctx = new Ctor();
       this.master = this.ctx.createGain();
-      this.master.gain.value = this.muted ? 0 : 0.9;
       this.master.connect(this.ctx.destination);
+
+      this.fx = this.ctx.createGain();
+      this.fx.connect(this.master);
+
+      this.droneBus = this.ctx.createGain();
+      this.droneBus.connect(this.master);
+
       this.noiseBuffer = this.makeNoise(this.ctx, 1.2);
+      this.applyGains();
     }
     if (this.ctx.state === 'suspended') void this.ctx.resume();
   }
@@ -69,7 +135,7 @@ export class Audio {
     sweepTo?: number;
   }): void {
     const ctx = this.ctx;
-    if (!ctx || !this.master || !this.noiseBuffer) return;
+    if (!ctx || !this.fx || !this.noiseBuffer) return;
     const t = ctx.currentTime;
 
     const src = ctx.createBufferSource();
@@ -92,7 +158,7 @@ export class Audio {
     gain.gain.exponentialRampToValueAtTime(opts.gain, t + 0.006);
     gain.gain.exponentialRampToValueAtTime(0.0001, t + opts.duration);
 
-    src.connect(filter).connect(gain).connect(this.master);
+    src.connect(filter).connect(gain).connect(this.fx);
     src.start(t);
     src.stop(t + opts.duration + 0.02);
   }
@@ -106,7 +172,7 @@ export class Audio {
     sweepTo?: number;
   }): void {
     const ctx = this.ctx;
-    if (!ctx || !this.master) return;
+    if (!ctx || !this.fx) return;
     const t = ctx.currentTime;
 
     const osc = ctx.createOscillator();
@@ -124,7 +190,7 @@ export class Audio {
     gain.gain.exponentialRampToValueAtTime(opts.gain, t + 0.012);
     gain.gain.exponentialRampToValueAtTime(0.0001, t + opts.duration);
 
-    osc.connect(gain).connect(this.master);
+    osc.connect(gain).connect(this.fx);
     osc.start(t);
     osc.stop(t + opts.duration + 0.02);
   }
@@ -195,7 +261,8 @@ export class Audio {
    */
   updateWhine(id: string, spinNorm: number, alive: boolean): void {
     const ctx = this.ctx;
-    if (!ctx || !this.master) return;
+    if (!ctx || !this.droneBus) return;
+    if (!this.settings.drone) return;
 
     let w = this.whines.get(id);
     if (!alive || spinNorm <= 0.01) {
@@ -209,13 +276,18 @@ export class Audio {
 
     if (!w) {
       const osc = ctx.createOscillator();
-      osc.type = 'sawtooth';
+      // Triangle rather than sawtooth. A sawtooth's dense upper harmonics are
+      // what made this abrasive over a full round; a triangle carries the same
+      // pitch information with a fraction of the harmonic content.
+      osc.type = 'triangle';
       const gain = ctx.createGain();
       gain.gain.value = 0;
       const filter = ctx.createBiquadFilter();
       filter.type = 'lowpass';
-      filter.frequency.value = 1800;
-      osc.connect(filter).connect(gain).connect(this.master);
+      // Well below the ear's 2-5kHz sensitivity peak, where sustained energy
+      // is most tiring.
+      filter.frequency.value = 900;
+      osc.connect(filter).connect(gain).connect(this.droneBus);
       osc.start();
       w = { osc, gain };
       this.whines.set(id, w);
@@ -223,7 +295,8 @@ export class Audio {
 
     const t = ctx.currentTime;
     w.osc.frequency.setTargetAtTime(70 + spinNorm * 190, t, 0.1);
-    w.gain.gain.setTargetAtTime(0.018 + spinNorm * 0.03, t, 0.1);
+    // Roughly half the previous level, and two tops sum.
+    w.gain.gain.setTargetAtTime(0.009 + spinNorm * 0.015, t, 0.1);
   }
 
   /** Stop every whine, e.g. when a round ends. */

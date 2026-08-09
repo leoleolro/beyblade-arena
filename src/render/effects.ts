@@ -38,6 +38,13 @@ export class SparkBurst {
     this.points.frustumCulled = false;
   }
 
+  /** Re-style for a theme. Same pool, different look. */
+  setStyle(colour: number, size: number): void {
+    const mat = this.points.material as THREE.PointsMaterial;
+    mat.color.setHex(colour);
+    mat.size = size;
+  }
+
   /** Spawn `count` sparks at a world position, scaled by hit strength. */
   spawn(at: THREE.Vector3, strength: number, count = 24): void {
     // Clamp the strength term: a heavy opposite-spin clash can register an
@@ -131,5 +138,9 @@ export class Trail {
 
   setVisible(v: boolean): void {
     this.line.visible = v;
+  }
+
+  setOpacity(o: number): void {
+    (this.line.material as THREE.LineBasicMaterial).opacity = o;
   }
 }

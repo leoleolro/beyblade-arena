@@ -2,11 +2,22 @@ import type { Game } from './game';
 import { DISCS, DRIVERS, LAYERS, deriveStats } from './sim/parts';
 import * as C from './sim/constants';
 import { SKINS, skinById } from './render/skins';
+import type { Channel } from './audio';
+import { THEMES } from './render/theme';
 import { LADDER } from './ladder';
 import type { BeyState, MoveKind } from './sim/types';
 
 const hex = (n: number): string => `#${n.toString(16).padStart(6, '0')}`;
 const pct = (n: number): string => `${Math.round(Math.max(0, Math.min(1, n)) * 100)}%`;
+
+/** Short, loud version of the finish reason for the title card. */
+const FINISHER_WORD: Record<string, string> = {
+  knockout: 'RING OUT',
+  burst: 'BURST FINISH',
+  'spin-finish': 'SPIN FINISH',
+  timeout: 'TIME UP',
+  draw: 'DOUBLE KO',
+};
 
 const REASON_TEXT: Record<string, string> = {
   knockout: 'Ring out! +2',
@@ -115,6 +126,23 @@ export class Ui {
         rivalMove.className = 'rival-move';
       }
     }
+  }
+
+  /**
+   * The finisher title card: letterbox bars and the finish reason, shown during
+   * the 1.15s hold that already exists. Pure CSS over the canvas — it converts
+   * a beat that was previously dead time into the moment of the round.
+   */
+  showFinisher(reason: string, won: boolean): void {
+    const el = document.createElement('div');
+    el.className = `finisher ${won ? 'win' : 'lose'}`;
+    el.innerHTML = `
+      <div class="finisher-bar top"></div>
+      <div class="finisher-word">${escapeHtml(FINISHER_WORD[reason] ?? 'FINISH')}</div>
+      <div class="finisher-bar bottom"></div>`;
+    this.root.appendChild(el);
+    // Remove itself when the hold ends; the result panel takes over from here.
+    window.setTimeout(() => el.remove(), 1400);
   }
 
   /** Flash a move button that the player couldn't afford. */
@@ -740,6 +768,26 @@ export class Ui {
     skinRow.appendChild(skinNote);
     panel.appendChild(skinRow);
 
+    // Visual theme. Cosmetic and fully reversible — 'Arena' is the original
+    // look, reproduced exactly.
+    const themeRow = document.createElement('div');
+    themeRow.className = 'slot';
+    themeRow.innerHTML = '<h4>Visual style</h4>';
+    const themeChips = document.createElement('div');
+    themeChips.className = 'chips';
+    for (const t of THEMES) {
+      const chip = document.createElement('button');
+      chip.className = 'chip' + (g.themeId === t.id ? ' on' : '');
+      chip.innerHTML = `<span>${escapeHtml(t.name)}<br><small>${escapeHtml(t.blurb)}</small></span>`;
+      chip.addEventListener('click', () => {
+        g.setTheme(t.id);
+        this.render();
+      });
+      themeChips.appendChild(chip);
+    }
+    themeRow.appendChild(themeChips);
+    panel.appendChild(themeRow);
+
     // Spin direction. Measured, the two pairings play completely differently,
     // so this is a real decision rather than a cosmetic toggle.
     const spinRow = document.createElement('div');
@@ -789,17 +837,41 @@ export class Ui {
     howto.addEventListener('click', () => g.goTo('howto'));
     row.appendChild(howto);
 
-    const sound = document.createElement('button');
-    sound.className = 'chip';
-    const label = (): string => (g.audio.isMuted ? 'Sound off' : 'Sound on');
-    sound.innerHTML = `<span>${label()}</span>`;
-    sound.addEventListener('click', () => {
-      g.audio.resume();
-      g.audio.setMuted(!g.audio.isMuted);
-      sound.innerHTML = `<span>${label()}</span>`;
-    });
-    row.appendChild(sound);
     panel.appendChild(row);
+
+    // Audio, split by channel. The sustained spin drone is the fatiguing one
+    // and is off by default, so it needs its own switch rather than being
+    // bundled under a single "sound" toggle.
+    const audioRow = document.createElement('div');
+    audioRow.className = 'slot';
+    audioRow.style.marginTop = '20px';
+    audioRow.innerHTML = '<h4>Audio</h4>';
+    const audioChips = document.createElement('div');
+    audioChips.className = 'chips';
+
+    const channels: [Channel, string, string][] = [
+      ['master', 'All sound', 'everything'],
+      ['effects', 'Impacts & cues', 'hits, launches, moves'],
+      ['drone', 'Spin drone', 'continuous — off by default'],
+    ];
+    for (const [ch, label, note] of channels) {
+      const chip = document.createElement('button');
+      const set = () => {
+        chip.className = 'chip' + (g.audio.isOn(ch) ? ' on' : '');
+        chip.innerHTML = `<span>${escapeHtml(label)}<br><small>${escapeHtml(
+          g.audio.isOn(ch) ? note : 'off',
+        )}</small></span>`;
+      };
+      set();
+      chip.addEventListener('click', () => {
+        g.audio.resume();
+        g.audio.setChannel(ch, !g.audio.isOn(ch));
+        set();
+      });
+      audioChips.appendChild(chip);
+    }
+    audioRow.appendChild(audioChips);
+    panel.appendChild(audioRow);
 
     overlay.appendChild(panel);
     return overlay;

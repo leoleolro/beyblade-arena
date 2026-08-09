@@ -6,6 +6,7 @@ import { Progress } from './progress';
 import type { Difficulty } from './ai';
 import { ArenaRenderer } from './render/arena';
 import { pickContrastingSkin, skinById } from './render/skins';
+import { loadThemeId, saveThemeId } from './render/theme';
 import { Battle } from './sim/battle';
 import type { Fighter } from './sim/battle';
 import * as C from './sim/constants';
@@ -25,7 +26,12 @@ export type Screen =
 export interface GameEvents {
   onScreen(screen: Screen): void;
   onFrame(): void;
+  /** The decisive blow, fired at the start of the finish hold. */
+  onFinish(reason: string, playerWon: boolean): void;
 }
+
+/** Shared empty array, so the no-hits path allocates nothing per frame. */
+const EMPTY_HITS: never[] = [];
 
 const PLAYER_ID = 'player';
 const AI_ID = 'ai';
@@ -47,6 +53,14 @@ export class Game {
   rivalSkinId = 'ember';
 
   readonly progress = new Progress();
+  /** Visual theme id. Cosmetic only; 'arena' is the untouched original look. */
+  themeId = loadThemeId();
+
+  setTheme(id: string): void {
+    this.themeId = id;
+    saveThemeId(id);
+    this.renderer.setTheme(id);
+  }
   /** What the last match unlocked, for the result screen to reveal. */
   lastUnlocks: Unlocks = {};
 
@@ -92,6 +106,7 @@ export class Game {
   constructor(canvas: HTMLCanvasElement, events: GameEvents) {
     this.events = events;
     this.renderer = new ArenaRenderer(canvas);
+    this.renderer.setTheme(this.themeId);
     this.battle = this.makeBattle(this.playerBuild, this.ai.chooseBuild(null).build);
     window.addEventListener('resize', () => this.renderer.resize());
   }
@@ -218,6 +233,9 @@ export class Game {
   }
 
   private setScreen(s: Screen): void {
+    // Leaving the arena silences anything sustained. Belt and braces against
+    // a drone outliving the round that spawned it.
+    if (s !== 'battle') this.audio.stopWhines();
     this.screen = s;
     this.events.onScreen(s);
   }
@@ -266,8 +284,14 @@ export class Game {
           this.audio.impact(h.strength, h.opposite);
           if (h.strength >= C.HITSTOP_THRESHOLD) this.hitstop = C.HITSTOP_DURATION;
         }
-        for (const b of this.battle.beys) {
-          this.audio.updateWhine(b.id, Math.abs(b.spin) / C.SPIN_REF, b.alive);
+        // Only while the round is genuinely running. `screen` stays 'battle'
+        // for the whole finish hold, so without this guard the drone is
+        // recreated on the frame after roundEnd() stopped it and then plays on
+        // through the result screen and menus, never stopping.
+        if (this.battle.phase === 'battle') {
+          for (const b of this.battle.beys) {
+            this.audio.updateWhine(b.id, Math.abs(b.spin) / C.SPIN_REF, b.alive);
+          }
         }
       }
 
@@ -275,6 +299,11 @@ export class Game {
       if (this.battle.phase !== 'battle' && this.finishHold <= 0) {
         this.finishHold = C.FINISH_HOLD_TIME;
         this.audio.roundEnd(this.battle.lastRound?.winnerId === PLAYER_ID);
+        this.renderer.finish();
+        this.events.onFinish(
+          this.battle.lastRound?.reason ?? 'timeout',
+          this.battle.lastRound?.winnerId === PLAYER_ID,
+        );
 
         // Record the match exactly once, the moment it is decided.
         if (this.battle.phase === 'match-over' && !this.matchRecorded) {
@@ -297,7 +326,10 @@ export class Game {
     // Keep drawing on every screen so the stadium is never a dead frame.
     // During the finish hold the renderer runs slow; that is what sells it.
     const renderDt = this.finishHold > 0 ? dt * C.FINISH_RENDER_SCALE : dt;
-    this.renderer.update(this.battle.beys, this.battle.hits, renderDt);
+    // Belt and braces alongside the fix in Battle.update: effects are only ever
+    // driven by hits from a round that is actually running.
+    const hits = this.screen === 'battle' ? this.battle.hits : EMPTY_HITS;
+    this.renderer.update(this.battle.beys, hits, renderDt);
     this.events.onFrame();
     requestAnimationFrame(this.tick);
   };

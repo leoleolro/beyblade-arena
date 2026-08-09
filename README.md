@@ -298,6 +298,52 @@ Storage is treated as unreliable — private browsing and a full quota both thro
 — so every access is wrapped. With storage unavailable the game plays
 identically and simply forgets between reloads.
 
+## Visual themes
+
+Two looks, switchable in the garage and persisted:
+
+- **Arena** — the original clean technical style. `ARENA` in `src/render/theme.ts`
+  is a literal transcription of the values that used to be hardcoded across
+  `arena.ts` and `stadium.ts`, so selecting it reproduces the original *exactly*.
+  That is the theme system's contract: a theme system that subtly changes the
+  default look has failed at its one job.
+- **Beam Clash** — the anime read. The move is to stop lighting the arena and let
+  the tops light it: near-black world, ambient fill crushed to 0.16, a coloured
+  PointLight parented to each top that flares off `hitFlash` on contact, bloom,
+  expanding shockwave rings on heavy clashes, a light-crush on the decisive blow,
+  and a letterbox title card over the finish hold.
+
+A theme is a flat bag of *parameters*, not callbacks or a subclass. Everything
+applies by assigning to existing materials and lights, so switching never
+rebuilds the scene graph and there is nothing to dispose — rebuilding would mean
+hand-disposing geometries and one missed dispose is a GPU leak that only shows
+after a dozen toggles. Themes compose *over* skins: a skin decides what a top is
+made of, a theme decides what the world looks like.
+
+### Cosmetic slots
+
+Themes, skins, arenas, finisher effects and audio are deliberately separate,
+independently swappable cosmetic slots that never touch a stat. That is the
+structure a cosmetic storefront would need (the TFT model), and it is also just
+good separation — nothing cosmetic can affect the balance the tests assert.
+Nothing here is monetised; the seams simply exist.
+
+## Audio
+
+Three independently toggleable channels, persisted:
+
+| Channel | Default | What it is |
+| --- | --- | --- |
+| All sound | on | master |
+| Impacts & cues | on | launches, hits, move cues, stings — all short |
+| Spin drone | **off** | the continuous pitch-tracks-spin tone |
+
+The drone defaults off because a sustained tone that never resolves is fatiguing
+in a way transient effects are not — a playtester reported it as a headache and
+assumed it was background music. It is genuinely informative, so it stays
+available, but opting *in* is the right default. It is also now a triangle rather
+than a sawtooth, filtered at 900Hz and about half the level.
+
 ## Known gaps
 
 - Skins vary colour and material but not **silhouette**. Blade count already
