@@ -219,8 +219,8 @@ button,
 }
 
 .rival-move.on.charge { color: var(--danger); }
-.rival-move.on.anchor { color: var(--accent); }
-.rival-move.on.slip { color: var(--good); }
+.rival-move.on.block { color: var(--accent); }
+.rival-move.on.dodge { color: var(--good); }
 
 /* ------------------------------------------------------------------ moves */
 
@@ -779,4 +779,161 @@ button.primary.ghost:hover {
   width: 13px;
   height: 13px;
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.25), 0 0 10px currentColor;
+}
+
+/* --------------------------------------------------------------- career */
+
+.career {
+  margin-top: 22px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.career-line {
+  font-size: 13px;
+  color: var(--dim);
+}
+
+.career-line b {
+  color: var(--text);
+}
+
+/* One pip per rival: filled for beaten, ringed for the one you're on. */
+.career-progress {
+  display: flex;
+  justify-content: center;
+  gap: 7px;
+  margin: 10px 0 8px;
+}
+
+.career-progress i {
+  width: 22px;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.career-progress i.done {
+  background: var(--good);
+}
+
+.career-progress i.now {
+  background: var(--accent);
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.8);
+}
+
+.career-stats {
+  font-size: 11px;
+  letter-spacing: 0.07em;
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------------- opponent */
+
+.opponent {
+  margin-bottom: 20px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(249, 115, 22, 0.35);
+  background: linear-gradient(180deg, rgba(249, 115, 22, 0.12), rgba(249, 115, 22, 0.03));
+}
+
+.opp-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.opp-label,
+.opp-diff {
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--warn);
+}
+
+.opp-diff {
+  padding: 2px 8px;
+  border-radius: 20px;
+  border: 1px solid rgba(249, 115, 22, 0.4);
+}
+
+.opp-name {
+  font-size: 19px;
+  font-weight: 700;
+}
+
+.opp-name span {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--dim);
+  margin-left: 6px;
+}
+
+.opp-bey {
+  font-size: 12px;
+  color: var(--dim);
+  margin-top: 2px;
+}
+
+.opp-line {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  color: var(--dim);
+  font-style: italic;
+}
+
+/* A locked part still shows its stats — you can see what you're working toward. */
+.chip.locked-part {
+  opacity: 0.34;
+  cursor: not-allowed;
+  filter: grayscale(0.7);
+}
+
+.chip.locked-part:hover {
+  border-color: var(--line);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* -------------------------------------------------------------- unlocks */
+
+.unlocks {
+  margin: 4px 0 20px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(250, 204, 21, 0.4);
+  background: rgba(250, 204, 21, 0.09);
+}
+
+.unlocks-head {
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #facc15;
+  margin-bottom: 8px;
+}
+
+.unlocks-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.unlocks-list span {
+  padding: 4px 10px;
+  border-radius: 7px;
+  background: rgba(250, 204, 21, 0.16);
+  border: 1px solid rgba(250, 204, 21, 0.32);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.unlocks-note {
+  margin: 9px 0 0;
+  font-size: 11.5px;
+  color: var(--dim);
 }

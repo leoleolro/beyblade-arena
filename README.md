@@ -264,6 +264,40 @@ why the manipulative versions are regulated. The line worth holding is that
 variance here creates *drama*, and is never attached to money, a purchase, or a
 "just one more" prompt.
 
+## The career ladder
+
+Six named rivals, each a fixed build with a stated tell, played in order. Beating
+one unlocks parts and reveals the next. Progress persists in `localStorage`.
+
+| # | Blader | Bey | Skill |
+| --- | --- | --- | --- |
+| 1 | Nyx, Street Blader | Blitz Striker | rookie |
+| 2 | Orin, Dojo Regular | Endless Coil | rookie |
+| 3 | Vale, Circuit Climber | Twin Fang | blader |
+| 4 | Kes, Iron Wall | Iron Bastion | blader |
+| 5 | Rhea, Storm Caller | Storm Breaker | champion |
+| 6 | Zeph, Arena Champion | Crimson Edge | champion |
+
+Two rules keep progression from undoing the balance work:
+
+- **Unlocks are sidegrades, never upgrades.** Every part sits on the same
+  trade-off surface, and the win-rate spread is asserted in tests. Handing out
+  strictly better parts would flatten the triangle and turn the collection into
+  a power ladder instead of a toolbox.
+- **Rivals escalate in skill, not in stats.** A harder opponent reads your moves
+  faster and misreads less; it never gets a bigger number. A rival that cheats
+  reads as unfair rather than skilled.
+
+`src/progress.test.ts` asserts the properties that are easy to break by hand:
+the ladder distributes the *entire* catalog with no duplicates and nothing
+unreachable, difficulty never goes backwards, losses don't advance the ladder,
+a cleared ladder can't be farmed for repeat unlocks, and a corrupt save falls
+back to a fresh one rather than crashing the garage.
+
+Storage is treated as unreliable — private browsing and a full quota both throw
+— so every access is wrapped. With storage unavailable the game plays
+identically and simply forgets between reloads.
+
 ## Known gaps
 
 - Skins vary colour and material but not **silhouette**. Blade count already
@@ -271,4 +305,7 @@ variance here creates *drama*, and is never attached to money, a purchase, or a
 - The AI reads moves but does not bluff, so a patient player can bait it.
 - The tutorial is explanatory, not interactive. A scripted round that forces
   each situation in turn would teach the triangle faster than reading it.
+- The ladder ends. After Zeph there's no endless mode, no ranked ladder and no
+  daily challenge — and the deterministic seeded sim makes a seeded daily run
+  nearly free, so that's the obvious next step.
 - Bundle is ~570 kB (147 kB gzipped), almost entirely Three.js.

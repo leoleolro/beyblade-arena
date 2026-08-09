@@ -1,5 +1,8 @@
 import { AiController } from './ai';
 import { Audio } from './audio';
+import { LADDER, rivalAt } from './ladder';
+import type { Rival, Unlocks } from './ladder';
+import { Progress } from './progress';
 import type { Difficulty } from './ai';
 import { ArenaRenderer } from './render/arena';
 import { pickContrastingSkin, skinById } from './render/skins';
@@ -42,6 +45,18 @@ export class Game {
   playerSkinId = 'frost';
   /** Chosen to contrast with the player's, so the two tops can't be confused. */
   rivalSkinId = 'ember';
+
+  readonly progress = new Progress();
+  /** What the last match unlocked, for the result screen to reveal. */
+  lastUnlocks: Unlocks = {};
+
+  /**
+   * The rival this match is against — fixed by the ladder, not random. Named
+   * distinctly from `rival`, which is the live BeyState during a battle.
+   */
+  get currentRival(): Rival {
+    return rivalAt(this.progress.data.rung);
+  }
   aiName = 'Rival';
   difficulty: Difficulty = 'blader';
 
@@ -59,6 +74,8 @@ export class Game {
   private meterDir = 1;
   /** Seconds of hitstop freeze remaining. */
   private hitstop = 0;
+  /** Guards against recording the same match result twice. */
+  private matchRecorded = false;
   /**
    * Seconds left holding on the stadium after a round is decided, before the
    * result panel covers it. The sim has already stopped by then, so this is not
@@ -92,14 +109,27 @@ export class Game {
     return new Battle(fighters, { seed: (Math.random() * 2 ** 31) | 0 });
   }
 
-  /** Begin a fresh match with the player's current build. */
+  /**
+   * Begin a match against the current ladder rival. The opponent is fixed
+   * rather than random: a named rival with a known build is a problem the
+   * player can prepare for, which is what makes the garage matter.
+   */
   startMatch(): void {
-    const pick = this.ai.chooseBuild(this.playerBuild);
-    this.aiName = pick.name;
-    // Force a contrasting rival skin every match, so identification never
-    // depends on the player having picked sensibly.
-    this.rivalSkinId = pickContrastingSkin(skinById(this.playerSkinId)).id;
-    this.battle = this.makeBattle(this.playerBuild, pick.build);
+    const rival = this.currentRival;
+    this.aiName = `${rival.name} · ${rival.beyName}`;
+    this.setDifficulty(rival.difficulty);
+
+    // The rival's own skin, unless it clashes with the player's — identification
+    // outranks flavour, so a collision falls back to the contrasting pick.
+    const playerSkin = skinById(this.playerSkinId);
+    this.rivalSkinId =
+      rival.skinId === this.playerSkinId
+        ? pickContrastingSkin(playerSkin).id
+        : rival.skinId;
+
+    this.lastUnlocks = {};
+    this.matchRecorded = false;
+    this.battle = this.makeBattle(this.playerBuild, rival.build());
     this.toLaunch();
   }
 
@@ -245,6 +275,14 @@ export class Game {
       if (this.battle.phase !== 'battle' && this.finishHold <= 0) {
         this.finishHold = C.FINISH_HOLD_TIME;
         this.audio.roundEnd(this.battle.lastRound?.winnerId === PLAYER_ID);
+
+        // Record the match exactly once, the moment it is decided.
+        if (this.battle.phase === 'match-over' && !this.matchRecorded) {
+          this.matchRecorded = true;
+          this.lastUnlocks = this.progress.recordMatch(
+            this.battle.matchWinnerId === PLAYER_ID,
+          );
+        }
       }
     }
 
@@ -265,4 +303,4 @@ export class Game {
   };
 }
 
-export { PLAYER_ID, AI_ID, C };
+export { PLAYER_ID, AI_ID, C, LADDER };

@@ -1,8 +1,8 @@
 import type { Game } from './game';
-import type { Difficulty } from './ai';
 import { DISCS, DRIVERS, LAYERS, deriveStats } from './sim/parts';
 import * as C from './sim/constants';
 import { SKINS, skinById } from './render/skins';
+import { LADDER } from './ladder';
 import type { BeyState, MoveKind } from './sim/types';
 
 const hex = (n: number): string => `#${n.toString(16).padStart(6, '0')}`;
@@ -382,6 +382,7 @@ export class Ui {
       <p class="result-reason">${escapeHtml(REASON_TEXT[r?.reason ?? 'timeout'] ?? '')}</p>
       <p class="sub">You ${g.playerScore} — ${g.rivalScore} ${escapeHtml(g.aiName)}</p>
       ${breakdown}
+      ${matchOver ? this.unlockHtml() : ''}
       <div class="row">
         <button class="primary" data-next>${matchOver ? 'Back to garage' : 'Next round'}</button>
       </div>`;
@@ -418,6 +419,25 @@ export class Ui {
     row.appendChild(play);
     row.appendChild(how);
     panel.appendChild(row);
+
+    // Career state, so the home screen answers "where was I?".
+    const d = g.progress.data;
+    const career = document.createElement('div');
+    career.className = 'career';
+    if (g.progress.cleared) {
+      career.innerHTML = `
+        <div class="career-line"><b>Ladder cleared</b> — all ${LADDER.length} bladers beaten</div>
+        <div class="career-stats">${d.wins}W · ${d.losses}L · best streak ${d.bestStreak}</div>`;
+    } else {
+      const next = g.currentRival;
+      career.innerHTML = `
+        <div class="career-line">Next up · <b>${escapeHtml(next.name)}</b>, ${escapeHtml(next.title)}</div>
+        <div class="career-progress">
+          ${LADDER.map((_, i) => `<i class="${i < d.rung ? 'done' : i === d.rung ? 'now' : ''}"></i>`).join('')}
+        </div>
+        <div class="career-stats">${d.rung} of ${LADDER.length} beaten · ${d.wins}W · ${d.losses}L</div>`;
+    }
+    panel.appendChild(career);
 
     const hint = document.createElement('p');
     hint.className = 'sub';
@@ -555,6 +575,27 @@ export class Ui {
     return wrap;
   }
 
+  /**
+   * What the match just unlocked. An unlock the player doesn't notice may as
+   * well not have happened, so it gets its own block rather than a line in the
+   * garage they might scroll past.
+   */
+  private unlockHtml(): string {
+    const u = this.game.lastUnlocks;
+    const names: string[] = [];
+    for (const id of u.layers ?? []) names.push(LAYERS.find((x) => x.id === id)?.name ?? id);
+    for (const id of u.discs ?? []) names.push(DISCS.find((x) => x.id === id)?.name ?? id);
+    for (const id of u.drivers ?? []) names.push(DRIVERS.find((x) => x.id === id)?.name ?? id);
+    for (const id of u.skins ?? []) names.push(SKINS.find((x) => x.id === id)?.name ?? id);
+    if (!names.length) return '';
+    return `
+      <div class="unlocks">
+        <div class="unlocks-head">Unlocked</div>
+        <div class="unlocks-list">${names.map((n) => `<span>${escapeHtml(n)}</span>`).join('')}</div>
+        <p class="unlocks-note">New options, not stronger ones — every part trades something away.</p>
+      </div>`;
+  }
+
   private garage(): HTMLElement {
     const g = this.game;
     const overlay = document.createElement('div');
@@ -569,6 +610,23 @@ export class Ui {
       <p class="sub">Build your top, then let it rip. First to ${C.POINTS_TO_WIN} points takes the match —
       ring out or burst scores 2, outlasting your rival scores 1.</p>`;
     panel.appendChild(header);
+
+    // Who you're up against. A named rival with a known build is a problem you
+    // can prepare for, which is the entire point of the garage.
+    if (!g.progress.cleared) {
+      const r = g.currentRival;
+      const opp = document.createElement('div');
+      opp.className = 'opponent';
+      opp.innerHTML = `
+        <div class="opp-head">
+          <span class="opp-label">Next opponent</span>
+          <span class="opp-diff">${escapeHtml(r.difficulty)}</span>
+        </div>
+        <div class="opp-name">${escapeHtml(r.name)} <span>${escapeHtml(r.title)}</span></div>
+        <div class="opp-bey">${escapeHtml(r.beyName)}</div>
+        <p class="opp-line">${escapeHtml(r.line)}</p>`;
+      panel.appendChild(opp);
+    }
 
     const slots: [string, { id: string; name: string; colour?: number; note: string }[], string][] = [
       [
@@ -612,14 +670,19 @@ export class Ui {
       const chips = document.createElement('div');
       chips.className = 'chips';
       for (const item of items) {
+        const kind = (slot + 's') as 'layers' | 'discs' | 'drivers';
+        const owned = g.progress.has(kind, item.id);
         const chip = document.createElement('button');
-        chip.className = 'chip';
+        chip.className = 'chip' + (owned ? '' : ' locked-part');
+        chip.disabled = !owned;
         const current = (g.playerBuild as any)[slot].id;
         if (current === item.id) chip.classList.add('on');
         chip.innerHTML = `
           ${item.colour !== undefined ? `<span class="dot" style="background:${hex(item.colour)}"></span>` : ''}
           <span>${escapeHtml(item.name)}<br><small>${escapeHtml(item.note)}</small></span>`;
+        if (!owned) chip.title = 'Beat more bladers to unlock this part';
         chip.addEventListener('click', () => {
+          if (!owned) return;
           const list = slot === 'layer' ? LAYERS : slot === 'disc' ? DISCS : DRIVERS;
           const part = (list as { id: string }[]).find((p) => p.id === item.id);
           (g.playerBuild as any)[slot] = part;
@@ -653,12 +716,16 @@ export class Ui {
     const skinChips = document.createElement('div');
     skinChips.className = 'chips';
     for (const s of SKINS) {
+      const owned = g.progress.has('skins', s.id);
       const chip = document.createElement('button');
-      chip.className = 'chip' + (g.playerSkinId === s.id ? ' on' : '');
+      chip.className =
+        'chip' + (g.playerSkinId === s.id ? ' on' : '') + (owned ? '' : ' locked-part');
+      chip.disabled = !owned;
       chip.innerHTML = `
         <span class="dot skin-dot" style="background:${hex(s.primary)}"></span>
         <span>${escapeHtml(s.name)}<br><small>${escapeHtml(s.finish)}</small></span>`;
       chip.addEventListener('click', () => {
+        if (!owned) return;
         g.playerSkinId = s.id;
         this.render();
       });
@@ -703,29 +770,6 @@ export class Ui {
       'Oppose it for a longer run of violent exchanges where attack pays off.';
     spinRow.appendChild(spinNote);
     panel.appendChild(spinRow);
-
-    const diffRow = document.createElement('div');
-    diffRow.className = 'slot';
-    diffRow.innerHTML = '<h4>Rival skill</h4>';
-    const diffChips = document.createElement('div');
-    diffChips.className = 'chips';
-    const diffs: [Difficulty, string][] = [
-      ['rookie', 'Rookie — sloppy launches, wastes boost'],
-      ['blader', 'Blader — solid launches, decent timing'],
-      ['champion', 'Champion — counter-picks your build'],
-    ];
-    for (const [id, label] of diffs) {
-      const chip = document.createElement('button');
-      chip.className = 'chip' + (g.difficulty === id ? ' on' : '');
-      chip.innerHTML = `<span>${escapeHtml(label)}</span>`;
-      chip.addEventListener('click', () => {
-        g.setDifficulty(id);
-        this.render();
-      });
-      diffChips.appendChild(chip);
-    }
-    diffRow.appendChild(diffChips);
-    panel.appendChild(diffRow);
 
     const row = document.createElement('div');
     row.className = 'row';

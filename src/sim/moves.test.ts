@@ -77,19 +77,19 @@ function winRate(aMove: MoveKind, bMove: MoveKind): number {
 describe('move triangle', () => {
   it('charge beats dodge, block beats charge, dodge beats block', () => {
     const chargeVsSlip = winRate('charge', 'dodge');
-    const anchorVsCharge = winRate('block', 'charge');
-    const slipVsAnchor = winRate('dodge', 'block');
+    const blockVsCharge = winRate('block', 'charge');
+    const dodgeVsBlock = winRate('dodge', 'block');
 
     console.log('\n=== move matchups (win rate for the first move) ===');
     console.log(`  charge vs dodge   ${(chargeVsSlip * 100).toFixed(1)}%`);
-    console.log(`  block vs charge ${(anchorVsCharge * 100).toFixed(1)}%`);
-    console.log(`  dodge   vs block ${(slipVsAnchor * 100).toFixed(1)}%`);
+    console.log(`  block vs charge ${(blockVsCharge * 100).toFixed(1)}%`);
+    console.log(`  dodge   vs block ${(dodgeVsBlock * 100).toFixed(1)}%`);
 
     // Each leg of the triangle must favour the counter. The margin is
     // deliberately loose: a hard counter would make the read the whole game.
     expect(chargeVsSlip).toBeGreaterThan(0.5);
-    expect(anchorVsCharge).toBeGreaterThan(0.5);
-    expect(slipVsAnchor).toBeGreaterThan(0.5);
+    expect(blockVsCharge).toBeGreaterThan(0.5);
+    expect(dodgeVsBlock).toBeGreaterThan(0.5);
   });
 
   it('keeps every move costed and time-limited', () => {
