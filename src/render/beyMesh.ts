@@ -105,21 +105,61 @@ export function buildBeyMesh(build: BeyBuild, skin: Skin): THREE.Group {
   // readable from the blade count and silhouette, which the skin doesn't touch.
   const layerMat = skinMaterial(skin, skin.primary);
 
+  // Faceted core with a hard bevel. Matching the facet count to the blade count
+  // makes the whole layer read as one machined piece rather than a cylinder with
+  // things glued to it.
+  const facets = Math.max(6, layer.blades * 2);
   const core = new THREE.Mesh(
-    new THREE.CylinderGeometry(r * 0.66, r * 0.78, r * 0.42, 24),
+    new THREE.CylinderGeometry(r * 0.62, r * 0.74, r * 0.34, facets),
     layerMat,
   );
   core.position.y = layerY;
   core.castShadow = true;
   layerGroup.add(core);
 
+  // Underside bevel — the layer tapers into the disc instead of stopping flat.
+  const bevel = new THREE.Mesh(
+    new THREE.CylinderGeometry(r * 0.74, r * 0.56, r * 0.16, facets),
+    layerMat,
+  );
+  bevel.position.y = layerY - r * 0.24;
+  layerGroup.add(bevel);
+
+  // The centre boss: a raised, faceted crown. This is the part that reads as a
+  // "face" at a glance and gives the top an up direction.
+  const boss = new THREE.Mesh(
+    new THREE.ConeGeometry(r * 0.36, r * 0.3, facets),
+    layerMat,
+  );
+  boss.position.y = layerY + r * 0.3;
+  boss.castShadow = true;
+  layerGroup.add(boss);
+
+  const bossRing = new THREE.Mesh(
+    new THREE.TorusGeometry(r * 0.34, r * 0.05, 6, facets),
+    layerMat,
+  );
+  bossRing.rotation.x = Math.PI / 2;
+  bossRing.position.y = layerY + r * 0.17;
+  layerGroup.add(bossRing);
+
   // Blades sit at the collision radius, so what you see is what hits.
-  const bladeGeo = new THREE.BoxGeometry(r * 0.5, r * 0.38, r * 0.34);
+  //
+  // Raked wedges rather than upright boxes: each one is tapered along its length
+  // and tilted so it leads with an edge. A blade that visibly cuts into the
+  // direction of travel is most of what separates this from a cog.
+  const bladeGeo = new THREE.CylinderGeometry(r * 0.055, r * 0.3, r * 0.62, 4);
   for (let i = 0; i < layer.blades; i++) {
     const angle = (i / layer.blades) * Math.PI * 2;
     const blade = new THREE.Mesh(bladeGeo, layerMat);
-    blade.position.set(Math.cos(angle) * r * 0.76, layerY, Math.sin(angle) * r * 0.76);
+    blade.position.set(Math.cos(angle) * r * 0.7, layerY, Math.sin(angle) * r * 0.7);
+
+    // Lay the wedge on its side pointing outward, then rake it back against the
+    // direction of spin so the leading edge is the thin one.
+    blade.rotation.order = 'YZX';
     blade.rotation.y = -angle;
+    blade.rotation.z = -Math.PI / 2;
+    blade.rotation.x = 0.42;
     blade.castShadow = true;
     layerGroup.add(blade);
   }

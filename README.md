@@ -322,6 +322,43 @@ Storage is treated as unreliable — private browsing and a full quota both thro
 — so every access is wrapped. With storage unavailable the game plays
 identically and simply forgets between reloads.
 
+## Arenas
+
+An arena is a **gameplay** setting, not a cosmetic one — it changes the physics,
+so it lives in the sim and is labelled in the UI as "changes how the match
+plays". This is the one slot in the game that isn't provably inert, which is
+exactly why it must never become something sold.
+
+| Arena | What it does |
+| --- | --- |
+| Standard Dish | the plain bowl — no archetype favoured |
+| X-Rail Stadium | outer rail slingshots fast tops — faster, deadlier rounds |
+
+The **X-Rail** is the signature mechanic of the current Beyblade generation.
+Engaging it requires being in the band, off cooldown, *and* carrying real
+tangential speed — a top that merely drifts across isn't moving fast enough for
+the teeth to bite, which makes riding it a choice rather than something that
+happens to you. While locked in, radial drift is cancelled so it tracks the band
+and speed is driven to a ceiling; on release the exit velocity is rotated toward
+the centre.
+
+It creates a **contested location**: the rail is where damage comes from, so
+both players want it, but a top riding it moves predictably along a known arc
+and sits one clean hit from an exit pocket.
+
+Two things the tuning taught, both preserved in `rail.test.ts`:
+
+- **Less inward redirect made rounds shorter, not longer.** A tangential exit
+  leaves the top hugging the rim next to the pockets; a steep inward redirect is
+  both safer and more dramatic, because throwing a top across the dish is the
+  actual mechanic.
+- **The rail roughly doubles fast finishes** (8% → 22% on identical pairings).
+  That is not a defect. Its purpose is to manufacture decisive moments, and
+  decisive moments end rounds — at the speeds where fast finishes matched the
+  plain dish, the rail had stopped slinging tops and was just holding them in a
+  circle. The test asserts the rail arena's own bounds rather than pretending it
+  should behave like a different arena.
+
 ## Visual themes
 
 Two looks, switchable in the garage and persisted:

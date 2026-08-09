@@ -345,7 +345,12 @@ export class ArenaRenderer {
         );
       }
     }
-    const targetDist = 1.62 + spread * 0.34;
+    // Pull back on narrow viewports. `fov` is the *vertical* field of view, so
+    // a portrait window has a much smaller horizontal one — without this the
+    // tops slide off the sides of the screen exactly when they separate.
+    const aspect = this.camera.aspect || 1;
+    const narrow = aspect < 1.6 ? 1.6 / Math.max(aspect, 0.5) : 1;
+    const targetDist = (1.62 + spread * 0.34) * narrow;
     const radius = THREE.MathUtils.lerp(
       Math.hypot(this.camera.position.x, this.camera.position.z),
       targetDist,
