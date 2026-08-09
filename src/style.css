@@ -956,7 +956,11 @@ button.primary.ghost:hover {
   height: 14vh;
   background: #000;
   transform-origin: center;
-  animation: bar-in 180ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
+  /* `forwards`, not `both`: with `both` the element holds the `from` state
+     during the delay, so if animations are paused or unsupported the card is
+     invisible rather than merely un-animated. The resting style must be the
+     visible one. */
+  animation: bar-in 180ms cubic-bezier(0.2, 0.9, 0.2, 1) forwards;
 }
 
 .finisher-bar.bottom {
@@ -979,7 +983,8 @@ button.primary.ghost:hover {
   text-shadow:
     0 0 24px rgba(255, 255, 255, 0.55),
     0 0 60px currentColor;
-  animation: word-in 320ms cubic-bezier(0.15, 1.2, 0.3, 1) both;
+  transform: skewX(-9deg);
+  animation: word-in 320ms cubic-bezier(0.15, 1.2, 0.3, 1) forwards;
   animation-delay: 90ms;
 }
 

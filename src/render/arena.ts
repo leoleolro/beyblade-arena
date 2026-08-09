@@ -296,8 +296,11 @@ export class ArenaRenderer {
     if (this.blackout > 0) {
       this.blackout = Math.max(0, this.blackout - dt);
       const k = this.blackout / 0.55;
-      this.hemi.intensity = this.theme.hemiIntensity * (1 - 0.92 * k);
-      this.key.intensity = this.theme.keyIntensity * (1 - 0.8 * k);
+      // Dim, don't extinguish. Taking ambient to near zero while a top is
+      // flaring left nothing for the eye to read the scene against, so the
+      // frame became one bright smear instead of two lit tops in the dark.
+      this.hemi.intensity = this.theme.hemiIntensity * (1 - 0.55 * k);
+      this.key.intensity = this.theme.keyIntensity * (1 - 0.5 * k);
     }
 
     this.sparks.update(dt);

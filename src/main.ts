@@ -45,4 +45,4 @@ window.addEventListener('keydown', (e) => {
 });
 
 // Expose for debugging in the console.
-(window as unknown as { game: Game }).game = game;
+Object.assign(window as unknown as Record<string, unknown>, { game, ui });

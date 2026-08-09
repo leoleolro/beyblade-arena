@@ -186,14 +186,19 @@ export const BEAM: Theme = {
   sparkColour: 0xfff3c4,
   sparkSize: 0.042,
   trailOpacity: 0.95,
-  beyLightIntensity: 1.8,
-  beyLightFlash: 14,
+  beyLightIntensity: 1.6,
+  // Measured, not guessed: at 14 a single hit drove the light to ~15.8 in a
+  // 1.6-unit falloff, and with bloom on top the whole centre of the dish blew
+  // out to a white blob that hid both tops.
+  beyLightFlash: 5,
   shockwave: true,
   finisherBlackout: true,
   postBloom: true,
-  bloomStrength: 0.9,
-  bloomRadius: 0.55,
-  bloomThreshold: 0.62,
+  // Threshold matters more than strength here: raising it means only genuinely
+  // hot things bloom, so the glow reads as emissive rather than as fog.
+  bloomStrength: 0.5,
+  bloomRadius: 0.5,
+  bloomThreshold: 0.78,
 
   bodyClass: 'theme-beam',
 };
