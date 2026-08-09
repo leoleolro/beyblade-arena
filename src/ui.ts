@@ -4,6 +4,7 @@ import * as C from './sim/constants';
 import { SKINS, skinById } from './render/skins';
 import type { Channel } from './audio';
 import { THEMES } from './render/theme';
+import { GarageView } from './render/garageView';
 import { LADDER } from './ladder';
 import type { BeyState, MoveKind } from './sim/types';
 
@@ -46,6 +47,17 @@ export class Ui {
 
   private game: Game;
 
+  /**
+   * The garage preview is created ONCE and re-parented on every render.
+   *
+   * render() wipes innerHTML, and the garage re-renders on every part click.
+   * Building a fresh GarageView each time would allocate a new WebGLRenderer
+   * per click and blow through the browser's ~16 live WebGL context limit in
+   * seconds, after which the canvas silently stops drawing.
+   */
+  private garageView: GarageView | null = null;
+  private garageCanvas: HTMLCanvasElement | null = null;
+
   constructor(root: HTMLElement, game: Game) {
     this.root = root;
     this.game = game;
@@ -53,6 +65,10 @@ export class Ui {
 
   render(): void {
     const g = this.game;
+    // Detach the preview canvas before the wipe so it survives innerHTML = ''.
+    this.garageCanvas?.remove();
+    if (g.screen !== 'garage') this.garageView?.stop();
+
     this.root.innerHTML = '';
     this.live = { moveButtons: new Map() };
 
@@ -419,6 +435,65 @@ export class Ui {
     return overlay;
   }
 
+  /**
+   * The exploded preview: the top pulled apart, each part labelled and spinning
+   * on its own axis. A parts list tells you a build's numbers; this shows you
+   * what you are actually assembling.
+   */
+  private explodedView(): HTMLElement {
+    const g = this.game;
+    const wrap = document.createElement('div');
+    wrap.className = 'exploded';
+
+    const stage = document.createElement('div');
+    stage.className = 'exploded-stage';
+
+    if (!this.garageCanvas) {
+      this.garageCanvas = document.createElement('canvas');
+      this.garageCanvas.className = 'exploded-canvas';
+    }
+    stage.appendChild(this.garageCanvas);
+
+    // Labels sit at the same three heights as the parts, with a connector rule,
+    // so the diagram reads without projecting 3D positions every frame.
+    const labels = document.createElement('div');
+    labels.className = 'exploded-labels';
+    const rows: [string, string, string][] = [
+      ['layer', g.playerBuild.layer.name, `${g.playerBuild.layer.archetype} · ${g.playerBuild.layer.blades} blades`],
+      ['disc', g.playerBuild.disc.name, `${g.playerBuild.disc.mass}kg · stability ${g.playerBuild.disc.stability}`],
+      ['driver', g.playerBuild.driver.name, `${g.playerBuild.driver.archetype} · spin ${g.playerBuild.driver.spinRetention}`],
+    ];
+    for (const [slot, name, note] of rows) {
+      const row = document.createElement('div');
+      row.className = `exploded-row ${slot}`;
+      row.innerHTML = `
+        <span class="exploded-rule"></span>
+        <span class="exploded-text">
+          <b>${escapeHtml(name)}</b>
+          <small>${escapeHtml(slot.toUpperCase())} — ${escapeHtml(note)}</small>
+        </span>`;
+      labels.appendChild(row);
+    }
+
+    wrap.appendChild(stage);
+    wrap.appendChild(labels);
+
+    const hint = document.createElement('p');
+    hint.className = 'exploded-hint';
+    hint.textContent = 'Drag to rotate.';
+    wrap.appendChild(hint);
+
+    // Build/refresh after the element is in the DOM so the canvas has a size.
+    requestAnimationFrame(() => {
+      if (!this.garageCanvas) return;
+      if (!this.garageView) this.garageView = new GarageView(this.garageCanvas);
+      this.garageView.setBuild(g.playerBuild, g.playerSkinId, g.themeId);
+      this.garageView.start();
+    });
+
+    return wrap;
+  }
+
   /** Title screen. The game used to open straight onto a wall of part chips. */
   private home(): HTMLElement {
     const g = this.game;
@@ -638,6 +713,8 @@ export class Ui {
       <p class="sub">Build your top, then let it rip. First to ${C.POINTS_TO_WIN} points takes the match —
       ring out or burst scores 2, outlasting your rival scores 1.</p>`;
     panel.appendChild(header);
+
+    panel.appendChild(this.explodedView());
 
     // Who you're up against. A named rival with a known build is a problem you
     // can prepare for, which is the entire point of the garage.

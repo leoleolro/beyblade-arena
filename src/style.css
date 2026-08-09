@@ -1020,3 +1020,117 @@ body.theme-beam .fill-spin {
   background: linear-gradient(90deg, #22d3ee, #a5f3fc);
   box-shadow: 0 0 10px rgba(34, 211, 238, 0.6);
 }
+
+/* -------------------------------------------------------- exploded view */
+
+.exploded {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0 18px;
+  align-items: center;
+  margin-bottom: 22px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.exploded-stage {
+  position: relative;
+  height: 250px;
+  border-radius: 11px;
+  overflow: hidden;
+}
+
+.exploded-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: grab;
+  touch-action: none;
+}
+
+.exploded-canvas:active {
+  cursor: grabbing;
+}
+
+/* Three rows at the same heights as the three parts, so the column reads as a
+   diagram rather than as a list that happens to sit alongside a picture. */
+.exploded-labels {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 250px;
+  padding: 26px 0;
+}
+
+.exploded-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.exploded-rule {
+  width: 26px;
+  height: 1px;
+  flex: 0 0 auto;
+  background: var(--line);
+  position: relative;
+}
+
+.exploded-rule::before {
+  content: '';
+  position: absolute;
+  left: -3px;
+  top: -2px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.exploded-row.layer { color: var(--accent); }
+.exploded-row.disc { color: var(--dim); }
+.exploded-row.driver { color: var(--warn); }
+
+.exploded-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.exploded-text b {
+  font-size: 15px;
+  color: var(--text);
+  line-height: 1.2;
+}
+
+.exploded-text small {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--dim);
+  margin-top: 2px;
+}
+
+.exploded-hint {
+  grid-column: 1 / -1;
+  margin: 6px 0 0;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--dim);
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .exploded {
+    grid-template-columns: 1fr;
+  }
+  .exploded-stage {
+    height: 190px;
+  }
+  .exploded-labels {
+    height: auto;
+    padding: 12px 0 0;
+    gap: 10px;
+  }
+}

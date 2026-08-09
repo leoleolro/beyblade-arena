@@ -344,6 +344,30 @@ assumed it was background music. It is genuinely informative, so it stays
 available, but opting *in* is the right default. It is also now a triangle rather
 than a sawtooth, filtered at 900Hz and about half the level.
 
+## The garage
+
+The parts list used to be a wall of text chips: it told you a build's numbers but
+never what it *was*. The garage now opens on the top itself, exploded into its
+three parts with each one labelled.
+
+The parts **counter-rotate at different rates** — layer slow one way, disc slower
+against it, driver fastest, with the driver's rate taken from its own spin
+retention. Spinning them in unison reads as a turntable; opposed rates read as a
+working mechanism, and the animation previews what the part actually does.
+
+Two implementation notes that matter more than they look:
+
+- `buildBeyMesh` now nests each part in its own sub-group at the origin, with the
+  meshes keeping their offsets. That is a deliberate no-op for the arena — the
+  assembled top renders identically — but it lets the garage pull the parts apart
+  without a second set of meshes.
+- The preview is created **once** and re-parented on every render. `render()`
+  wipes `innerHTML` and the garage re-renders on every part click, so building a
+  fresh view each time would allocate a new `WebGLRenderer` per click and exhaust
+  the browser's ~16 live WebGL context limit within seconds, after which the
+  canvas silently stops drawing. Verified: clicking through six parts keeps the
+  same canvas element and two total contexts.
+
 ## Known gaps
 
 - Skins vary colour and material but not **silhouette**. Blade count already
@@ -351,6 +375,9 @@ than a sawtooth, filtered at 900Hz and about half the level.
 - The AI reads moves but does not bluff, so a patient player can bait it.
 - The tutorial is explanatory, not interactive. A scripted round that forces
   each situation in turn would teach the triangle faster than reading it.
+- The garage labels sit at fixed thirds rather than tracking the projected
+  screen position of each part, so they drift slightly from the parts when the
+  model is rotated steeply.
 - The ladder ends. After Zeph there's no endless mode, no ranked ladder and no
   daily challenge — and the deterministic seeded sim makes a seeded daily run
   nearly free, so that's the obvious next step.
