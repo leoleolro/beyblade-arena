@@ -43,6 +43,7 @@ export class Ui {
     rivalPts?: HTMLElement;
     rivalMove?: HTMLElement;
     coach?: HTMLElement;
+    speedLines?: HTMLElement;
     moveButtons: Map<MoveKind, HTMLElement>;
   } = { moveButtons: new Map() };
 
@@ -58,6 +59,8 @@ export class Ui {
    */
   private garageView: GarageView | null = null;
   private garageCanvas: HTMLCanvasElement | null = null;
+  /** Eased speed-line opacity, so it swells instead of snapping. */
+  private speedEase = 0;
 
   constructor(root: HTMLElement, game: Game) {
     this.root = root;
@@ -90,6 +93,7 @@ export class Ui {
     this.root.appendChild(this.fighters());
 
     if (g.screen === 'battle') {
+      this.root.appendChild(this.speedLines());
       this.root.appendChild(this.coach());
       this.root.appendChild(this.moveBar());
     }
@@ -127,6 +131,15 @@ export class Ui {
         const timer = el.querySelector<HTMLElement>('.move-timer');
         if (timer) timer.textContent = active ? `${p.moveTime.toFixed(1)}s` : '';
       }
+    }
+
+    // Speed lines follow the renderer's intensity signal, eased so they swell
+    // and fade rather than snapping on.
+    const lines = this.live.speedLines;
+    if (lines) {
+      const target = g.intensity;
+      this.speedEase += (target - this.speedEase) * 0.12;
+      lines.style.opacity = String(this.speedEase);
     }
 
     this.updateCoach();
@@ -305,6 +318,27 @@ export class Ui {
    * matches. It names the situation and the key that answers it, because the
    * move names alone were not teaching anyone what to press.
    */
+  /**
+   * Radial speed lines. Pure CSS over the canvas, so it costs the renderer
+   * nothing and can't destabilise the 3D path — but it is most of what makes
+   * fast motion read as *anime* fast rather than merely quick.
+   */
+  private speedLines(): HTMLElement {
+    const el = document.createElement('div');
+    el.className = 'speedlines';
+    this.live.speedLines = el;
+    return el;
+  }
+
+  /** Full-screen pulse on a heavy clash. */
+  impactFlash(strength: number): void {
+    const el = document.createElement('div');
+    el.className = 'impact-flash';
+    el.style.setProperty('--flash', String(Math.min(1, strength)));
+    this.root.appendChild(el);
+    window.setTimeout(() => el.remove(), 260);
+  }
+
   private coach(): HTMLElement {
     const el = document.createElement('div');
     el.className = 'coach';

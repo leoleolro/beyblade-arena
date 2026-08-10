@@ -29,6 +29,8 @@ export interface GameEvents {
   onFrame(): void;
   /** The decisive blow, fired at the start of the finish hold. */
   onFinish(reason: string, playerWon: boolean): void;
+  /** A heavy clash, in themes that pulse the screen. 0–1 strength. */
+  onImpactFlash(strength: number): void;
 }
 
 /** Shared empty array, so the no-hits path allocates nothing per frame. */
@@ -242,6 +244,13 @@ export class Game {
     return this.battle.beys.find((b) => b.id === AI_ID) ?? null;
   }
 
+  /** 0–1 "how fast does this feel", for the speed-line overlay. */
+  get intensity(): number {
+    return this.screen === 'battle'
+      ? this.renderer.intensity(this.battle.beys)
+      : 0;
+  }
+
   get playerScore(): number {
     return this.battle.scores[PLAYER_ID] ?? 0;
   }
@@ -309,7 +318,12 @@ export class Game {
 
         for (const h of this.battle.hits) {
           this.audio.impact(h.strength, h.opposite);
-          if (h.strength >= C.HITSTOP_THRESHOLD) this.hitstop = C.HITSTOP_DURATION;
+          if (h.strength >= C.HITSTOP_THRESHOLD) {
+            this.hitstop = C.HITSTOP_DURATION;
+            if (this.renderer.wantsImpactFlash) {
+              this.events.onImpactFlash(Math.min(1, h.strength / 4));
+            }
+          }
         }
         // Only while the round is genuinely running. `screen` stays 'battle'
         // for the whole finish hold, so without this guard the drone is

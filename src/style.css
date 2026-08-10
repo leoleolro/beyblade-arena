@@ -1134,3 +1134,63 @@ body.theme-beam .fill-spin {
     gap: 10px;
   }
 }
+
+/* ----------------------------------------------------- speed lines / flash */
+
+/* Radial streaks converging on the centre. Two layered repeating gradients at
+   different frequencies, so it reads as many lines of varying weight rather
+   than a regular comb. */
+.speedlines {
+  position: absolute;
+  inset: -12%;
+  pointer-events: none;
+  opacity: 0;
+  mix-blend-mode: screen;
+  background:
+    repeating-conic-gradient(
+      from 0deg at 50% 50%,
+      rgba(255, 255, 255, 0.32) 0deg 0.3deg,
+      transparent 0.35deg 3.4deg
+    ),
+    repeating-conic-gradient(
+      from 1.4deg at 50% 50%,
+      rgba(140, 220, 255, 0.26) 0deg 0.2deg,
+      transparent 0.22deg 5.8deg
+    );
+  /* Hollow out the middle so the tops stay readable — the lines belong in the
+     periphery, which is exactly where the medium puts them. */
+  -webkit-mask-image: radial-gradient(
+    circle at 50% 50%,
+    transparent 34%,
+    #000 78%
+  );
+  mask-image: radial-gradient(circle at 50% 50%, transparent 34%, #000 78%);
+  animation: spin-lines 9s linear infinite;
+}
+
+@keyframes spin-lines {
+  to { transform: rotate(360deg); }
+}
+
+.impact-flash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at 50% 45%,
+    rgba(255, 255, 255, calc(var(--flash) * 0.85)) 0%,
+    rgba(255, 255, 255, calc(var(--flash) * 0.25)) 30%,
+    transparent 65%
+  );
+  animation: flash-out 240ms ease-out forwards;
+}
+
+@keyframes flash-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .speedlines { animation: none; }
+  .impact-flash { animation: none; opacity: 0; }
+}

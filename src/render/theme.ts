@@ -82,6 +82,12 @@ export interface Theme {
   bloomRadius: number;
   bloomThreshold: number;
 
+  /** Energy aura sprite around each top, swelling with spin and flaring on hits. */
+  aura: boolean;
+  /** Radial speed lines over the whole screen when the action is fast. */
+  speedLines: boolean;
+  /** Full-screen white pulse on a heavy clash. */
+  impactFlash: boolean;
   /** Class applied to <body>, so CSS can theme the DOM overlay too. */
   bodyClass: string;
 }
@@ -135,6 +141,9 @@ export const ARENA: Theme = {
   bloomStrength: 0,
   bloomRadius: 0,
   bloomThreshold: 1,
+  aura: false,
+  speedLines: false,
+  impactFlash: false,
 
   bodyClass: 'theme-arena',
 };
@@ -199,11 +208,78 @@ export const BEAM: Theme = {
   bloomStrength: 0.5,
   bloomRadius: 0.5,
   bloomThreshold: 0.78,
+  aura: false,
+  speedLines: false,
+  impactFlash: false,
 
   bodyClass: 'theme-beam',
 };
 
-export const THEMES: Theme[] = [ARENA, BEAM];
+/**
+ * Overdrive: the full anime treatment.
+ *
+ * Beam Clash changed the *lighting*. This changes the grammar. Anime draws
+ * power around a fighter rather than on them, cuts to speed lines when
+ * something moves fast, and blows the frame white on a decisive hit — so this
+ * adds an energy aura per top, a radial speed-line overlay driven by actual
+ * speed, and an impact flash. Bloom runs hotter and the trails read as ribbons
+ * rather than threads.
+ *
+ * Both earlier themes are untouched and remain selectable.
+ */
+export const OVERDRIVE: Theme = {
+  id: 'overdrive',
+  name: 'Overdrive',
+  blurb: 'full anime — auras, speed lines, impact flash',
+
+  background: 0x05010f,
+  fogColour: 0x0a0320,
+  fogNear: 2.8,
+  fogFar: 6.8,
+
+  dishColour: 0x140a26,
+  dishMetalness: 0.2,
+  dishRoughness: 0.8,
+  ridgeColour: 0xffe066,
+  ridgeOpacity: 1,
+  guideColour: 0x35205c,
+  guideOpacity: 0.6,
+
+  wallColour: 0x140a28,
+  wallMetalness: 0.3,
+  wallRoughness: 0.7,
+  postColour: 0x00e5ff,
+  postEmissive: 3,
+  skirtColour: 0x050110,
+
+  hemiSky: 0x4a2f8f,
+  hemiGround: 0x05010f,
+  hemiIntensity: 0.28,
+  keyIntensity: 0.5,
+  rimAColour: 0xff2e88,
+  rimAIntensity: 3.4,
+  rimBColour: 0x00e5ff,
+  rimBIntensity: 3.4,
+
+  sparkColour: 0xffffff,
+  sparkSize: 0.05,
+  trailOpacity: 1,
+  beyLightIntensity: 2.1,
+  beyLightFlash: 6,
+  shockwave: true,
+  finisherBlackout: true,
+  postBloom: true,
+  bloomStrength: 0.72,
+  bloomRadius: 0.62,
+  bloomThreshold: 0.7,
+  aura: true,
+  speedLines: true,
+  impactFlash: true,
+
+  bodyClass: 'theme-overdrive',
+};
+
+export const THEMES: Theme[] = [ARENA, BEAM, OVERDRIVE];
 
 export const themeById = (id: string): Theme =>
   THEMES.find((t) => t.id === id) ?? ARENA;

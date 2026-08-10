@@ -12,6 +12,7 @@ const game = new Game(canvas, {
   onScreen: () => ui.render(),
   onFrame: () => ui.tick(),
   onFinish: (reason, won) => ui.showFinisher(reason, won),
+  onImpactFlash: (strength) => ui.impactFlash(strength),
 });
 
 ui = new Ui(uiRoot, game);

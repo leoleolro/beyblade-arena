@@ -388,11 +388,24 @@ Two looks, switchable in the garage and persisted:
   `arena.ts` and `stadium.ts`, so selecting it reproduces the original *exactly*.
   That is the theme system's contract: a theme system that subtly changes the
   default look has failed at its one job.
+- **Overdrive** — the full anime treatment. Beam Clash changed the *lighting*;
+  this changes the grammar. An energy aura per top that swells with spin and
+  flares on contact, radial speed lines driven by actual speed, a full-screen
+  impact flash, hotter bloom and ribbon trails.
 - **Beam Clash** — the anime read. The move is to stop lighting the arena and let
   the tops light it: near-black world, ambient fill crushed to 0.16, a coloured
   PointLight parented to each top that flares off `hitFlash` on contact, bloom,
   expanding shockwave rings on heavy clashes, a light-crush on the decisive blow,
   and a letterbox title card over the finish hold.
+
+All three are selectable; adding Overdrive changed nothing about the other two.
+
+Both effect passes had to be pulled *back* after first build, and for the same
+reason each time: an effect that overpowers its subject stops being an effect.
+The aura initially rendered over the tops and washed them out — it now draws
+behind them, which is where the medium actually puts it — and the speed lines
+peaked at full opacity and fought the beys for attention, so they're capped
+around 0.4 and masked out of the centre of the screen.
 
 A theme is a flat bag of *parameters*, not callbacks or a subclass. Everything
 applies by assigning to existing materials and lights, so switching never

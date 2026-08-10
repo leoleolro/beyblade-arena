@@ -18,6 +18,8 @@ import { Shockwave } from './shockwave';
 import type { ArenaSpec } from '../sim/arena';
 import { buildRail } from './rail';
 import type { RailHandles } from './rail';
+import { buildAura } from './aura';
+import type { Aura } from './aura';
 
 interface BeyVisual {
   group: THREE.Group;
@@ -28,6 +30,8 @@ interface BeyVisual {
    * lighting the arena rather than being lit by it.
    */
   light: THREE.PointLight;
+  /** Energy shell, present only in themes that use one. */
+  aura: Aura | null;
   /** Free-running precession phase, so wobble doesn't look mechanical. */
   wobblePhase: number;
 }
@@ -38,6 +42,8 @@ interface BeyVisual {
  * the sim's scalar spin value rather than separately simulated, which is what
  * keeps the physics stable while still looking like a real spinning top.
  */
+const clampUnit = (n: number): number => (n < 0 ? 0 : n > 1 ? 1 : n);
+
 export class ArenaRenderer {
   readonly scene = new THREE.Scene();
   readonly camera: THREE.PerspectiveCamera;
@@ -129,6 +135,7 @@ export class ArenaRenderer {
     for (const v of this.visuals.values()) {
       v.trail.setOpacity(t.trailOpacity);
       v.light.intensity = t.beyLightIntensity;
+      if (v.aura) v.aura.sprite.visible = t.aura;
     }
 
     if (t.postBloom) {
@@ -239,12 +246,20 @@ export class ArenaRenderer {
       light.position.y = 0.1;
       group.add(light);
 
+      // Parented to the top so it tracks for free. Built regardless of theme
+      // and simply hidden, so a mid-match theme switch needs no rebuild.
+      const aura = buildAura(skin.primary);
+      aura.sprite.position.y = 0.12;
+      aura.sprite.visible = this.theme.aura;
+      group.add(aura.sprite);
+
       this.beyRoot.add(group);
       this.beyRoot.add(trail.line);
       this.visuals.set(b.id, {
         group,
         trail,
         light,
+        aura,
         wobblePhase: Math.random() * Math.PI * 2,
       });
     }
@@ -263,6 +278,7 @@ export class ArenaRenderer {
         v.group.position.y -= dt * 1.6;
         v.group.rotation.z += dt * 4;
         v.trail.setVisible(false);
+        if (v.aura) v.aura.sprite.visible = false;
         if (v.group.position.y < -1.5) v.group.visible = false;
         continue;
       }
@@ -290,6 +306,16 @@ export class ArenaRenderer {
       if (ring) {
         const mat = ring.material as THREE.MeshBasicMaterial;
         mat.opacity = 0.18 + 0.5 * sn + b.hitFlash * 0.5;
+      }
+
+      if (v.aura) {
+        v.aura.sprite.visible = this.theme.aura;
+        if (this.theme.aura) {
+          // Moves and rail rides both count as "winding up", which is when
+          // anime draws the aura biggest.
+          const boost = (b.moveTime > 0 ? 0.7 : 0) + (b.railTime > 0 ? 0.9 : 0);
+          v.aura.update(sn, b.hitFlash, b.stats.radius, boost);
+        }
       }
 
       // hitFlash is already set to 1 on contact and decays in the sim, so the
@@ -390,6 +416,31 @@ export class ArenaRenderer {
       Math.cos(this.cameraAngle) * radius + (Math.random() - 0.5) * jitter,
     );
     this.camera.lookAt(0, C.BOWL_DEPTH * 0.35, 0);
+  }
+
+  /**
+   * How fast the action currently feels, 0–1, for the DOM overlay to drive
+   * speed lines from. Reading it from the renderer keeps the UI ignorant of
+   * physics units.
+   */
+  intensity(beys: BeyState[]): number {
+    if (!this.theme.speedLines) return 0;
+    let fastest = 0;
+    let boosted = false;
+    for (const b of beys) {
+      if (!b.alive) continue;
+      fastest = Math.max(fastest, Math.hypot(b.vel.x, b.vel.y));
+      if (b.moveTime > 0 || b.railTime > 0) boosted = true;
+    }
+    // Capped below 1: at full opacity the streaks fought the tops for
+    // attention instead of framing them.
+    const speedPart = clampUnit((fastest - 2.0) / 2.6);
+    return clampUnit(speedPart * 0.42 + (boosted ? 0.18 : 0));
+  }
+
+  /** True when this theme wants a full-screen pulse on heavy contact. */
+  get wantsImpactFlash(): boolean {
+    return this.theme.impactFlash;
   }
 
   resize(): void {
