@@ -162,8 +162,25 @@ export interface MoveProfile {
   knockback: number;
   /** Extra spin lost per second while active — the cost of holding the move. */
   spinDrain: number;
-  /** One-off tangential speed added the instant the move fires. */
+  /** One-off speed added the instant the move fires. */
   speedKick: number;
+  /**
+   * Which way that one-off kick points.
+   *
+   * 'escape' aims away from the opponent (Dodge), 'pursue' aims straight at
+   * them (Charge). Charge originally had no kick at all, so pressing it
+   * produced no visible response — the button felt dead.
+   */
+  kickMode: 'none' | 'escape' | 'pursue';
+  /**
+   * Acceleration toward the nearest opponent while active.
+   *
+   * Charge used to work by multiplying the driver's `wander`, but wander pushes
+   * a top *radially outward from the centre* — it never points at anyone. So
+   * "hunt & smash" did not hunt: it nudged you toward the rim, by an amount
+   * scaled by a stat that is 0.06 on some drivers. This is the actual homing.
+   */
+  seek: number;
   /**
    * Multiplier on spin retention while the move is active.
    *
@@ -187,14 +204,19 @@ export const MOVES: Record<'charge' | 'block' | 'dodge', MoveProfile> = {
   charge: {
     duration: 2.2,
     cost: 1.0,
-    wander: 2.4,
+    // Neutral, not boosted. Cranking `wander` was the old, broken proxy for
+    // hunting — it pushes radially OUTWARD, so on a high-wander driver it
+    // fought the new inward seek and the two cancelled to zero movement.
+    wander: 1.0,
     friction: 1.0,
     attack: 1.45,
-    defense: 0.7,
+    defense: 0.8,
     burstResist: 0.8,
     knockback: 1.0,
     spinDrain: 4,
-    speedKick: 0,
+    speedKick: 1.15,
+    kickMode: 'pursue',
+    seek: 8.5,
     spinRetention: 0.95,
     reflect: 0,
   },
@@ -209,8 +231,10 @@ export const MOVES: Record<'charge' | 'block' | 'dodge', MoveProfile> = {
     knockback: 0.35,
     spinDrain: 19,
     speedKick: 0,
+    kickMode: 'none',
+    seek: 0,
     spinRetention: 1.0,
-    reflect: 1.7,
+    reflect: 1.35,
   },
   dodge: {
     duration: 1.6,
@@ -223,6 +247,8 @@ export const MOVES: Record<'charge' | 'block' | 'dodge', MoveProfile> = {
     knockback: 1.1,
     spinDrain: 0,
     speedKick: 1.6,
+    kickMode: 'escape',
+    seek: 0,
     spinRetention: 2.0,
     reflect: 0,
   },

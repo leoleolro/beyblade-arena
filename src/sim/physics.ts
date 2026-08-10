@@ -60,6 +60,8 @@ const NEUTRAL_MOVE: C.MoveProfile = {
   knockback: 1,
   spinDrain: 0,
   speedKick: 0,
+  kickMode: 'none',
+  seek: 0,
   spinRetention: 1,
   reflect: 0,
 };
@@ -217,6 +219,76 @@ function isPerfectBlock(b: BeyState): boolean {
   if (b.move !== 'block') return false;
   const elapsed = C.MOVES.block.duration - b.moveTime;
   return elapsed <= C.PERFECT_BLOCK_WINDOW;
+}
+
+/**
+ * Steer charging tops at their opponent.
+ *
+ * This lives in `step` rather than `integrate` because it is the one force that
+ * depends on another top's position. Scaled by remaining spin, so a nearly-dead
+ * top can't suddenly sprint across the dish.
+ */
+function applySeek(beys: BeyState[], dt: number): void {
+  for (const b of beys) {
+    if (!b.alive) continue;
+    const mv = moveProfile(b);
+    if (mv.seek <= 0) continue;
+
+    const foe = nearestFoe(beys, b);
+    if (!foe) continue;
+
+    const dx = foe.pos.x - b.pos.x;
+    const dy = foe.pos.y - b.pos.y;
+    const d = Math.hypot(dx, dy);
+    if (d < 1e-6) continue;
+
+    const sn = spinNorm(b);
+
+    // Steer, don't just push.
+    //
+    // Adding acceleration toward the opponent is not enough on a low-drag
+    // driver: it carries so much orbital velocity, and precession rotates that
+    // velocity a full turn every ~1.4s, that the added component is smeared
+    // away before it closes any distance. Measured, Volcanic closed 5% of the
+    // gap where Atomic closed 74%. Rotating the velocity toward the target
+    // works regardless of how fast the top is already going — which is what a
+    // homing move should do.
+    const speed = Math.hypot(b.vel.x, b.vel.y);
+    if (speed > 1e-6) {
+      const current = Math.atan2(b.vel.y, b.vel.x);
+      const wanted = Math.atan2(dy, dx);
+      let diff = (wanted - current) % (Math.PI * 2);
+      if (diff > Math.PI) diff -= Math.PI * 2;
+      if (diff < -Math.PI) diff += Math.PI * 2;
+
+      const maxTurn = mv.seek * 0.8 * sn * dt;
+      const turn = clamp(diff, -maxTurn, maxTurn);
+      const turned = rotate(b.vel, turn);
+      b.vel.x = turned.x;
+      b.vel.y = turned.y;
+    }
+
+    // A smaller direct push on top, so a charge also closes rather than merely
+    // orbiting at the same radius pointed inward.
+    const push = mv.seek * 0.45 * sn * dt;
+    b.vel.x += (dx / d) * push;
+    b.vel.y += (dy / d) * push;
+  }
+}
+
+/** Nearest living opponent, or null. */
+export function nearestFoe(beys: BeyState[], self: BeyState): BeyState | null {
+  let best: BeyState | null = null;
+  let bestD = Infinity;
+  for (const o of beys) {
+    if (o === self || !o.alive) continue;
+    const d = dist(self.pos, o.pos);
+    if (d < bestD) {
+      bestD = d;
+      best = o;
+    }
+  }
+  return best;
 }
 
 /** Angular centre of each exit pocket, radians. */
@@ -497,6 +569,8 @@ export function step(
     if (!b.alive) continue;
     integrate(b, dt, arena);
   }
+
+  applySeek(beys, dt);
 
   // Pairwise — with 2-8 tops this is trivially cheap and exact.
   for (let i = 0; i < beys.length; i++) {

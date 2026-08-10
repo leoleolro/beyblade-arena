@@ -243,7 +243,7 @@ export class Battle {
     bey.moveTime = profile.duration;
     bey.movesUsed += 1;
 
-    if (profile.speedKick > 0) this.applyEscapeKick(bey, profile.speedKick);
+    if (profile.speedKick > 0) this.applyKick(bey, profile);
     return true;
   }
 
@@ -255,26 +255,33 @@ export class Battle {
    * Near the rim the direction is blended inward instead, because an uncapped
    * outward escape rang the top out on its own kick.
    */
-  private applyEscapeKick(bey: BeyState, kick: number): void {
+  private applyKick(bey: BeyState, profile: C.MoveProfile): void {
+    const kick = profile.speedKick;
     const speed = Math.hypot(bey.vel.x, bey.vel.y);
     let dx = speed > 1e-6 ? bey.vel.x / speed : 1;
     let dy = speed > 1e-6 ? bey.vel.y / speed : 0;
 
     const foe = this.beys.find((o) => o !== bey && o.alive);
     if (foe) {
-      const ax = bey.pos.x - foe.pos.x;
-      const ay = bey.pos.y - foe.pos.y;
+      // 'pursue' aims the kick straight at the opponent so a Charge press
+      // produces immediate, legible movement toward them. 'escape' aims away.
+      const sign = profile.kickMode === 'pursue' ? -1 : 1;
+      const ax = (bey.pos.x - foe.pos.x) * sign;
+      const ay = (bey.pos.y - foe.pos.y) * sign;
       const alen = Math.hypot(ax, ay);
       if (alen > 1e-6) {
-        const k = C.DODGE_AWAY_BIAS;
+        // A pursuit kick commits harder than an escape: the whole point is to
+        // close distance now, not to drift vaguely toward them.
+        const k = profile.kickMode === 'pursue' ? 0.9 : C.DODGE_AWAY_BIAS;
         dx = dx * (1 - k) + (ax / alen) * k;
         dy = dy * (1 - k) + (ay / alen) * k;
       }
     }
 
-    // Don't escape into a pocket.
+    // Don't escape into a pocket. A pursuit kick is aimed at an opponent who is
+    // inside the dish by definition, so it needs no such guard.
     const r = Math.hypot(bey.pos.x, bey.pos.y);
-    if (r > C.DODGE_SAFE_RADIUS) {
+    if (profile.kickMode === 'escape' && r > C.DODGE_SAFE_RADIUS) {
       const k = C.DODGE_INWARD_BIAS;
       dx = dx * (1 - k) + (-bey.pos.x / r) * k;
       dy = dy * (1 - k) + (-bey.pos.y / r) * k;
@@ -285,7 +292,7 @@ export class Battle {
     bey.vel.y += (dy / dlen) * kick;
 
     const after = Math.hypot(bey.vel.x, bey.vel.y);
-    if (after > C.DODGE_MAX_SPEED) {
+    if (profile.kickMode === 'escape' && after > C.DODGE_MAX_SPEED) {
       bey.vel.x = (bey.vel.x / after) * C.DODGE_MAX_SPEED;
       bey.vel.y = (bey.vel.y / after) * C.DODGE_MAX_SPEED;
     }

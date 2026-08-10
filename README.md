@@ -185,9 +185,23 @@ means it also holds against builds and situations never explicitly considered.
 
 | Matchup | Win rate | Why |
 | --- | --- | --- |
-| Charge beats Dodge | 60.9% | a fleeing top can't outrun a seeking one |
-| Block beats Charge | 50.4% | the charger is committed and eats the reflected hit |
-| Dodge beats Block | 55.0% | a blocking top can't catch anything and bleeds spin waiting |
+| Charge beats Dodge | 63.3% | a fleeing top can't outrun a seeking one |
+| Block beats Charge | 57.1% | the charger is committed and eats the reflected hit |
+| Dodge beats Block | 64.6% | a blocking top can't catch anything and bleeds spin waiting |
+
+**Charge actually hunts now.** It originally worked by multiplying the driver's
+`wander` stat — but wander pushes a top *radially outward from the centre*, so
+it never pointed at anyone. Pressing Charge nudged you toward the rim by an
+amount scaled by a stat that is 0.06 on some drivers, which is why the button
+felt dead. It now has real homing plus an instant kick toward the opponent, and
+closes 43–76% of the gap depending on driver.
+
+The homing **steers** rather than only accelerating. Adding acceleration alone
+worked on most drivers but did nothing on Volcanic (5% of the gap closed, versus
+74% for Atomic): it carries so much orbital velocity, and precession rotates
+that velocity a full turn every ~1.4s, that the added component was smeared away
+before it closed anything. Rotating the velocity toward the target works
+regardless of how fast the top is already moving.
 
 `src/sim/moves.test.ts` measures every leg with identical builds on both sides,
 so any difference is down to the moves alone, and fails if a leg inverts.
