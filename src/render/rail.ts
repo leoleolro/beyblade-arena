@@ -8,7 +8,14 @@ import { bowlHeight } from '../sim/physics';
  * the player recognising it as something that *grabs* rather than as decoration.
  * A smooth ring would read like the tornado-ridge guide it sits next to.
  */
-export function buildRail(radius: number): THREE.Group {
+export interface RailHandles {
+  group: THREE.Group;
+  material: THREE.MeshStandardMaterial;
+  /** Baseline emissive, so the flare can return to it exactly. */
+  baseEmissive: number;
+}
+
+export function buildRail(radius: number): RailHandles {
   const group = new THREE.Group();
   const y = bowlHeight(radius) + 0.012;
 
@@ -36,5 +43,5 @@ export function buildRail(radius: number): THREE.Group {
     group.add(tooth);
   }
 
-  return group;
+  return { group, material: railMat, baseEmissive: railMat.emissiveIntensity };
 }

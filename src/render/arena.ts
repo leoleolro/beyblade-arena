@@ -17,6 +17,7 @@ import type { Theme } from './theme';
 import { Shockwave } from './shockwave';
 import type { ArenaSpec } from '../sim/arena';
 import { buildRail } from './rail';
+import type { RailHandles } from './rail';
 
 interface BeyVisual {
   group: THREE.Group;
@@ -63,7 +64,9 @@ export class ArenaRenderer {
   /** Seconds left of the decisive-blow blackout, when the theme uses one. */
   private blackout = 0;
   /** The X-Rail ring, present only in arenas that have one. */
-  private rail: THREE.Group | null = null;
+  private rail: RailHandles | null = null;
+  /** Throttles rail sparks so a ride doesn't drain the whole particle pool. */
+  private railSparkClock = 0;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -161,9 +164,9 @@ export class ArenaRenderer {
   setArena(arena: ArenaSpec): void {
     if (arena.rail && !this.rail) {
       this.rail = buildRail(arena.rail.radius);
-      this.scene.add(this.rail);
+      this.scene.add(this.rail.group);
     }
-    if (this.rail) this.rail.visible = !!arena.rail;
+    if (this.rail) this.rail.group.visible = !!arena.rail;
   }
 
   /**
@@ -306,6 +309,27 @@ export class ArenaRenderer {
       if (this.theme.shockwave && h.strength >= C.HITSTOP_THRESHOLD) {
         this.shockwaves.spawn(at, h.crit ? 0xfff0a0 : 0xffffff, h.crit ? 1.6 : 1.1);
       }
+    }
+
+    // Riding the rail needs to be *visible*, not just felt. Sparks stream off
+    // the contact point and the rail itself flares while anyone is locked in —
+    // without this the slingshot arrives with no explanation.
+    if (this.rail && this.rail.group.visible) {
+      const riders = beys.filter((b) => b.alive && b.railTime > 0);
+      this.railSparkClock += dt;
+      if (riders.length && this.railSparkClock > 0.035) {
+        this.railSparkClock = 0;
+        for (const b of riders) {
+          const at = beyWorldPosition(b.pos.x, b.pos.y);
+          at.y += 0.03;
+          this.sparks.spawn(at, 1.4, 5);
+        }
+      }
+      const flare = riders.length > 0 ? 2.6 : 0;
+      const mat = this.rail.material;
+      mat.emissiveIntensity +=
+        (this.rail.baseEmissive + flare - mat.emissiveIntensity) *
+        Math.min(1, dt * 9);
     }
 
     // Crush the fill for a beat on the decisive blow, then ease it back.

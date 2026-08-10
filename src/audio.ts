@@ -249,6 +249,37 @@ export class Audio {
     }
   }
 
+  /**
+   * The X-Rail.
+   *
+   * Deliberately a one-shot sweep lasting the ride rather than a sustained
+   * loop: a ride is only ~0.55s, and the spin drone already proved that
+   * sustained tones in this game are fatiguing. A transient that rises for
+   * exactly as long as the ride tells the player the same thing without the
+   * cost, and it routes through the effects bus so it follows that toggle.
+   */
+  railEngage(duration: number): void {
+    if (!this.ctx) return;
+    // The teeth biting: a short mechanical clatter.
+    this.burst({ freq: 900, q: 3.5, duration: 0.09, gain: 0.3, sweepTo: 2200 });
+    // The ride: pitch climbs for exactly as long as the top is locked in, so
+    // the sound ends when the slingshot fires.
+    this.tone({
+      freq: 180,
+      duration,
+      gain: 0.22,
+      type: 'sawtooth',
+      sweepTo: 900,
+    });
+    this.burst({ freq: 600, q: 1.6, duration, gain: 0.16, sweepTo: 3200 });
+  }
+
+  /** The slingshot release — a downward whoosh as it lets go. */
+  railRelease(): void {
+    if (!this.ctx) return;
+    this.burst({ freq: 2600, q: 1.1, duration: 0.28, gain: 0.3, sweepTo: 260 });
+  }
+
   /** Rejected input — a short dull thud, so a mis-press isn't silent. */
   reject(): void {
     if (!this.ctx) return;

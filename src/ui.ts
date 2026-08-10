@@ -347,6 +347,12 @@ export class Ui {
     } else if (them.move === 'dodge' && them.moveTime > 0) {
       msg = 'Rival is DODGING — tap SPACE to Charge it down';
       tone = 'urgent';
+    } else if (you.railTime > 0) {
+      msg = 'ON THE RAIL — it will slingshot you across the dish';
+      tone = 'good';
+    } else if (them.railTime > 0) {
+      msg = 'Rival is on the rail — tap A to Block the slingshot';
+      tone = 'urgent';
     } else if (you.meter >= 1) {
       msg = 'Meter full — SPACE to Charge, A to Block, S to Dodge';
       tone = '';
@@ -592,6 +598,17 @@ export class Ui {
           card: it fills as the round runs, and you spend it on moves.
           <b>Every move is a single tap — nothing here is held down.</b>
           You can also click the buttons instead of using keys.
+        </p>
+      </div>
+
+      <div class="slot">
+        <h4>Arenas</h4>
+        <p class="howto-body">
+          The <b>Standard Dish</b> is a plain bowl. The <b>X-Rail Stadium</b> adds a
+          glowing rail around the outside: a top moving fast enough gets caught,
+          accelerated, then flung back across the arena. Rounds there are faster
+          and deadlier. Pick it in the garage — it's the one setting that changes
+          how the match actually plays, rather than how it looks.
         </p>
       </div>
 

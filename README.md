@@ -342,6 +342,12 @@ happens to you. While locked in, radial drift is cancelled so it tracks the band
 and speed is driven to a ceiling; on release the exit velocity is rotated toward
 the centre.
 
+Riding it is deliberately loud: the rail flares while anyone is locked in,
+sparks stream off the contact point, a mechanical clatter plays on engage
+followed by a tone that rises for exactly the length of the ride, and a whoosh
+fires on release. The coach names it too. Without all that the slingshot arrives
+with no explanation — the player feels it without seeing why.
+
 It creates a **contested location**: the rail is where damage comes from, so
 both players want it, but a top riding it moves predictably along a known arc
 and sits one clean hit from an exit pocket.

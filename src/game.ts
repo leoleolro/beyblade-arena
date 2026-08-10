@@ -101,6 +101,8 @@ export class Game {
   private hitstop = 0;
   /** Guards against recording the same match result twice. */
   private matchRecorded = false;
+  /** Previous rail timer per top, for engage/release edge detection. */
+  private railWas = new Map<string, number>();
   /**
    * Seconds left holding on the stadium after a round is decided, before the
    * result panel covers it. The sim has already stopped by then, so this is not
@@ -158,6 +160,7 @@ export class Game {
 
     this.lastUnlocks = {};
     this.matchRecorded = false;
+    this.railWas.clear();
     this.battle = this.makeBattle(this.playerBuild, rival.build());
     this.toLaunch();
   }
@@ -293,6 +296,15 @@ export class Game {
         const rivalMoveAfter = this.rival?.move ?? null;
         if (rivalMoveAfter && rivalMoveAfter !== rivalMoveBefore) {
           this.audio.move(rivalMoveAfter);
+        }
+
+        // Rail transitions. Detected here rather than in the sim so the sim
+        // stays free of presentation concerns and replays identically.
+        for (const b of this.battle.beys) {
+          const was = this.railWas.get(b.id) ?? 0;
+          if (was === 0 && b.railTime > 0) this.audio.railEngage(b.railTime);
+          else if (was > 0 && b.railTime === 0) this.audio.railRelease();
+          this.railWas.set(b.id, b.railTime);
         }
 
         for (const h of this.battle.hits) {
