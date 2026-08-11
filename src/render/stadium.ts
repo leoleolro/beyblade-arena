@@ -186,11 +186,17 @@ export function buildStadium(theme: Theme): StadiumHandles {
   }
 
   // ---- outer housing -------------------------------------------------------
-  const skirtMat = new THREE.MeshStandardMaterial({
-    color: theme.skirtColour,
-    metalness: 0.4,
-    roughness: 0.8,
-  });
+  const skirtMat = (
+    theme.toon
+      ? // Matte and banded: a metalness-0.4 standard surface would be the one
+        // shiny CG object left in an otherwise cel-shaded frame.
+        toonMaterial(theme.skirtColour)
+      : new THREE.MeshStandardMaterial({
+          color: theme.skirtColour,
+          metalness: 0.4,
+          roughness: 0.8,
+        })
+  ) as THREE.MeshStandardMaterial;
   const skirt = new THREE.Mesh(
     new THREE.CylinderGeometry(C.STADIUM_RADIUS * 1.32, C.STADIUM_RADIUS * 1.5, 0.16, 64),
     skirtMat,

@@ -2,11 +2,11 @@
  * Visual themes.
  *
  * The game has one look today — dark, clean, technical — and it works. This
- * adds a second, anime-inspired one *without touching it*: `ARENA` below is a
- * literal transcription of the values that were previously hardcoded across
- * arena.ts and stadium.ts, so selecting it reproduces the original exactly.
- * That is the whole point. A theme system that subtly changes the default look
- * has failed at its one job, which is being reversible.
+ * adds a second, anime one *without touching it*: `ARENA` below is a literal
+ * transcription of the values that were previously hardcoded across arena.ts
+ * and stadium.ts, so selecting it reproduces the original exactly. That is the
+ * whole point. A theme system that subtly changes the default look has failed
+ * at its one job, which is being reversible.
  *
  * A theme is deliberately a flat bag of *parameters*, not a set of callbacks or
  * a subclass. Everything here can be applied by assigning to existing materials
@@ -18,6 +18,10 @@
  * top is made of, a theme decides what the world around it looks like. They are
  * separate cosmetic slots on purpose, because they are intended to become
  * separate cosmetic slots in the product sense too.
+ *
+ * There used to be three attempts at the anime look (beam / overdrive / toon).
+ * They are consolidated into ANIME; the retired ids must keep resolving — see
+ * LEGACY_ANIME_IDS — because they live in players' localStorage.
  */
 
 export interface Theme {
@@ -158,177 +162,58 @@ export const ARENA: Theme = {
 };
 
 /**
- * Beam Clash: the anime read.
+ * Anime: the one cartoon theme, replacing the beam / overdrive / toon trio.
  *
- * The move is to stop lighting the arena and let the tops light it instead —
- * near-black world, almost no ambient fill, a coloured light parented to each
- * top that flares hard on contact, and bloom to bleed it. Everything that isn't
- * a bey falls away, which is exactly the framing the medium uses.
+ * The cartoon read comes from the render path, not the palette: banded light,
+ * ink outlines, drawn effects (aura, speed lines, impact flash, shockwave).
+ * Bloom stays off because cel art doesn't bleed — glow fights the flat bands —
+ * and the per-top light stays at 0 because painted colour must not be re-lit.
+ *
+ * PALETTE: every hex below is a PLACEHOLDER (carried over from the retired
+ * Toon theme). The bright anime palette — cyan glossy dish, white rim, high-key
+ * environment — is owned by the palette pass; keep the structure, swap values.
  */
-export const BEAM: Theme = {
-  id: 'beam',
-  name: 'Beam Clash',
-  blurb: 'anime — the tops light the arena',
+export const ANIME: Theme = {
+  id: 'anime',
+  name: 'Anime',
+  blurb: 'full cartoon — cel shading, ink lines, impact frames',
 
-  background: 0x01020a,
-  fogColour: 0x01020a,
-  fogNear: 2.6,
-  fogFar: 6.4,
+  // The hall stays DARK. Research on the source material was unambiguous:
+  // Burst battles run on dark, desaturated backgrounds so the saturated bey
+  // colours and trails carry all the energy, and the glossy cyan bowl is the
+  // brightest object in frame — a lit stage in a dark arena, not a daytime
+  // scene. fogColour matches the backdrop sphere's horizon band so fogged
+  // geometry dissolves into the backdrop rather than into a different haze.
+  background: 0x0b1322,
+  fogColour: 0x16294a,
+  fogNear: 5.0,
+  fogFar: 12.0,
 
-  // Near-black and rough, so it takes coloured light rather than adding any.
-  dishColour: 0x090d18,
-  dishMetalness: 0.12,
-  dishRoughness: 0.86,
-  ridgeColour: 0x67e8f9,
-  ridgeOpacity: 0.95,
-  guideColour: 0x1b2a44,
-  guideOpacity: 0.5,
-
-  wallColour: 0x0c1020,
-  wallMetalness: 0.2,
-  wallRoughness: 0.78,
-  postColour: 0xff3d7f,
-  postEmissive: 2.4,
-  skirtColour: 0x03050e,
-
-  // Ambient is crushed. This is the single biggest lever on the whole look.
-  hemiSky: 0x2a3f6b,
-  hemiGround: 0x000000,
-  hemiIntensity: 0.16,
-  keyIntensity: 0.35,
-  rimAColour: 0x22d3ee,
-  rimAIntensity: 2.2,
-  rimBColour: 0xff2d6f,
-  rimBIntensity: 2.2,
-
-  sparkColour: 0xfff3c4,
-  sparkSize: 0.042,
-  trailOpacity: 0.95,
-  beyLightIntensity: 1.6,
-  // Measured, not guessed: at 14 a single hit drove the light to ~15.8 in a
-  // 1.6-unit falloff, and with bloom on top the whole centre of the dish blew
-  // out to a white blob that hid both tops.
-  beyLightFlash: 5,
-  shockwave: true,
-  finisherBlackout: true,
-  postBloom: true,
-  // Threshold matters more than strength here: raising it means only genuinely
-  // hot things bloom, so the glow reads as emissive rather than as fog.
-  bloomStrength: 0.5,
-  bloomRadius: 0.5,
-  bloomThreshold: 0.78,
-  toon: false,
-  aura: false,
-  speedLines: false,
-  impactFlash: false,
-
-  bodyClass: 'theme-beam',
-};
-
-/**
- * Overdrive: the full anime treatment.
- *
- * Beam Clash changed the *lighting*. This changes the grammar. Anime draws
- * power around a fighter rather than on them, cuts to speed lines when
- * something moves fast, and blows the frame white on a decisive hit — so this
- * adds an energy aura per top, a radial speed-line overlay driven by actual
- * speed, and an impact flash. Bloom runs hotter and the trails read as ribbons
- * rather than threads.
- *
- * Both earlier themes are untouched and remain selectable.
- */
-export const OVERDRIVE: Theme = {
-  id: 'overdrive',
-  name: 'Overdrive',
-  blurb: 'full anime — auras, speed lines, impact flash',
-
-  background: 0x05010f,
-  fogColour: 0x0a0320,
-  fogNear: 2.8,
-  fogFar: 6.8,
-
-  dishColour: 0x140a26,
-  dishMetalness: 0.2,
-  dishRoughness: 0.8,
-  ridgeColour: 0xffe066,
-  ridgeOpacity: 1,
-  guideColour: 0x35205c,
-  guideOpacity: 0.6,
-
-  wallColour: 0x140a28,
-  wallMetalness: 0.3,
-  wallRoughness: 0.7,
-  postColour: 0x00e5ff,
-  postEmissive: 3,
-  skirtColour: 0x050110,
-
-  hemiSky: 0x4a2f8f,
-  hemiGround: 0x05010f,
-  hemiIntensity: 0.28,
-  keyIntensity: 0.5,
-  rimAColour: 0xff2e88,
-  rimAIntensity: 3.4,
-  rimBColour: 0x00e5ff,
-  rimBIntensity: 3.4,
-
-  sparkColour: 0xffffff,
-  sparkSize: 0.05,
-  trailOpacity: 1,
-  beyLightIntensity: 2.1,
-  beyLightFlash: 6,
-  shockwave: true,
-  finisherBlackout: true,
-  postBloom: true,
-  bloomStrength: 0.72,
-  bloomRadius: 0.62,
-  bloomThreshold: 0.7,
-  toon: false,
-  aura: true,
-  speedLines: true,
-  impactFlash: true,
-
-  bodyClass: 'theme-overdrive',
-};
-
-/**
- * Toon: the actual anime look.
- *
- * The gap between "3D game" and "cartoon" turns out to be almost entirely two
- * things — light falling in hard bands rather than a smooth gradient, and a
- * dark line around every silhouette. Palette and effects matter far less than
- * people expect. So this theme is bright, flat and high-key: strong ambient so
- * colours read as painted rather than lit, no bloom (cel art doesn't bleed),
- * and saturated primaries against a light dish.
- */
-export const TOON: Theme = {
-  id: 'toon',
-  name: 'Toon',
-  blurb: 'full anime — cel shading and outlines',
-
-  background: 0x121a34,
-  fogColour: 0x1a2444,
-  fogNear: 4.5,
-  fogFar: 9.5,
-
-  dishColour: 0x3d5aa8,
+  // Under toon this hex is the centre colour of the painted dish texture, not
+  // a material tint — see dishTexture. Pale Beystadium polycarbonate.
+  dishColour: 0xcfe8ff,
   dishMetalness: 0,
   dishRoughness: 1,
-  ridgeColour: 0xffe14d,
-  ridgeOpacity: 1,
-  guideColour: 0x2a3f7d,
-  guideOpacity: 0.9,
+  // Red ring on the saturated-blue tornado shelf: the Burst accent pairing.
+  ridgeColour: 0xff4646,
+  ridgeOpacity: 0.9,
+  guideColour: 0x6ea9dd,
+  guideOpacity: 0.22,
 
-  wallColour: 0x24356b,
+  // White-grey moulding, red exit posts — the wbba stadium's own colours.
+  wallColour: 0xf2f5f9,
   wallMetalness: 0,
   wallRoughness: 1,
-  postColour: 0xff5a3c,
+  postColour: 0xe0312f,
   postEmissive: 0.5,
-  skirtColour: 0x18234a,
+  skirtColour: 0x33415e,
 
-  // High and flat. Cel bands need strong, simple light: a dim scene collapses
-  // every band into the same shadow step and the shading stops reading.
+  // High and flat ON THE SUBJECT. Cel bands need strong, simple light: a dim
+  // scene collapses every band into the same shadow step. The dish is unlit
+  // painted texture, so bright lights here hit only the beys and the rim —
+  // which is exactly the "lit stage in a dark hall" framing.
   hemiSky: 0xffffff,
-  hemiGround: 0x5566aa,
+  hemiGround: 0x51648c,
   hemiIntensity: 1.5,
   keyIntensity: 2.2,
   rimAColour: 0x88bbff,
@@ -336,15 +221,15 @@ export const TOON: Theme = {
   rimBColour: 0xffbb88,
   rimBIntensity: 1.2,
 
-  sparkColour: 0xfff27a,
+  // Deeper spark orange than the other themes: pale yellow vanishes against a
+  // near-white dish.
+  sparkColour: 0xff9f2e,
   sparkSize: 0.055,
   trailOpacity: 0.85,
   beyLightIntensity: 0,
   beyLightFlash: 0,
   shockwave: true,
   finisherBlackout: false,
-  // Bloom off on purpose: cel art doesn't bleed, and glow fights the flat bands
-  // that are doing all the work.
   postBloom: false,
   bloomStrength: 0,
   bloomRadius: 0,
@@ -354,19 +239,28 @@ export const TOON: Theme = {
   speedLines: true,
   impactFlash: true,
 
-  bodyClass: 'theme-toon',
+  bodyClass: 'theme-anime',
 };
 
-export const THEMES: Theme[] = [ARENA, BEAM, OVERDRIVE, TOON];
+export const THEMES: Theme[] = [ARENA, ANIME];
+
+/**
+ * Retired theme ids that may still be in players' localStorage or in old
+ * ArenaSpec.suggestedTheme values. They were all attempts at the anime look,
+ * so they must resolve to ANIME — falling back to ARENA would silently strip
+ * the cartoon mode from returning players.
+ */
+const LEGACY_ANIME_IDS = new Set(['beam', 'overdrive', 'toon']);
 
 export const themeById = (id: string): Theme =>
-  THEMES.find((t) => t.id === id) ?? ARENA;
+  LEGACY_ANIME_IDS.has(id) ? ANIME : (THEMES.find((t) => t.id === id) ?? ARENA);
 
 const KEY = 'beyblade-arena.theme.v1';
 
 export function loadThemeId(): string {
   try {
-    return localStorage.getItem(KEY) ?? ARENA.id;
+    const raw = localStorage.getItem(KEY) ?? ARENA.id;
+    return LEGACY_ANIME_IDS.has(raw) ? ANIME.id : raw;
   } catch {
     return ARENA.id;
   }

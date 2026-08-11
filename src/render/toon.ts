@@ -79,38 +79,57 @@ export function dishTexture(base: number): THREE.CanvasTexture {
   const ctx = canvas.getContext('2d');
 
   if (ctx) {
-    const c = new THREE.Color(base);
-    const tone = (mult: number): string =>
-      `#${c.clone().multiplyScalar(mult).getHexString()}`;
+    // The Burst Beystadium palette: pale cyan plastic, one saturated-blue
+    // tornado shelf, a white rim. `base` (theme.dishColour) tints the centre
+    // plastic; the shelf and rim hexes are fixed because they are what makes
+    // this read as *that* stadium rather than a recolour of a bowl.
+    const centre = new THREE.Color(base);
+    const shelf = new THREE.Color(0x2f7fd6);
+    const rim = new THREE.Color(0xe9eef4);
+    const white = new THREE.Color(0xffffff);
+    const css = (c: THREE.Color): string => `#${c.getHexString()}`;
+    const mix = (a: THREE.Color, b: THREE.Color, t: number): string =>
+      css(a.clone().lerp(b, t));
 
     // Concentric tone rings. v = 0 is the centre of the dish, v = 1 the rim.
-    const rings: Array<[number, number, number]> = [
-      [0, 0.46, 1.18], // inner floor, the lightest — the fight happens here
-      [0.46, 0.72, 1.0],
-      [0.72, 0.86, 0.82], // the tornado-ridge shelf
-      [0.86, 1, 0.66], // rim slope, darkest so the wall reads as an edge
+    const rings: Array<[number, number, string]> = [
+      [0, 0.3, mix(centre, white, 0.55)], // near-white centre — the fight happens here
+      [0.3, 0.46, mix(centre, white, 0.28)],
+      [0.46, 0.62, css(centre)],
+      [0.62, 0.72, mix(centre, shelf, 0.22)],
+      [0.72, 0.86, css(shelf)], // tornado-ridge shelf, the one saturated band
+      [0.86, 1, css(rim)], // rim slope, white-grey so wall and dish read as one moulding
     ];
-    for (const [from, to, mult] of rings) {
-      ctx.fillStyle = tone(mult);
+    for (const [from, to, fill] of rings) {
+      ctx.fillStyle = fill;
       ctx.fillRect(0, from * h, w, (to - from) * h);
     }
 
-    // Two soft sheen sweeps. Painted highlights, not specular — they give the
-    // dish somewhere for the eye to rest without implying a light source.
+    // Crisp ink lines between bands. The dish suppresses the mesh outline
+    // (`noOutline`, see below), so its linework has to be painted — these are
+    // the cel outlines of the floor.
+    ctx.fillStyle = 'rgba(21, 60, 110, 0.3)';
+    for (const [, to] of rings.slice(0, -1)) {
+      ctx.fillRect(0, to * h - 1, w, 2);
+    }
+
+    // Two soft sheen sweeps. Painted highlights, not specular — glossy plastic
+    // without implying a light source. Alpha is higher than the old dark-dish
+    // value because white-on-pale needs more to register at all.
     //
     // They start clear of v = 0 because every u collapses to a single point at
     // the lathe's pole: whichever texel lands on the centre vertex gets
     // stretched across the middle of the dish, and a sheen texel there showed
     // up as a white speck in the exact centre of the arena.
     const sheenFrom = 0.14 * h;
-    ctx.globalAlpha = 0.16;
-    for (const centre of [0.18, 0.66]) {
-      const grad = ctx.createLinearGradient((centre - 0.13) * w, 0, (centre + 0.13) * w, 0);
+    ctx.globalAlpha = 0.22;
+    for (const centre2 of [0.18, 0.66]) {
+      const grad = ctx.createLinearGradient((centre2 - 0.13) * w, 0, (centre2 + 0.13) * w, 0);
       grad.addColorStop(0, 'rgba(255,255,255,0)');
       grad.addColorStop(0.5, 'rgba(255,255,255,1)');
       grad.addColorStop(1, 'rgba(255,255,255,0)');
       ctx.fillStyle = grad;
-      ctx.fillRect((centre - 0.13) * w, sheenFrom, 0.26 * w, h - sheenFrom);
+      ctx.fillRect((centre2 - 0.13) * w, sheenFrom, 0.26 * w, h - sheenFrom);
     }
     ctx.globalAlpha = 1;
   }

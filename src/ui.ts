@@ -1,5 +1,6 @@
 import type { Game } from './game';
-import { DISCS, DRIVERS, LAYERS, deriveStats } from './sim/parts';
+import { DISCS, DRIVERS, LAYERS, deriveStats, makeBuild } from './sim/parts';
+import { BEY_PRESETS, designByLayer } from './render/beydex';
 import * as C from './sim/constants';
 import { SKINS, skinById } from './render/skins';
 import type { Channel } from './audio';
@@ -789,6 +790,50 @@ export class Ui {
         <p class="opp-line">${escapeHtml(r.line)}</p>`;
       panel.appendChild(opp);
     }
+
+    // Whole beyblades first. Most players think in beys, not in parts — "give
+    // me Valtryek" — and the anime's combos ARE identities. The part slots
+    // below stay for the players who want to tinker; picking a preset simply
+    // sets all three slots (and the canonical spin direction) at once.
+    const presetRow = document.createElement('div');
+    presetRow.className = 'slot';
+    presetRow.innerHTML =
+      '<h4>Beyblade — pick a whole top, or build your own below</h4>';
+    const presetChips = document.createElement('div');
+    presetChips.className = 'chips';
+    for (const p of BEY_PRESETS) {
+      const design = designByLayer(p.layerId);
+      const owned =
+        g.progress.has('layers', p.layerId) &&
+        g.progress.has('discs', p.discId) &&
+        g.progress.has('drivers', p.driverId);
+      const active =
+        g.playerBuild.layer.id === p.layerId &&
+        g.playerBuild.disc.id === p.discId &&
+        g.playerBuild.driver.id === p.driverId &&
+        g.playerSpinDir === p.spinDir;
+      const chip = document.createElement('button');
+      chip.className = 'chip' + (active ? ' on' : '') + (owned ? '' : ' locked-part');
+      chip.disabled = !owned;
+      chip.innerHTML = `
+        <span class="dot" style="background:${hex(design.primary)};box-shadow:0 0 0 2px ${hex(design.accent)}"></span>
+        <span>${escapeHtml(p.name)}<br><small>${escapeHtml(
+          `${p.spinDir === -1 ? 'left spin' : 'right spin'} · ${p.discId} · ${p.driverId}`,
+        )}</small></span>`;
+      if (!owned) chip.title = 'Beat more bladers to unlock its parts';
+      chip.addEventListener('click', () => {
+        if (!owned) return;
+        g.playerBuild = makeBuild(p.layerId, p.discId, p.driverId);
+        // Canonical spin comes with the bey: choosing Fafnir means choosing
+        // left spin, exactly as in the source material.
+        g.playerSpinDir = p.spinDir;
+        if (g.progress.has('skins', p.skinId)) g.playerSkinId = p.skinId;
+        this.render();
+      });
+      presetChips.appendChild(chip);
+    }
+    presetRow.appendChild(presetChips);
+    panel.appendChild(presetRow);
 
     const slots: [string, { id: string; name: string; colour?: number; note: string }[], string][] = [
       [

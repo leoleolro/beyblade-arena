@@ -1,4 +1,27 @@
 import * as THREE from 'three';
+import { noOutline } from './toon';
+
+let sharedSparkSprite: THREE.CanvasTexture | null = null;
+
+/** Round soft-edged sprite for the spark points, built once and shared. */
+function sparkSprite(): THREE.CanvasTexture {
+  if (sharedSparkSprite) return sharedSparkSprite;
+  const size = 32;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+    g.addColorStop(0, 'rgba(255,255,255,1)');
+    g.addColorStop(0.4, 'rgba(255,255,255,0.9)');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, size, size);
+  }
+  sharedSparkSprite = new THREE.CanvasTexture(canvas);
+  return sharedSparkSprite;
+}
 
 /**
  * A pooled additive-blended particle burst, used for clash sparks. Particles
@@ -37,6 +60,10 @@ export class SparkBurst {
     const mat = new THREE.PointsMaterial({
       size: 0.028,
       color: 0xffd28a,
+      // PointsMaterial draws square points; the round falloff map is what
+      // makes them sparks. Invisible on a dark dish, but on the anime theme's
+      // near-white floor the bare squares read as boxes.
+      map: sparkSprite(),
       transparent: true,
       opacity: 0.95,
       blending: THREE.AdditiveBlending,
@@ -97,8 +124,21 @@ export class SparkBurst {
   }
 }
 
+/**
+ * The surface arena.ts holds a trail through, so the toon ribbon and the
+ * classic line are interchangeable per theme without the caller caring which
+ * one it has.
+ */
+export interface TrailLike {
+  readonly object: THREE.Object3D;
+  push(p: THREE.Vector3): void;
+  reset(): void;
+  setVisible(v: boolean): void;
+  setOpacity(o: number): void;
+}
+
 /** A fading ribbon following one top, so its orbit path stays readable. */
-export class Trail {
+export class Trail implements TrailLike {
   readonly line: THREE.Line;
   private readonly positions: Float32Array;
   private readonly length: number;
@@ -120,6 +160,10 @@ export class Trail {
       }),
     );
     this.line.frustumCulled = false;
+  }
+
+  get object(): THREE.Object3D {
+    return this.line;
   }
 
   push(p: THREE.Vector3): void {
@@ -152,5 +196,144 @@ export class Trail {
 
   setOpacity(o: number): void {
     (this.line.material as THREE.LineBasicMaterial).opacity = o;
+  }
+}
+
+/**
+ * The toon trail: a flat triangle-strip ribbon rather than a one-pixel line.
+ *
+ * Anime draws motion as a thick glowing ribbon behind the mover, and
+ * LineBasicMaterial cannot be wider than a pixel on most platforms — so the
+ * width has to be real geometry. Fixed-size buffers rewritten in place per
+ * push: a battle pushes every frame, and per-frame allocation would sawtooth
+ * the frame time.
+ *
+ * The fade lives in a per-vertex colour attribute under additive blending,
+ * where black *is* transparent — which keeps the material a plain
+ * MeshBasicMaterial instead of a shader.
+ */
+export class RibbonTrail implements TrailLike {
+  readonly mesh: THREE.Mesh;
+  private readonly centres: Float32Array;
+  private readonly positions: Float32Array;
+  private readonly samples: number;
+  private readonly halfWidth: number;
+  private filled = false;
+  private lastSideX = 1;
+  private lastSideZ = 0;
+
+  constructor(colour: number, layerRadius: number, samples = 60) {
+    this.samples = samples;
+    this.halfWidth = layerRadius * 0.55 * 0.5;
+    this.centres = new Float32Array(samples * 3);
+    this.positions = new Float32Array(samples * 2 * 3);
+
+    // Static fade ramp, brightest at the head. Never touched again.
+    const colours = new Float32Array(samples * 2 * 3);
+    const c = new THREE.Color(colour);
+    for (let i = 0; i < samples; i++) {
+      const fade = (i / (samples - 1)) ** 1.6;
+      const o = i * 2 * 3;
+      colours[o] = colours[o + 3] = c.r * fade;
+      colours[o + 1] = colours[o + 4] = c.g * fade;
+      colours[o + 2] = colours[o + 5] = c.b * fade;
+    }
+
+    const index: number[] = [];
+    for (let i = 0; i < samples - 1; i++) {
+      const a = i * 2;
+      index.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+    }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(this.positions, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(colours, 3));
+    geo.setIndex(index);
+
+    const mat = new THREE.MeshBasicMaterial({
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.85,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    // OutlineEffect would draw an inverted hull around the strip — a black
+    // ribbon under the glowing one.
+    noOutline(mat);
+
+    this.mesh = new THREE.Mesh(geo, mat);
+    this.mesh.frustumCulled = false;
+    // Above the dish and the tops' transparent bits, below blur discs (2) and
+    // sparks (3).
+    this.mesh.renderOrder = 1;
+  }
+
+  get object(): THREE.Object3D {
+    return this.mesh;
+  }
+
+  push(p: THREE.Vector3): void {
+    const n = this.samples;
+    if (!this.filled) {
+      // Seed the whole buffer on first use so the ribbon doesn't streak in
+      // from the world origin.
+      for (let i = 0; i < n; i++) {
+        this.centres[i * 3] = p.x;
+        this.centres[i * 3 + 1] = p.y;
+        this.centres[i * 3 + 2] = p.z;
+      }
+      this.filled = true;
+    } else {
+      this.centres.copyWithin(0, 3);
+      const last = (n - 1) * 3;
+      this.centres[last] = p.x;
+      this.centres[last + 1] = p.y;
+      this.centres[last + 2] = p.z;
+    }
+
+    // Rebuild the strip: each sample extrudes sideways in the ground plane,
+    // perpendicular to the path, tapering from full width at the head to zero
+    // at the tail.
+    for (let i = 0; i < n; i++) {
+      const prev = Math.max(0, i - 1) * 3;
+      const next = Math.min(n - 1, i + 1) * 3;
+      const dx = this.centres[next] - this.centres[prev];
+      const dz = this.centres[next + 2] - this.centres[prev + 2];
+      const len = Math.hypot(dx, dz);
+      if (len > 1e-6) {
+        this.lastSideX = -dz / len;
+        this.lastSideZ = dx / len;
+      }
+      // A stationary segment keeps the last good side vector — collapsing the
+      // width there makes the ribbon flicker whenever the top slows.
+      const w = this.halfWidth * (i / (n - 1));
+      const sx = this.lastSideX * w;
+      const sz = this.lastSideZ * w;
+
+      const cx = this.centres[i * 3];
+      const cy = this.centres[i * 3 + 1];
+      const cz = this.centres[i * 3 + 2];
+      const o = i * 2 * 3;
+      this.positions[o] = cx + sx;
+      this.positions[o + 1] = cy;
+      this.positions[o + 2] = cz + sz;
+      this.positions[o + 3] = cx - sx;
+      this.positions[o + 4] = cy;
+      this.positions[o + 5] = cz - sz;
+    }
+    this.mesh.geometry.attributes.position.needsUpdate = true;
+  }
+
+  reset(): void {
+    this.filled = false;
+  }
+
+  setVisible(v: boolean): void {
+    this.mesh.visible = v;
+  }
+
+  setOpacity(o: number): void {
+    (this.mesh.material as THREE.MeshBasicMaterial).opacity = o;
   }
 }

@@ -2,7 +2,9 @@ import * as THREE from 'three';
 import type { BeyBuild } from '../sim/types';
 import { skinMaterial } from './skins';
 import type { Skin } from './skins';
-import { emblemTexture, noOutline, setOutline, toonMaterial } from './toon';
+import { noOutline, setOutline, toonMaterial } from './toon';
+import { beastEmblem, designByLayer } from './beydex';
+import type { BeyDesign, BladeStyle } from './beydex';
 
 /**
  * The tops get a heavier line than the world around them.
@@ -32,8 +34,25 @@ export interface BeyParts {
  * keeping their own offsets. That is deliberately a no-op for the arena — the
  * assembled top renders identically — but it lets the garage pull the parts
  * apart and spin them independently without a second set of meshes.
+ *
+ * Two entirely separate constructions behind one signature. The classic path
+ * is the preserved backup style and must not drift; the toon path rebuilds
+ * every part around the anime read (sculpted silhouette, sticker face, metal
+ * ring) rather than re-dressing the classic geometry. Sharing meshes between
+ * them would force compromises on both, so they share only the contract:
+ * userData.parts / partY / ring / layerMat, and the tip at local origin.
  */
 export function buildBeyMesh(build: BeyBuild, skin: Skin, toon = false): THREE.Group {
+  return toon ? buildToonBey(build, skin) : buildClassicBey(build, skin);
+}
+
+// ---------------------------------------------------------------------------
+// Classic path — the preserved non-toon style. Do not restyle: this is the
+// backup look, kept byte-for-byte equivalent to what it rendered before the
+// toon redesign.
+// ---------------------------------------------------------------------------
+
+function buildClassicBey(build: BeyBuild, skin: Skin): THREE.Group {
   const group = new THREE.Group();
   const driverGroup = new THREE.Group();
   const discGroup = new THREE.Group();
@@ -47,29 +66,21 @@ export function buildBeyMesh(build: BeyBuild, skin: Skin, toon = false): THREE.G
   const tipHeight = r * 1.05;
   const tip = new THREE.Mesh(
     new THREE.ConeGeometry(r * 0.22, tipHeight, 16),
-    toon
-      ? toonMaterial(0x39405a)
-      : new THREE.MeshStandardMaterial({
-          color: 0x2a2f3a,
-          metalness: 0.85,
-          roughness: 0.35,
-        }),
+    new THREE.MeshStandardMaterial({
+      color: 0x2a2f3a,
+      metalness: 0.85,
+      roughness: 0.35,
+    }),
   );
   tip.position.y = tipHeight / 2;
   tip.rotation.x = Math.PI; // point downward
   driverGroup.add(tip);
 
-  const driverMat = toon
-    ? toonMaterial(0x4a5268)
-    : new THREE.MeshStandardMaterial({
-        color: 0x3d4450,
-        metalness: 0.7,
-        roughness: 0.45,
-      });
-  if (toon) {
-    setOutline(tip.material as THREE.Material, { thickness: BEY_OUTLINE });
-    setOutline(driverMat, { thickness: BEY_OUTLINE });
-  }
+  const driverMat = new THREE.MeshStandardMaterial({
+    color: 0x3d4450,
+    metalness: 0.7,
+    roughness: 0.45,
+  });
   const shaft = new THREE.Mesh(
     new THREE.CylinderGeometry(r * 0.3, r * 0.3, r * 0.4, 16),
     driverMat,
@@ -98,8 +109,7 @@ export function buildBeyMesh(build: BeyBuild, skin: Skin, toon = false): THREE.G
   const discY = tipHeight + r * 0.36;
   // Six radial segments rather than 24: the flat faces catch the light
   // differently as it turns, which is what makes the rotation readable.
-  const discMat = skinMaterial(skin, skin.secondary, { toon });
-  if (toon) setOutline(discMat, { thickness: BEY_OUTLINE });
+  const discMat = skinMaterial(skin, skin.secondary);
   const discMesh = new THREE.Mesh(
     new THREE.CylinderGeometry(r * 0.78, r * 0.88, discHeight, 6),
     discMat,
@@ -123,8 +133,7 @@ export function buildBeyMesh(build: BeyBuild, skin: Skin, toon = false): THREE.G
   const layerY = discY + discHeight * 0.5 + r * 0.2;
   // The layer carries the skin's primary colour. Part identity is still
   // readable from the blade count and silhouette, which the skin doesn't touch.
-  const layerMat = skinMaterial(skin, skin.primary, { toon });
-  if (toon) setOutline(layerMat, { thickness: BEY_OUTLINE });
+  const layerMat = skinMaterial(skin, skin.primary);
 
   // Faceted core with a hard bevel. Matching the facet count to the blade count
   // makes the whole layer read as one machined piece rather than a cylinder with
@@ -155,21 +164,6 @@ export function buildBeyMesh(build: BeyBuild, skin: Skin, toon = false): THREE.G
   boss.position.y = layerY + r * 0.3;
   boss.castShadow = true;
   layerGroup.add(boss);
-
-  // The beast emblem. Every real Beyblade has one, and it is the single detail
-  // that most says "Beyblade" rather than "spinning shape".
-  if (toon) {
-    const emblem = new THREE.Mesh(
-      new THREE.CircleGeometry(r * 0.46, 24),
-      new THREE.MeshBasicMaterial({
-        map: emblemTexture(skin.primary, skin.secondary),
-        transparent: true,
-      }),
-    );
-    emblem.rotation.x = -Math.PI / 2;
-    emblem.position.y = layerY + r * 0.47;
-    layerGroup.add(emblem);
-  }
 
   const bossRing = new THREE.Mesh(
     new THREE.TorusGeometry(r * 0.34, r * 0.05, 6, facets),
@@ -228,4 +222,559 @@ export function buildBeyMesh(build: BeyBuild, skin: Skin, toon = false): THREE.G
     layer: layerY,
   };
   return group;
+}
+
+// ---------------------------------------------------------------------------
+// Toon path — the anime construction.
+// ---------------------------------------------------------------------------
+
+/**
+ * Burst proportions, as fractions of the layer radius. Real Burst hardware is
+ * wide and squat — a 45 mm layer on a ~35 mm-tall body — and the camera sits
+ * 34° above horizontal, so most of what the player ever sees is the top face.
+ * The classic stack is ~2.3 radii tall, which under this camera reads as a
+ * chess piece; the toon stack tops out at 1.15 radii so the layer dominates.
+ *
+ * The stack is built tip-up with ~0.01r of deliberate interpenetration at each
+ * joint: cel shading has no ambient occlusion to swallow hairline gaps, so any
+ * daylight between parts reads as a broken toy.
+ */
+const TOON = {
+  tipH: 0.4,
+  discY: 0.78,
+  layerBottom: 0.85,
+  layerDepth: 0.3,
+} as const;
+
+function buildToonBey(build: BeyBuild, skin: Skin): THREE.Group {
+  const group = new THREE.Group();
+  const driverGroup = new THREE.Group();
+  const discGroup = new THREE.Group();
+  const layerGroup = new THREE.Group();
+  group.add(driverGroup, discGroup, layerGroup);
+
+  const r = build.layer.radius;
+  const blades = build.layer.blades;
+  // The layer's look comes from its canonical design, not the skin: Valtryek
+  // is blue-and-gold whoever throws it. The skin keeps the slots that carry
+  // *ownership* — trail, aura, blur tint, hit ring, HUD swatch — so the two
+  // systems answer different questions: "which bey is that?" vs "whose is it?".
+  const design = designByLayer(build.layer.id);
+
+  buildToonDriver(driverGroup, build.driver.id, r);
+  const discY = buildToonDisc(discGroup, build.disc.id, r);
+
+  // ---- energy layer: extruded blade silhouette + sticker face --------------
+  const layerBottom = r * TOON.layerBottom;
+  const layerDepth = r * TOON.layerDepth;
+  const layerY = layerBottom + layerDepth / 2;
+
+  // Side walls keep the skin pipeline's finish but wear the design's colour;
+  // this is also the material the arena flashes on hits, so it is the one
+  // exported as layerMat.
+  const sideMat = setOutline(
+    skinMaterial(skin, design.primary, { toon: true }),
+    { thickness: BEY_OUTLINE },
+  );
+  // The face is unlit for the same reason the dish is: anime stickers are
+  // flat-printed, and a cel band crawling across the emblem as the top wobbles
+  // reads as a rendering artefact, not shading.
+  const faceMat = new THREE.MeshBasicMaterial({
+    map: layerFaceTexture(design, blades, r),
+  });
+  // No hull on the cap: OutlineEffect would float a copy of this flat face
+  // 0.02 above the sticker, which flashes black at low camera angles (garage
+  // orbit, deep wobble). The side-wall hull already inks the silhouette.
+  noOutline(faceMat);
+
+  // ExtrudeGeometry material groups: index 0 is the caps, index 1 the walls.
+  const geo = new THREE.ExtrudeGeometry(bladeSilhouette(blades, r, design.blade), {
+    depth: layerDepth,
+    // No bevel: the outline carries the edge, and a bevel would push cap
+    // vertices outside the shape and break the face texture's ±r mapping.
+    bevelEnabled: false,
+    curveSegments: 10,
+  });
+  const layerMesh = new THREE.Mesh(geo, [faceMat, sideMat]);
+  // Extrusion runs along local +z; this maps it to +y so the cap faces the
+  // camera. It mirrors the profile in plan view, but the face texture is
+  // authored in the same shape space, so paint and geometry mirror together.
+  layerMesh.rotation.x = -Math.PI / 2;
+  layerMesh.position.y = layerBottom;
+  layerMesh.castShadow = true;
+  layerGroup.add(layerMesh);
+
+  // A faint energy ring at the exact collision radius — reads as the hitbox,
+  // and carries the OWNER's colour (see the design/skin split above).
+  const ringMat = new THREE.MeshBasicMaterial({
+    color: skin.primary,
+    transparent: true,
+    opacity: 0.32,
+  });
+  // No ink on the hitbox. A solid black line around a 32%-opacity guide turns a
+  // hint into the loudest thing on the top.
+  noOutline(ringMat);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(r, r * 0.05, 8, 40), ringMat);
+  ring.rotation.x = Math.PI / 2;
+  ring.position.y = layerY;
+  layerGroup.add(ring);
+
+  group.userData.ring = ring;
+  group.userData.layerMat = sideMat;
+  group.userData.parts = {
+    driver: driverGroup,
+    disc: discGroup,
+    layer: layerGroup,
+  } satisfies BeyParts;
+  // Height of each part's centre, so the garage knows where to draw its label.
+  group.userData.partY = {
+    driver: r * TOON.tipH * 0.8,
+    disc: discY,
+    layer: layerY,
+  };
+  return group;
+}
+
+/** Toon material with the bey-weight outline, in one call. */
+const inked = (colour: number, emissive = 0): THREE.Material =>
+  setOutline(toonMaterial(colour, emissive), { thickness: BEY_OUTLINE });
+
+/**
+ * Drivers, each with the real part's silhouette.
+ *
+ * Six ids, six genuinely different shapes — the user's complaint that drove
+ * this was that swapping a driver "does not look like it changed much". The
+ * distinguishing features come from the researched hardware: Xtreme's wide
+ * rubber puck, Volcanic's knurled free-tip collar, Atomic's ball-and-skirt,
+ * Orbit's tight-collared ball, Needle's studded point, Bastion's pot-lid
+ * flange. Colours are the parts' own — drivers are hardware, not cosmetics,
+ * so they do not take the skin.
+ */
+function buildToonDriver(parent: THREE.Group, driverId: string, r: number): void {
+  const tipH = r * TOON.tipH;
+
+  switch (driverId) {
+    case 'xtreme': {
+      // Short wide cone into the widest contact tip of the set: a broad flat
+      // blue rubber puck.
+      const body = new THREE.Mesh(
+        new THREE.CylinderGeometry(r * 0.3, r * 0.2, tipH * 0.8, 12),
+        inked(0xdfe3e8),
+      );
+      body.position.y = tipH * 0.6;
+      parent.add(body);
+      const puck = new THREE.Mesh(
+        new THREE.CylinderGeometry(r * 0.24, r * 0.28, tipH * 0.4, 16),
+        inked(0x2b6fd4, 0.08),
+      );
+      puck.position.y = tipH * 0.2;
+      parent.add(puck);
+      break;
+    }
+    case 'volcanic': {
+      // Taller than standard; a small flat tip under a knurled friction ring
+      // with a visible seam — drawn as an actual ring.
+      const body = new THREE.Mesh(
+        new THREE.CylinderGeometry(r * 0.28, r * 0.16, tipH * 0.9, 12),
+        inked(0xe8681f, 0.1),
+      );
+      body.position.y = tipH * 0.65;
+      parent.add(body);
+      const collar = new THREE.Mesh(
+        new THREE.TorusGeometry(r * 0.17, r * 0.05, 8, 8),
+        inked(0xc23c22),
+      );
+      collar.rotation.x = Math.PI / 2;
+      collar.position.y = tipH * 0.28;
+      parent.add(collar);
+      const tip = new THREE.Mesh(
+        new THREE.CylinderGeometry(r * 0.1, r * 0.13, tipH * 0.24, 10),
+        inked(0xc23c22),
+      );
+      tip.position.y = tipH * 0.1;
+      parent.add(tip);
+      break;
+    }
+    case 'atomic': {
+      // The planet-with-a-collar: a big exposed ball under a wide flaring
+      // skirt ring that reaches past the cone body.
+      const body = new THREE.Mesh(
+        new THREE.CylinderGeometry(r * 0.26, r * 0.18, tipH * 0.6, 12),
+        inked(0xefece4),
+      );
+      body.position.y = tipH * 0.72;
+      parent.add(body);
+      const skirt = new THREE.Mesh(
+        new THREE.CylinderGeometry(r * 0.34, r * 0.42, tipH * 0.22, 16),
+        inked(0xb8383d, 0.06),
+      );
+      skirt.position.y = tipH * 0.42;
+      parent.add(skirt);
+      const ball = new THREE.Mesh(
+        new THREE.SphereGeometry(r * 0.16, 12, 10),
+        inked(0xefece4),
+      );
+      ball.position.y = tipH * 0.16;
+      parent.add(ball);
+      break;
+    }
+    case 'orbit': {
+      // Atomic's slimmer sibling: smaller ball, tight three-tab collar, no
+      // skirt — a straight conical silhouette.
+      const body = new THREE.Mesh(
+        new THREE.CylinderGeometry(r * 0.26, r * 0.15, tipH * 0.75, 12),
+        inked(0xf0eee8),
+      );
+      body.position.y = tipH * 0.62;
+      parent.add(body);
+      const collarMat = inked(0x2e8b8b);
+      for (let i = 0; i < 3; i++) {
+        const a = (i / 3) * Math.PI * 2;
+        const tab = new THREE.Mesh(
+          new THREE.BoxGeometry(r * 0.08, tipH * 0.2, r * 0.06),
+          collarMat,
+        );
+        tab.position.set(Math.cos(a) * r * 0.11, tipH * 0.26, Math.sin(a) * r * 0.11);
+        tab.rotation.y = -a;
+        parent.add(tab);
+      }
+      const ball = new THREE.Mesh(
+        new THREE.SphereGeometry(r * 0.11, 10, 8),
+        inked(0xf0eee8),
+      );
+      ball.position.y = tipH * 0.12;
+      parent.add(ball);
+      break;
+    }
+    case 'needle': {
+      // Narrowest contact of the set: a studded point — the studs are real
+      // little spheres because at this scale a bump map would vanish.
+      const body = new THREE.Mesh(
+        new THREE.CylinderGeometry(r * 0.26, r * 0.1, tipH * 0.85, 10),
+        inked(0x6b4fa0, 0.08),
+      );
+      body.position.y = tipH * 0.55;
+      parent.add(body);
+      const point = new THREE.Mesh(
+        new THREE.ConeGeometry(r * 0.09, tipH * 0.3, 8),
+        inked(0x6b4fa0),
+      );
+      point.rotation.x = Math.PI;
+      point.position.y = tipH * 0.15;
+      parent.add(point);
+      const studMat = inked(0x8f74c4);
+      for (let i = 0; i < 5; i++) {
+        const a = (i / 5) * Math.PI * 2;
+        const stud = new THREE.Mesh(new THREE.SphereGeometry(r * 0.03, 6, 5), studMat);
+        stud.position.set(Math.cos(a) * r * 0.08, tipH * 0.22, Math.sin(a) * r * 0.08);
+        parent.add(stud);
+      }
+      break;
+    }
+    case 'bastion':
+    default: {
+      // Squat and armoured: ball tip, four chunky tabs, and the pot-lid — a
+      // fixed horizontal flange wider than the cone itself.
+      const body = new THREE.Mesh(
+        new THREE.CylinderGeometry(r * 0.28, r * 0.2, tipH * 0.6, 12),
+        inked(0xd4a017, 0.08),
+      );
+      body.position.y = tipH * 0.72;
+      parent.add(body);
+      const flange = new THREE.Mesh(
+        new THREE.CylinderGeometry(r * 0.46, r * 0.46, tipH * 0.12, 16),
+        inked(0xb8860b),
+      );
+      flange.position.y = tipH * 0.46;
+      parent.add(flange);
+      const tabMat = inked(0xb8860b);
+      for (let i = 0; i < 4; i++) {
+        const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+        const tab = new THREE.Mesh(
+          new THREE.BoxGeometry(r * 0.1, tipH * 0.26, r * 0.09),
+          tabMat,
+        );
+        tab.position.set(Math.cos(a) * r * 0.18, tipH * 0.26, Math.sin(a) * r * 0.18);
+        tab.rotation.y = -a;
+        parent.add(tab);
+      }
+      const ball = new THREE.Mesh(
+        new THREE.SphereGeometry(r * 0.12, 10, 8),
+        inked(0xd4a017),
+      );
+      ball.position.y = tipH * 0.12;
+      parent.add(ball);
+      break;
+    }
+  }
+}
+
+/**
+ * Forge discs. Same rule as the drivers: six ids, six silhouettes, colours
+ * from the researched metal tones. Returns the disc's centre height for
+ * `partY`, since the shapes differ enough that one constant no longer covers
+ * them.
+ */
+function buildToonDisc(parent: THREE.Group, discId: string, r: number): number {
+  const discY = r * TOON.discY;
+
+  switch (discId) {
+    case 'heavy': {
+      // Compact thick ring, mass packed at the centre, four armour bosses.
+      const ringMesh = new THREE.Mesh(
+        new THREE.CylinderGeometry(r * 0.62, r * 0.58, r * 0.2, 16),
+        inked(0xa8adb4, 0.06),
+      );
+      ringMesh.position.y = discY;
+      ringMesh.castShadow = true;
+      parent.add(ringMesh);
+      const bossMat = inked(0x878d96);
+      for (let i = 0; i < 4; i++) {
+        const a = (i / 4) * Math.PI * 2;
+        const boss = new THREE.Mesh(
+          new THREE.BoxGeometry(r * 0.16, r * 0.06, r * 0.12),
+          bossMat,
+        );
+        boss.position.set(Math.cos(a) * r * 0.42, discY + r * 0.1, Math.sin(a) * r * 0.42);
+        boss.rotation.y = -a;
+        parent.add(boss);
+      }
+      break;
+    }
+    case 'gravity': {
+      // The octagon: eight straight facets, rim-heavy flywheel band, thinner
+      // than Heavy. The 8-segment cylinder IS the octagonal silhouette.
+      const plate = new THREE.Mesh(
+        new THREE.CylinderGeometry(r * 0.74, r * 0.72, r * 0.12, 8),
+        inked(0xb9bec5, 0.06),
+      );
+      plate.position.y = discY;
+      plate.castShadow = true;
+      parent.add(plate);
+      const hub = new THREE.Mesh(
+        new THREE.CylinderGeometry(r * 0.36, r * 0.34, r * 0.16, 8),
+        inked(0x9aa1ab),
+      );
+      hub.position.y = discY;
+      parent.add(hub);
+      break;
+    }
+    case 'spread': {
+      // The discus: widest and flattest, tapering to a knife edge — two
+      // shallow cones back to back.
+      const top = new THREE.Mesh(
+        new THREE.CylinderGeometry(r * 0.4, r * 0.8, r * 0.07, 24),
+        inked(0xc6cad1, 0.08),
+      );
+      top.position.y = discY + r * 0.035;
+      top.castShadow = true;
+      parent.add(top);
+      const bottom = new THREE.Mesh(
+        new THREE.CylinderGeometry(r * 0.8, r * 0.4, r * 0.07, 24),
+        inked(0xb3b9c2),
+      );
+      bottom.position.y = discY - r * 0.035;
+      parent.add(bottom);
+      break;
+    }
+    case 'blitz': {
+      // Rounded-triangular core with three blade flaps flaring at the
+      // corners — the attacking disc visibly wants to hit things.
+      const core = new THREE.Mesh(
+        new THREE.CylinderGeometry(r * 0.56, r * 0.52, r * 0.14, 3),
+        inked(0xb0b5bc, 0.06),
+      );
+      core.position.y = discY;
+      core.castShadow = true;
+      parent.add(core);
+      const flapMat = inked(0xd94840);
+      for (let i = 0; i < 3; i++) {
+        // CylinderGeometry's 3 segments put corners at these angles; the flaps
+        // must ride the corners, not the flats, to read as extensions of them.
+        const a = (i / 3) * Math.PI * 2 + Math.PI / 2;
+        const flap = new THREE.Mesh(
+          new THREE.BoxGeometry(r * 0.26, r * 0.08, r * 0.14),
+          flapMat,
+        );
+        flap.position.set(Math.cos(a) * r * 0.58, discY, Math.sin(a) * r * 0.58);
+        flap.rotation.y = -a + 0.35; // raked, like a swinging flap caught mid-flare
+        parent.add(flap);
+      }
+      break;
+    }
+    case 'wall':
+    default: {
+      // Six shield lobes bulging outward and upward — a raised defensive wall,
+      // clearly the tallest band of the five.
+      const base = new THREE.Mesh(
+        new THREE.CylinderGeometry(r * 0.56, r * 0.52, r * 0.14, 12),
+        inked(0x9ba1a9, 0.05),
+      );
+      base.position.y = discY;
+      base.castShadow = true;
+      parent.add(base);
+      const lobeMat = inked(0x8a9099);
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2;
+        const lobe = new THREE.Mesh(new THREE.SphereGeometry(r * 0.14, 10, 8), lobeMat);
+        lobe.scale.set(1, 0.85, 0.8);
+        lobe.position.set(Math.cos(a) * r * 0.52, discY + r * 0.05, Math.sin(a) * r * 0.52);
+        lobe.rotation.y = -a;
+        parent.add(lobe);
+      }
+      break;
+    }
+  }
+
+  return discY;
+}
+
+/**
+ * The layer's blade profile: `blades` sweeping wedges around a core circle,
+ * shaped by the design's BladeStyle. The silhouette IS the design — Burst
+ * layers are recognised by their cut-out — so the three style numbers move it
+ * from Valtryek's aggressive pinwheel (low root, deep cut) to Fafnir's
+ * near-circular spin-steal shield (high root, nub-shallow everything) without
+ * changing the curve grammar.
+ *
+ * Per sector of width step = 2π/blades, anchored at angle a (polar → xy):
+ *   root out:  (root, a)
+ *   leading:   quadratic to (r, a+0.46·step) — control radius scales with
+ *              `belly`, outside the chord so the edge bulges outward
+ *   tip:       quadratic to (r, a+0.64·step) — an arc approximation good to
+ *              <1% over this span
+ *   trailing:  quadratic to (root, a+step) — control radius dips toward the
+ *              centre with `cut`, the concave undercut
+ *
+ * Every ratio is of `step`, so the same math holds from Ragnaruk's 2 blades
+ * to Aegis's 8. Peak radius is exactly r: what you see is what hits.
+ */
+function bladeSilhouette(blades: number, r: number, style: BladeStyle): THREE.Shape {
+  const shape = new THREE.Shape();
+  const step = (Math.PI * 2) / blades;
+  const root = r * style.root;
+  const px = (rad: number, ang: number): number => Math.cos(ang) * rad;
+  const py = (rad: number, ang: number): number => Math.sin(ang) * rad;
+
+  const leadR = root + (r - root) * 0.92 * style.belly;
+  const cutR = root - (r - root) * 0.32 * style.cut;
+
+  for (let i = 0; i < blades; i++) {
+    const a = i * step;
+    if (i === 0) shape.moveTo(px(root, a), py(root, a));
+    else shape.lineTo(px(root, a), py(root, a));
+
+    const lead = a + step * 0.2;
+    const tip0 = a + step * 0.46;
+    shape.quadraticCurveTo(px(leadR, lead), py(leadR, lead), px(r, tip0), py(r, tip0));
+
+    const tipC = a + step * 0.55;
+    const tip1 = a + step * 0.64;
+    shape.quadraticCurveTo(px(r, tipC), py(r, tipC), px(r, tip1), py(r, tip1));
+
+    const cut = a + step * 0.8;
+    const end = a + step;
+    shape.quadraticCurveTo(px(cutR, cut), py(cutR, cut), px(root, end), py(root, end));
+  }
+  shape.closePath();
+  return shape;
+}
+
+/**
+ * The sticker face: one canvas across the whole top cap, in the design's own
+ * colours with its beast crest at the centre.
+ *
+ * ExtrudeGeometry generates cap UVs as the raw shape-space x/y, so the
+ * texture's repeat/offset maps [-r, r]² onto [0, 1]² and the canvas is drawn
+ * in that same space (setTransform flips y so math angles match the shape).
+ * The chain cancels exactly: a mark painted at polar (rad, θ) lands on the
+ * geometry at polar (rad, θ), which is what lets the speed ticks below sit on
+ * the actual blades instead of drifting off them.
+ *
+ * Paint order is radial because that is how the real stickers are die-cut:
+ * secondary blade tips, primary body disc, accent ring, thin near-black ring
+ * lines (die-cut seams), one white tick per blade, and the beast crest across
+ * the centre.
+ */
+function layerFaceTexture(design: BeyDesign, blades: number, r: number): THREE.CanvasTexture {
+  const size = 512;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+
+  if (ctx) {
+    const scale = size / (2 * r);
+    ctx.setTransform(scale, 0, 0, -scale, size / 2, size / 2);
+    const hex = (c: number): string => `#${c.toString(16).padStart(6, '0')}`;
+
+    // Base coat = blade tips; only the region outside the body disc survives.
+    ctx.fillStyle = hex(design.secondary);
+    ctx.fillRect(-r, -r, 2 * r, 2 * r);
+
+    // Body disc, lifted toward white: the face is unlit, so any brightness the
+    // "plastic" is going to have must be painted in here.
+    const bodyCol = new THREE.Color(design.primary).lerp(new THREE.Color(0xffffff), 0.16);
+    ctx.fillStyle = `#${bodyCol.getHexString()}`;
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.72, 0, Math.PI * 2);
+    ctx.fill();
+
+    // One white speed tick per blade, riding the leading sweep. Angles reuse
+    // the silhouette's step fractions so the ticks stay on the blade wedges
+    // for any blade count.
+    const step = (Math.PI * 2) / blades;
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    for (let i = 0; i < blades; i++) {
+      const a = i * step;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a + step * 0.26) * r * 0.75, Math.sin(a + step * 0.26) * r * 0.75);
+      ctx.lineTo(Math.cos(a + step * 0.42) * r * 0.97, Math.sin(a + step * 0.42) * r * 0.97);
+      ctx.lineTo(Math.cos(a + step * 0.44) * r * 0.8, Math.sin(a + step * 0.44) * r * 0.8);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // Ring lines — near-black, not pure black, so they sit under the true
+    // black of the mesh outlines instead of competing with them. The accent
+    // ring between them is the design's "jewellery" colour.
+    ctx.strokeStyle = '#11131c';
+    ctx.lineWidth = r * 0.028;
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.72, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.lineWidth = r * 0.014;
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.87, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.strokeStyle = hex(design.accent);
+    ctx.lineWidth = r * 0.022;
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.6, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // The beast crest, big: its disc spans the whole inner face. The transform
+    // chain (y-flipped canvas → extrude cap UVs → the -π/2 mesh rotation) nets
+    // out to a 180° turn, verified on screen: without the counter-rotation the
+    // V rendered as an A. The rotate cancels it so the crest reads upright
+    // from the camera's side of the dish.
+    ctx.save();
+    ctx.scale(1, -1);
+    ctx.rotate(Math.PI);
+    const emblem = beastEmblem(design);
+    const eSize = r * 1.1;
+    ctx.drawImage(emblem, -eSize / 2, -eSize / 2, eSize, eSize);
+    ctx.restore();
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  // Cap UVs are shape-space coordinates; this maps x, y ∈ [-r, r] to [0, 1].
+  tex.repeat.set(1 / (2 * r), 1 / (2 * r));
+  tex.offset.set(0.5, 0.5);
+  // The face is viewed at ~34° elevation, where trilinear filtering smears the
+  // ring lines radially; mild anisotropy keeps them crisp without a renderer
+  // capability query.
+  tex.anisotropy = 4;
+  return tex;
 }

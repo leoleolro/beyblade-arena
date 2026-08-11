@@ -4,7 +4,12 @@ import { spinNorm } from '../sim/physics';
 import type { HitEvent } from '../sim/physics';
 import type { BeyState } from '../sim/types';
 import { buildBeyMesh } from './beyMesh';
-import { SparkBurst, Trail } from './effects';
+import type { BeyParts } from './beyMesh';
+import { RibbonTrail, SparkBurst, Trail } from './effects';
+import type { TrailLike } from './effects';
+import { buildSpinBlur } from './spinBlur';
+import type { SpinBlur } from './spinBlur';
+import { ImpactFrame } from './impactFrame';
 import { skinById } from './skins';
 import type { Skin } from './skins';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
@@ -12,7 +17,7 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { applyStadiumTheme, beyWorldPosition, buildStadium } from './stadium';
 import type { StadiumHandles } from './stadium';
-import { ARENA, themeById } from './theme';
+import { ARENA, THEMES, themeById } from './theme';
 import type { Theme } from './theme';
 import { Shockwave } from './shockwave';
 import type { ArenaSpec } from '../sim/arena';
@@ -21,11 +26,16 @@ import type { RailHandles } from './rail';
 import { OutlineEffect } from 'three/examples/jsm/effects/OutlineEffect.js';
 import { buildAura } from './aura';
 import type { Aura } from './aura';
-import { contactShadow } from './toon';
+import { contactShadow, noOutline } from './toon';
+import { designByLayer } from './beydex';
 
 interface BeyVisual {
   group: THREE.Group;
-  trail: Trail;
+  trail: TrailLike;
+  /** Spin-blur disc, toon only: the drawn stand-in for a top too fast to see. */
+  blur: SpinBlur | null;
+  /** The three part sub-groups, scaled down while the blur dominates. */
+  parts: BeyParts;
   /**
    * A light that lives with the top and flares on impact. Off in the default
    * theme; in the anime theme it's most of the look, because the tops end up
@@ -65,11 +75,58 @@ function disposeTree(obj: THREE.Object3D): void {
   });
 }
 
+/**
+ * The anime backdrop: a huge inverted sphere carrying a painted vertical
+ * gradient of a dark tournament hall.
+ *
+ * `scene.background` is a flat Color and cannot hold a gradient, so the hall
+ * is geometry. Dark on purpose — the source material lights the bowl and lets
+ * the arena around it fall away, so the gradient is near-black at the zenith
+ * with one cyan glow band at the horizon where the stadium lighting would be.
+ * BackSide so the camera sees it from inside; fog off because at radius 40 the
+ * whole sphere sits past fogFar and would flatten to one solid fog-coloured
+ * wall, deleting the gradient it exists to show; depthWrite off plus
+ * renderOrder -10 so it can never occlude the stadium; outline suppressed
+ * because an inverted hull on a BackSide sphere renders in front of it.
+ */
+function buildBackdrop(): THREE.Mesh {
+  const canvas = document.createElement('canvas');
+  canvas.width = 4;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    const g = ctx.createLinearGradient(0, 0, 0, 256);
+    g.addColorStop(0, '#060b16'); // zenith: the dark of the hall
+    g.addColorStop(0.4, '#101d36');
+    g.addColorStop(0.52, '#16294a'); // must equal ANIME.fogColour — fog blends here
+    g.addColorStop(0.58, '#2b5a8f'); // the arena-light glow band on the horizon
+    g.addColorStop(0.66, '#16294a');
+    g.addColorStop(1, '#0a1424'); // below horizon: the dark floor mass
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 4, 256);
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const mat = new THREE.MeshBasicMaterial({
+    map: tex,
+    side: THREE.BackSide,
+    fog: false,
+    depthWrite: false,
+  });
+  noOutline(mat);
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(40, 32, 24), mat);
+  mesh.renderOrder = -10;
+  return mesh;
+}
+
 export class ArenaRenderer {
   readonly scene = new THREE.Scene();
   readonly camera: THREE.PerspectiveCamera;
   private readonly renderer: THREE.WebGLRenderer;
   private readonly sparks = new SparkBurst();
+  private readonly impactFrame = new ImpactFrame();
+  /** Scratch for projecting hit points to the screen; no per-hit allocation. */
+  private readonly projected = new THREE.Vector3();
   private readonly visuals = new Map<string, BeyVisual>();
   private readonly beyRoot = new THREE.Group();
 
@@ -101,6 +158,8 @@ export class ArenaRenderer {
   private blackout = 0;
   /** The X-Rail ring, present only in arenas that have one. */
   private rail: RailHandles | null = null;
+  /** Painted hall sphere, present only under the anime theme. */
+  private backdrop: THREE.Mesh | null = null;
   /** Throttles rail sparks so a ride doesn't drain the whole particle pool. */
   private railSparkClock = 0;
 
@@ -126,6 +185,8 @@ export class ArenaRenderer {
     this.scene.add(this.stadium.group);
     this.scene.add(this.beyRoot);
     this.scene.add(this.sparks.points);
+    // Sparks draw over the ribbons (1) and blur discs (2) in every theme.
+    this.sparks.points.renderOrder = 3;
     this.scene.add(this.shockwaves.group);
     this.addLights();
     this.resize();
@@ -170,6 +231,19 @@ export class ArenaRenderer {
     fog.near = t.fogNear;
     fog.far = t.fogFar;
 
+    // Built on entering the anime theme, fully disposed on leaving it, so
+    // toggling can't accumulate spheres. disposeTree covers geometry and
+    // material but not the texture hanging off the material's map slot.
+    if (t.toon && !this.backdrop) {
+      this.backdrop = buildBackdrop();
+      this.scene.add(this.backdrop);
+    } else if (!t.toon && this.backdrop) {
+      this.scene.remove(this.backdrop);
+      (this.backdrop.material as THREE.MeshBasicMaterial).map?.dispose();
+      disposeTree(this.backdrop);
+      this.backdrop = null;
+    }
+
     applyStadiumTheme(this.stadium, t);
 
     this.hemi.color.setHex(t.hemiSky);
@@ -198,7 +272,9 @@ export class ArenaRenderer {
     }
 
     if (typeof document !== 'undefined') {
-      document.body.classList.remove('theme-arena', 'theme-beam');
+      // Every theme class, not a hand-kept subset — a stale class left behind
+      // keeps the wrong HUD skin active after switching away.
+      for (const th of THEMES) document.body.classList.remove(th.bodyClass);
       document.body.classList.add(t.bodyClass);
     }
   }
@@ -283,7 +359,8 @@ export class ArenaRenderer {
     this.lastBeys = beys;
     for (const v of this.visuals.values()) {
       this.beyRoot.remove(v.group);
-      this.beyRoot.remove(v.trail.line);
+      this.beyRoot.remove(v.trail.object);
+      disposeTree(v.trail.object);
       if (v.shadow) {
         this.beyRoot.remove(v.shadow);
         disposeTree(v.shadow);
@@ -294,8 +371,18 @@ export class ArenaRenderer {
     for (const b of beys) {
       const skin: Skin = skinById(skins[b.id] ?? 'frost');
       const group = buildBeyMesh(b.build, skin, this.theme.toon);
-      const trail = new Trail(skin.primary);
+      const trail: TrailLike = this.theme.toon
+        ? new RibbonTrail(skin.primary, b.stats.radius)
+        : new Trail(skin.primary);
       trail.setOpacity(this.theme.trailOpacity);
+
+      // Toon only: motion is drawn, not simulated — at high spin the blur disc
+      // is the top, and the detailed mesh shrinks slightly underneath it.
+      const design = designByLayer(b.build.layer.id);
+      const blur = this.theme.toon
+        ? buildSpinBlur(design.primary, design.secondary, b.stats.radius)
+        : null;
+      if (blur) group.add(blur.mesh);
 
       // Parented to the group, so it tracks the top for free.
       const light = new THREE.PointLight(skin.primary, this.theme.beyLightIntensity, 1.6);
@@ -313,10 +400,12 @@ export class ArenaRenderer {
       if (shadow) this.beyRoot.add(shadow);
 
       this.beyRoot.add(group);
-      this.beyRoot.add(trail.line);
+      this.beyRoot.add(trail.object);
       this.visuals.set(b.id, {
         group,
         trail,
+        blur,
+        parts: group.userData.parts as BeyParts,
         light,
         aura,
         shadow,
@@ -338,6 +427,7 @@ export class ArenaRenderer {
         v.group.position.y -= dt * 1.6;
         v.group.rotation.z += dt * 4;
         v.trail.setVisible(false);
+        if (v.blur) v.blur.mesh.visible = false;
         if (v.aura) v.aura.sprite.visible = false;
         if (v.shadow) v.shadow.visible = false;
         if (v.group.position.y < -1.5) v.group.visible = false;
@@ -366,6 +456,14 @@ export class ArenaRenderer {
       const lean = b.tilt;
       v.group.rotation.x = Math.sin(v.wobblePhase) * lean;
       v.group.rotation.z = Math.cos(v.wobblePhase) * lean;
+
+      // Hand the silhouette to the blur disc at high spin; at low spin the
+      // detail returns at full size and its wobble carries the frame. Shrink
+      // rather than hide, so hints of the blades stay visible in the streaks.
+      const blurK = v.blur ? v.blur.update(sn, dt) : 0;
+      const detail = 1 - blurK * 0.18;
+      v.parts.layer.scale.setScalar(detail);
+      v.parts.disc.scale.setScalar(detail);
 
       v.trail.setVisible(true);
       v.trail.push(p.clone().setY(p.y + 0.05));
@@ -403,6 +501,17 @@ export class ArenaRenderer {
       this.shake = Math.min(0.09, this.shake + h.strength * 0.016);
       if (this.theme.shockwave && h.strength >= C.HITSTOP_THRESHOLD) {
         this.shockwaves.spawn(at, h.crit ? 0xfff0a0 : 0xffffff, h.crit ? 1.6 : 1.1);
+      }
+      // The manga cut, centred on where the clash actually happened. Same
+      // threshold as hitstop: the sim freezes for a beat and this is the frame
+      // it freezes on. Camera matrices are one frame stale here, which is
+      // invisible at these speeds.
+      if (this.theme.toon && h.strength >= C.HITSTOP_THRESHOLD) {
+        this.projected.copy(at).project(this.camera);
+        this.impactFrame.trigger(
+          (this.projected.x * 0.5 + 0.5) * 100,
+          (0.5 - this.projected.y * 0.5) * 100,
+        );
       }
     }
 
@@ -524,7 +633,9 @@ export class ArenaRenderer {
 
   /** True when this theme wants a full-screen pulse on heavy contact. */
   get wantsImpactFlash(): boolean {
-    return this.theme.impactFlash;
+    // Toon replaces the soft screen pulse with the manga impact frame — a cut
+    // and a fade on the same hit undercut each other.
+    return this.theme.impactFlash && !this.theme.toon;
   }
 
   resize(): void {

@@ -60,7 +60,7 @@ export const XRAIL: ArenaSpec = {
   id: 'xrail',
   name: 'X-Rail Stadium',
   blurb: 'outer rail slingshots fast tops — faster, deadlier rounds',
-  suggestedTheme: 'beam',
+  suggestedTheme: 'anime',
   rail: {
     // Just outside the tornado ridge, so riding the rail is a deliberate
     // commitment to the outer orbit rather than something that happens to you.

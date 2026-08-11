@@ -1003,22 +1003,32 @@ button.primary.ghost:hover {
   }
 }
 
-/* The anime theme pushes the DOM overlay harder too: heavier weights, sharper
-   accents. The default theme is untouched. */
-body.theme-beam .scoreboard,
-body.theme-beam .card,
-body.theme-beam .move {
-  border-color: rgba(120, 220, 255, 0.3);
-  background: rgba(4, 8, 20, 0.82);
+/* The anime theme pushes the DOM overlay harder too: comic-panel chrome —
+   hard ink borders and a drop-shadow offset instead of glow. The hall behind
+   the stadium is dark, so the cards stay dark; only the linework changes. */
+body.theme-anime .scoreboard,
+body.theme-anime .card,
+body.theme-anime .move {
+  border: 2px solid rgba(190, 225, 255, 0.55);
+  background: rgba(6, 11, 24, 0.86);
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.45);
 }
 
-body.theme-beam .scoreboard .pts {
+body.theme-anime .scoreboard .pts {
   text-shadow: 0 0 18px rgba(103, 232, 249, 0.7);
 }
 
-body.theme-beam .fill-spin {
+body.theme-anime .fill-spin {
   background: linear-gradient(90deg, #22d3ee, #a5f3fc);
   box-shadow: 0 0 10px rgba(34, 211, 238, 0.6);
+}
+
+/* The coach line sits over the near-white dish in this theme; without a plate
+   the yellow prompt text vanished into it. */
+body.theme-anime .coach.on {
+  background: rgba(6, 11, 24, 0.78);
+  padding: 6px 14px;
+  border-radius: 9px;
 }
 
 /* -------------------------------------------------------- exploded view */
@@ -1193,4 +1203,32 @@ body.theme-beam .fill-spin {
 @media (prefers-reduced-motion: reduce) {
   .speedlines { animation: none; }
   .impact-flash { animation: none; opacity: 0; }
+}
+
+/* ------------------------------------------------------- manga impact frame */
+
+/* Radial burst lines on a heavy clash, centred on the projected hit point.
+   Present for ~0.18s and then gone — a cut, not a fade, which is why there is
+   deliberately no animation or transition here at all. */
+.impact-frame-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 40;
+  overflow: hidden;
+}
+
+.impact-frame {
+  position: absolute;
+  inset: 0;
+}
+
+.impact-frame svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .impact-frame { display: none; }
 }

@@ -381,33 +381,69 @@ Two things the tuning taught, both preserved in `rail.test.ts`:
 
 ## Visual themes
 
-Four looks, switchable in the garage and persisted:
+Two looks, switchable in the garage and persisted:
 
 - **Arena** — the original clean technical style. `ARENA` in `src/render/theme.ts`
   is a literal transcription of the values that used to be hardcoded across
   `arena.ts` and `stadium.ts`, so selecting it reproduces the original *exactly*.
   That is the theme system's contract: a theme system that subtly changes the
   default look has failed at its one job.
-- **Overdrive** — the full anime treatment. Beam Clash changed the *lighting*;
-  this changes the grammar. An energy aura per top that swells with spin and
-  flares on contact, radial speed lines driven by actual speed, a full-screen
-  impact flash, hotter bloom and ribbon trails.
-- **Beam Clash** — the anime read. The move is to stop lighting the arena and let
-  the tops light it: near-black world, ambient fill crushed to 0.16, a coloured
-  PointLight parented to each top that flares off `hitFlash` on contact, bloom,
-  expanding shockwave rings on heavy clashes, a light-crush on the decisive blow,
-  and a letterbox title card over the finish hold.
-- **Toon** — full anime cartoon mode, and the only theme that changes the render
-  *path* rather than parameters. Two ingredients do almost all of the work:
-  `MeshToonMaterial` driven by a three-step `DataTexture` ramp with
-  `NearestFilter` (linear filtering interpolates straight back into the smooth
-  gradient the ramp exists to replace), and `OutlineEffect`'s inverted hull at a
-  thickness heavy enough to read as a drawn line. The tops carry a thicker line
-  than the world, because anime inks the fighters harder than the set. Each
-  layer also gets a procedural beast emblem, which is the single detail that
-  most says "Beyblade" rather than "spinning shape".
+- **Anime** — full cartoon mode. Cel shading (`MeshToonMaterial` on a three-step
+  `NearestFilter` ramp), `OutlineEffect` ink lines with the beys carrying a
+  heavier line than the set, the painted Beystadium below, spin-blur discs,
+  ribbon trails, manga impact frames, auras, speed lines and shockwaves — one
+  theme that owns the whole treatment.
 
-All four are selectable; each addition changed nothing about the ones before it.
+There used to be four: three separate part-way attempts at the anime look
+(Beam Clash, Overdrive, Toon) accumulated alongside Arena, none of which
+actually landed it — three "anime" chips in the picker and no anime. They are
+consolidated into the single **Anime** theme; saved ids from the retired themes
+migrate to it via `loadThemeId`/`themeById`, so returning players keep their
+cartoon mode instead of silently falling back to Arena. The lesson worth
+keeping: themes are *commitments*, not accretions — when a new attempt at a
+look supersedes an old one, the old one should be absorbed, not left as a
+third option that dilutes the picker.
+
+### The anime pipeline
+
+What finally closed the gap with the source material was research, not more
+effects. A deep pass on the actual designs produced `src/render/beydex.ts` —
+per-layer canonical identity as *data*: palette, beast motif, face letter, spin
+direction, and blade character for all six layers (Valtryek's swept wings,
+Fafnir's near-round gold spin-steal shield, Luinor's jagged left-spin dragon…).
+The mesh code consumes it:
+
+- **Layers** are `ExtrudeGeometry` silhouettes shaped by the design's
+  `BladeStyle` (root/belly/cut), with a full-face painted sticker texture:
+  body disc, blade ticks, die-cut ring lines and the procedural beast crest
+  with its roman letter, mapped so painted marks land exactly on the geometry.
+- **Discs and drivers** each get their own researched shape — Heavy's squat
+  ring with armour bosses, Gravity's octagonal flywheel, Spread's knife-edge
+  saucer, Blitz's tri-corner flaps, Wall's shield lobes; Xtreme's rubber puck,
+  Volcanic's knurled collar, Atomic's ball-and-skirt, Orbit's tabbed collar,
+  Needle's studded point, Bastion's pot-lid flange. This came from a direct
+  complaint: swapping parts "does not look like it changed much". Parts are
+  hardware, so they wear their own colours, not the skin's.
+- **Design vs skin**: the layer's look comes from its canonical design —
+  Valtryek is blue-and-gold whoever throws it — while the skin keeps the slots
+  that carry *ownership*: trail, aura, blur tint, hit ring, HUD swatch. Two
+  systems, two questions: "which bey is that?" vs "whose is it?".
+- **Motion is drawn, not simulated**: past ~55% spin the detailed mesh hands
+  its silhouette to a **spin-blur disc** — tangential streaks in the design's
+  colours bounded by a hot rim, which is exactly the shorthand the show uses
+  for a top too fast to see. Trails are triangle-strip **ribbons** (a line
+  can't be wider than a pixel), and heavy clashes cut to a 0.18s **manga
+  impact frame** of irregular radial wedges projected from the actual hit
+  position — a cut, not a fade.
+- **The stadium** is the researched wbba Beystadium: pale glossy cyan dish,
+  white moulding, red posts, red ring on the saturated-blue tornado shelf —
+  sitting in a *dark* painted hall (a gradient on an inverted sphere), because
+  the source material lights the bowl and lets everything else fall away.
+
+The garage gained a **whole-bey picker**: six canonical presets (matching the
+rival ladder's builds) that set layer, disc, driver, matching skin and the
+bey's canonical spin direction in one click — picking Fafnir *means* picking
+left spin. The per-part slots remain below for tinkerers.
 
 ### What the cartoon look actually cost
 
