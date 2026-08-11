@@ -381,7 +381,7 @@ Two things the tuning taught, both preserved in `rail.test.ts`:
 
 ## Visual themes
 
-Two looks, switchable in the garage and persisted:
+Four looks, switchable in the garage and persisted:
 
 - **Arena** — the original clean technical style. `ARENA` in `src/render/theme.ts`
   is a literal transcription of the values that used to be hardcoded across
@@ -397,8 +397,50 @@ Two looks, switchable in the garage and persisted:
   PointLight parented to each top that flares off `hitFlash` on contact, bloom,
   expanding shockwave rings on heavy clashes, a light-crush on the decisive blow,
   and a letterbox title card over the finish hold.
+- **Toon** — full anime cartoon mode, and the only theme that changes the render
+  *path* rather than parameters. Two ingredients do almost all of the work:
+  `MeshToonMaterial` driven by a three-step `DataTexture` ramp with
+  `NearestFilter` (linear filtering interpolates straight back into the smooth
+  gradient the ramp exists to replace), and `OutlineEffect`'s inverted hull at a
+  thickness heavy enough to read as a drawn line. The tops carry a thicker line
+  than the world, because anime inks the fighters harder than the set. Each
+  layer also gets a procedural beast emblem, which is the single detail that
+  most says "Beyblade" rather than "spinning shape".
 
-All three are selectable; adding Overdrive changed nothing about the other two.
+All four are selectable; each addition changed nothing about the ones before it.
+
+### What the cartoon look actually cost
+
+Almost none of the work was cel shading. It was four bugs the dark themes had
+been hiding, each of which looked like a lighting problem and wasn't:
+
+- **A dark ellipse over the middle of the stadium.** The outer housing skirt is
+  a `CylinderGeometry`, which is capped, and its top cap sat at y = 0.06 while
+  the bowl floor — `0.2r²` — is below 0.06 for every radius under 0.548. The cap
+  had been painted across the centre of the dish in every theme since the
+  stadium was written. It only became visible when the dish got bright.
+- **A bright speck at dead centre.** `SparkBurst` parks dead particles at
+  y = -999, but a particle that has never been *spawned* has never been through
+  that path, so all 600 sat at the origin — the exact centre of the dish —
+  drawing additively every frame.
+- **The dish rendering nearly black.** `LatheGeometry` derives normals from the
+  profile direction, and a centre → rim profile yields `normal.y = -Δr`, i.e.
+  straight *down*: measured at `ny ≈ -1` on every sampled vertex, `NdotL ≈ -0.8`
+  against an overhead key. Under a toon ramp that collapses the whole floor into
+  the darkest band. The dish is now unlit `MeshBasicMaterial` with a painted
+  texture, which sidesteps the question rather than depending on winding.
+- **A dark cap over the basin from the outline pass.** An inverted hull on a
+  *concave* surface lifts off it toward the camera instead of hiding behind it,
+  so the back faces win the depth test across the whole bowl. The floor opts out
+  of outlining via `material.userData.outlineParameters`.
+
+The through-line: three of the four had been shipping for weeks and were only
+ever invisible because the background was as dark as the artefact. Raising the
+brightness of a scene is a surprisingly effective way to audit it.
+
+Because the dish is now unlit it cannot receive a shadow map, so each top draws
+its own hard elliptical contact shadow — which is what the reference art does
+anyway. It's cheaper than shadow mapping and more on-model.
 
 Both effect passes had to be pulled *back* after first build, and for the same
 reason each time: an effect that overpowers its subject stops being an effect.

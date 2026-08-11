@@ -2,6 +2,17 @@ import * as THREE from 'three';
 import type { BeyBuild } from '../sim/types';
 import { skinMaterial } from './skins';
 import type { Skin } from './skins';
+import { emblemTexture, noOutline, setOutline, toonMaterial } from './toon';
+
+/**
+ * The tops get a heavier line than the world around them.
+ *
+ * Anime doesn't ink every object equally — the fighters carry the thickest
+ * line and the set behind them is drawn lighter. Giving the beys their own
+ * thickness is what stops them from dissolving into the stadium once both are
+ * outlined, and it costs nothing: OutlineEffect reads it per material.
+ */
+const BEY_OUTLINE = 0.02;
 
 /** The three part sub-groups, so a caller can address them individually. */
 export interface BeyParts {
@@ -22,7 +33,7 @@ export interface BeyParts {
  * assembled top renders identically — but it lets the garage pull the parts
  * apart and spin them independently without a second set of meshes.
  */
-export function buildBeyMesh(build: BeyBuild, skin: Skin): THREE.Group {
+export function buildBeyMesh(build: BeyBuild, skin: Skin, toon = false): THREE.Group {
   const group = new THREE.Group();
   const driverGroup = new THREE.Group();
   const discGroup = new THREE.Group();
@@ -36,21 +47,29 @@ export function buildBeyMesh(build: BeyBuild, skin: Skin): THREE.Group {
   const tipHeight = r * 1.05;
   const tip = new THREE.Mesh(
     new THREE.ConeGeometry(r * 0.22, tipHeight, 16),
-    new THREE.MeshStandardMaterial({
-      color: 0x2a2f3a,
-      metalness: 0.85,
-      roughness: 0.35,
-    }),
+    toon
+      ? toonMaterial(0x39405a)
+      : new THREE.MeshStandardMaterial({
+          color: 0x2a2f3a,
+          metalness: 0.85,
+          roughness: 0.35,
+        }),
   );
   tip.position.y = tipHeight / 2;
   tip.rotation.x = Math.PI; // point downward
   driverGroup.add(tip);
 
-  const driverMat = new THREE.MeshStandardMaterial({
-    color: 0x3d4450,
-    metalness: 0.7,
-    roughness: 0.45,
-  });
+  const driverMat = toon
+    ? toonMaterial(0x4a5268)
+    : new THREE.MeshStandardMaterial({
+        color: 0x3d4450,
+        metalness: 0.7,
+        roughness: 0.45,
+      });
+  if (toon) {
+    setOutline(tip.material as THREE.Material, { thickness: BEY_OUTLINE });
+    setOutline(driverMat, { thickness: BEY_OUTLINE });
+  }
   const shaft = new THREE.Mesh(
     new THREE.CylinderGeometry(r * 0.3, r * 0.3, r * 0.4, 16),
     driverMat,
@@ -79,7 +98,8 @@ export function buildBeyMesh(build: BeyBuild, skin: Skin): THREE.Group {
   const discY = tipHeight + r * 0.36;
   // Six radial segments rather than 24: the flat faces catch the light
   // differently as it turns, which is what makes the rotation readable.
-  const discMat = skinMaterial(skin, skin.secondary);
+  const discMat = skinMaterial(skin, skin.secondary, { toon });
+  if (toon) setOutline(discMat, { thickness: BEY_OUTLINE });
   const discMesh = new THREE.Mesh(
     new THREE.CylinderGeometry(r * 0.78, r * 0.88, discHeight, 6),
     discMat,
@@ -103,7 +123,8 @@ export function buildBeyMesh(build: BeyBuild, skin: Skin): THREE.Group {
   const layerY = discY + discHeight * 0.5 + r * 0.2;
   // The layer carries the skin's primary colour. Part identity is still
   // readable from the blade count and silhouette, which the skin doesn't touch.
-  const layerMat = skinMaterial(skin, skin.primary);
+  const layerMat = skinMaterial(skin, skin.primary, { toon });
+  if (toon) setOutline(layerMat, { thickness: BEY_OUTLINE });
 
   // Faceted core with a hard bevel. Matching the facet count to the blade count
   // makes the whole layer read as one machined piece rather than a cylinder with
@@ -135,6 +156,21 @@ export function buildBeyMesh(build: BeyBuild, skin: Skin): THREE.Group {
   boss.castShadow = true;
   layerGroup.add(boss);
 
+  // The beast emblem. Every real Beyblade has one, and it is the single detail
+  // that most says "Beyblade" rather than "spinning shape".
+  if (toon) {
+    const emblem = new THREE.Mesh(
+      new THREE.CircleGeometry(r * 0.46, 24),
+      new THREE.MeshBasicMaterial({
+        map: emblemTexture(skin.primary, skin.secondary),
+        transparent: true,
+      }),
+    );
+    emblem.rotation.x = -Math.PI / 2;
+    emblem.position.y = layerY + r * 0.47;
+    layerGroup.add(emblem);
+  }
+
   const bossRing = new THREE.Mesh(
     new THREE.TorusGeometry(r * 0.34, r * 0.05, 6, facets),
     layerMat,
@@ -165,14 +201,15 @@ export function buildBeyMesh(build: BeyBuild, skin: Skin): THREE.Group {
   }
 
   // A faint energy ring at the exact collision radius — reads as the hitbox.
-  const ring = new THREE.Mesh(
-    new THREE.TorusGeometry(r, r * 0.05, 8, 40),
-    new THREE.MeshBasicMaterial({
-      color: skin.primary,
-      transparent: true,
-      opacity: 0.32,
-    }),
-  );
+  const ringMat = new THREE.MeshBasicMaterial({
+    color: skin.primary,
+    transparent: true,
+    opacity: 0.32,
+  });
+  // No ink on the hitbox. A solid black line around a 32%-opacity guide turns a
+  // hint into the loudest thing on the top.
+  noOutline(ringMat);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(r, r * 0.05, 8, 40), ringMat);
   ring.rotation.x = Math.PI / 2;
   ring.position.y = layerY;
   layerGroup.add(ring);

@@ -82,6 +82,14 @@ export interface Theme {
   bloomRadius: number;
   bloomThreshold: number;
 
+  /**
+   * Cel shading: banded lighting and a hard outline on every silhouette.
+   *
+   * This is the switch that turns the game from "3D" into "cartoon". It changes
+   * the render *path* (outline pass instead of the bloom composer) and the
+   * materials, so it is the one theme flag that isn't a simple parameter.
+   */
+  toon: boolean;
   /** Energy aura sprite around each top, swelling with spin and flaring on hits. */
   aura: boolean;
   /** Radial speed lines over the whole screen when the action is fast. */
@@ -141,6 +149,7 @@ export const ARENA: Theme = {
   bloomStrength: 0,
   bloomRadius: 0,
   bloomThreshold: 1,
+  toon: false,
   aura: false,
   speedLines: false,
   impactFlash: false,
@@ -208,6 +217,7 @@ export const BEAM: Theme = {
   bloomStrength: 0.5,
   bloomRadius: 0.5,
   bloomThreshold: 0.78,
+  toon: false,
   aura: false,
   speedLines: false,
   impactFlash: false,
@@ -272,6 +282,7 @@ export const OVERDRIVE: Theme = {
   bloomStrength: 0.72,
   bloomRadius: 0.62,
   bloomThreshold: 0.7,
+  toon: false,
   aura: true,
   speedLines: true,
   impactFlash: true,
@@ -279,7 +290,74 @@ export const OVERDRIVE: Theme = {
   bodyClass: 'theme-overdrive',
 };
 
-export const THEMES: Theme[] = [ARENA, BEAM, OVERDRIVE];
+/**
+ * Toon: the actual anime look.
+ *
+ * The gap between "3D game" and "cartoon" turns out to be almost entirely two
+ * things — light falling in hard bands rather than a smooth gradient, and a
+ * dark line around every silhouette. Palette and effects matter far less than
+ * people expect. So this theme is bright, flat and high-key: strong ambient so
+ * colours read as painted rather than lit, no bloom (cel art doesn't bleed),
+ * and saturated primaries against a light dish.
+ */
+export const TOON: Theme = {
+  id: 'toon',
+  name: 'Toon',
+  blurb: 'full anime — cel shading and outlines',
+
+  background: 0x121a34,
+  fogColour: 0x1a2444,
+  fogNear: 4.5,
+  fogFar: 9.5,
+
+  dishColour: 0x3d5aa8,
+  dishMetalness: 0,
+  dishRoughness: 1,
+  ridgeColour: 0xffe14d,
+  ridgeOpacity: 1,
+  guideColour: 0x2a3f7d,
+  guideOpacity: 0.9,
+
+  wallColour: 0x24356b,
+  wallMetalness: 0,
+  wallRoughness: 1,
+  postColour: 0xff5a3c,
+  postEmissive: 0.5,
+  skirtColour: 0x18234a,
+
+  // High and flat. Cel bands need strong, simple light: a dim scene collapses
+  // every band into the same shadow step and the shading stops reading.
+  hemiSky: 0xffffff,
+  hemiGround: 0x5566aa,
+  hemiIntensity: 1.5,
+  keyIntensity: 2.2,
+  rimAColour: 0x88bbff,
+  rimAIntensity: 1.2,
+  rimBColour: 0xffbb88,
+  rimBIntensity: 1.2,
+
+  sparkColour: 0xfff27a,
+  sparkSize: 0.055,
+  trailOpacity: 0.85,
+  beyLightIntensity: 0,
+  beyLightFlash: 0,
+  shockwave: true,
+  finisherBlackout: false,
+  // Bloom off on purpose: cel art doesn't bleed, and glow fights the flat bands
+  // that are doing all the work.
+  postBloom: false,
+  bloomStrength: 0,
+  bloomRadius: 0,
+  bloomThreshold: 1,
+  toon: true,
+  aura: true,
+  speedLines: true,
+  impactFlash: true,
+
+  bodyClass: 'theme-toon',
+};
+
+export const THEMES: Theme[] = [ARENA, BEAM, OVERDRIVE, TOON];
 
 export const themeById = (id: string): Theme =>
   THEMES.find((t) => t.id === id) ?? ARENA;

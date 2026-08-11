@@ -19,6 +19,16 @@ export class SparkBurst {
     this.velocities = new Float32Array(max * 3);
     this.life = new Float32Array(max);
 
+    // Park the whole pool below the stadium up front.
+    //
+    // `update` parks sparks at y = -999 once they die, but a particle that has
+    // never been *spawned* has never been through that path — so the untouched
+    // pool sat at (0, 0, 0), which is the exact centre of the dish. All 600 of
+    // them drew there additively every frame, as a bright speck in the middle
+    // of the arena that looked like a rendering glitch and outlived every
+    // theme.
+    for (let i = 0; i < max; i++) this.positions[i * 3 + 1] = -999;
+
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(this.positions, 3));
     const alpha = new THREE.BufferAttribute(new Float32Array(max), 1);

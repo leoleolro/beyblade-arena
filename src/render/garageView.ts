@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { OutlineEffect } from 'three/examples/jsm/effects/OutlineEffect.js';
 import { buildBeyMesh } from './beyMesh';
 import type { BeyParts } from './beyMesh';
 import { skinById } from './skins';
@@ -37,6 +38,19 @@ export class GarageView {
 
   private mesh: THREE.Group | null = null;
   private parts: BeyParts | null = null;
+  /**
+   * Outline pass, created lazily on first toon build.
+   *
+   * The garage owns its own renderer, so it needs its own outline wrapper —
+   * the arena's can't be shared. Without this the exploded view stayed
+   * un-inked while the battle behind it was fully cel-shaded, which read as a
+   * bug rather than a style.
+   */
+  private outline: OutlineEffect | null = null;
+  private toon = false;
+  private readonly hemi: THREE.HemisphereLight;
+  private readonly key: THREE.DirectionalLight;
+  private readonly fill: THREE.PointLight;
   private rates = { driver: 0, disc: 0, layer: 0 };
   /** Y offset that centres the exploded assembly on the origin. */
   private centreY = 0;
@@ -63,13 +77,14 @@ export class GarageView {
     this.scene.add(this.root);
 
     // Lit from three sides so the silhouette reads without the arena's rig.
-    this.scene.add(new THREE.HemisphereLight(0x9fc6ff, 0x0a0e18, 1.1));
-    const key = new THREE.DirectionalLight(0xffffff, 2.1);
-    key.position.set(1.4, 2.2, 1.6);
-    this.scene.add(key);
-    const fill = new THREE.PointLight(0x66ccff, 3.2, 4);
-    fill.position.set(-1.2, 0.4, 0.8);
-    this.scene.add(fill);
+    this.hemi = new THREE.HemisphereLight(0x9fc6ff, 0x0a0e18, 1.1);
+    this.scene.add(this.hemi);
+    this.key = new THREE.DirectionalLight(0xffffff, 2.1);
+    this.key.position.set(1.4, 2.2, 1.6);
+    this.scene.add(this.key);
+    this.fill = new THREE.PointLight(0x66ccff, 3.2, 4);
+    this.fill.position.set(-1.2, 0.4, 0.8);
+    this.scene.add(this.fill);
 
     this.bindDrag();
   }
@@ -112,7 +127,8 @@ export class GarageView {
     }
 
     const skin = skinById(skinId);
-    const mesh = buildBeyMesh(build, skin);
+    this.toon = themeById(themeId).toon;
+    const mesh = buildBeyMesh(build, skin, this.toon);
     this.mesh = mesh;
     this.parts = mesh.userData.parts as BeyParts;
     this.root.add(mesh);
@@ -130,6 +146,16 @@ export class GarageView {
     // The preview picks up the chosen theme's background so the garage and the
     // arena don't look like two different games.
     const theme = themeById(themeId);
+
+    // Cel bands need flat, high-key light. The default rig's tight blue point
+    // fill is a specular trick — under a toon ramp it just blows one side of
+    // the disc to the top band and hides the shape it was meant to describe.
+    this.hemi.color.setHex(this.toon ? 0xffffff : 0x9fc6ff);
+    this.hemi.groundColor.setHex(this.toon ? 0x5566aa : 0x0a0e18);
+    this.hemi.intensity = this.toon ? 1.5 : 1.1;
+    this.key.intensity = this.toon ? 2.2 : 2.1;
+    this.fill.intensity = this.toon ? 0 : 3.2;
+
     this.scene.background = null;
     this.canvas.style.background = `radial-gradient(circle at 50% 40%, #${theme.dishColour
       .toString(16)
@@ -203,7 +229,18 @@ export class GarageView {
     this.root.rotation.x = this.pitch * 0.4;
     this.root.position.y = -this.centreY;
 
-    this.renderer.render(this.scene, this.camera);
+    if (this.toon) {
+      if (!this.outline) {
+        this.outline = new OutlineEffect(this.renderer, {
+          defaultThickness: 0.014,
+          defaultColor: [0.02, 0.02, 0.05],
+          defaultAlpha: 1,
+        });
+      }
+      this.outline.render(this.scene, this.camera);
+    } else {
+      this.renderer.render(this.scene, this.camera);
+    }
   }
 
   resize(): void {

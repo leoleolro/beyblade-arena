@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import * as C from '../sim/constants';
 import { bowlHeight, pocketAngles } from '../sim/physics';
 import type { Theme } from './theme';
+import { dishMaterial, noOutline, toonMaterial } from './toon';
 
 /**
  * Handles onto every themed material in the stadium.
@@ -23,9 +24,14 @@ export interface StadiumHandles {
 
 /** Push a theme's values onto an already-built stadium. */
 export function applyStadiumTheme(h: StadiumHandles, t: Theme): void {
-  h.floor.color.setHex(t.dishColour);
-  h.floor.metalness = t.dishMetalness;
-  h.floor.roughness = t.dishRoughness;
+  // Under toon the dish colour lives in its painted texture and the material
+  // tint is left at white; re-applying the hex here would multiply the colour
+  // into itself and the dish would come out near-black.
+  if (!t.toon) {
+    h.floor.color.setHex(t.dishColour);
+    h.floor.metalness = t.dishMetalness;
+    h.floor.roughness = t.dishRoughness;
+  }
 
   h.ridge.color.setHex(t.ridgeColour);
   h.ridge.opacity = t.ridgeOpacity;
@@ -66,14 +72,29 @@ export function buildStadium(theme: Theme): StadiumHandles {
     profile.push(new THREE.Vector2(Math.max(r, 0.0001), bowlHeight(r)));
   }
 
-  const floorMat = new THREE.MeshStandardMaterial({
-    color: theme.dishColour,
-    metalness: theme.dishMetalness,
-    roughness: theme.dishRoughness,
-    side: THREE.DoubleSide,
-  });
+  // The dish is rebuilt on a toon switch rather than re-parameterised, because
+  // MeshToonMaterial is a different material class — the one place the
+  // "assign, never rebuild" rule genuinely can't hold.
+  const floorMat = (
+    theme.toon
+      ? // Unlit and painted — see `dishMaterial` for why this one surface
+        // opts out of lighting entirely.
+        dishMaterial(theme.dishColour)
+      : new THREE.MeshStandardMaterial({
+          color: theme.dishColour,
+          metalness: theme.dishMetalness,
+          roughness: theme.dishRoughness,
+          side: THREE.DoubleSide,
+        })
+  ) as THREE.MeshStandardMaterial;
+  floorMat.side = THREE.DoubleSide;
+  // The dish is concave, so an inverted-hull outline lifts off it and paints the
+  // basin dark — see `noOutline`. The rim, ridge and posts carry the linework.
+  noOutline(floorMat);
   const floor = new THREE.Mesh(new THREE.LatheGeometry(profile, 128), floorMat);
-  floor.receiveShadow = true;
+  // An unlit dish can't take a shadow map; under toon the tops draw their own
+  // contact shadow instead.
+  floor.receiveShadow = !theme.toon;
   group.add(floor);
 
   // Concentric guide rings, so motion across the dish is readable.
@@ -97,12 +118,17 @@ export function buildStadium(theme: Theme): StadiumHandles {
   const rimHeight = 0.13;
   const rimY = bowlHeight(C.STADIUM_RADIUS) + rimHeight / 2;
   const pockets = pocketAngles().sort((a, b) => a - b);
-  const wallMat = new THREE.MeshStandardMaterial({
-    color: theme.wallColour,
-    metalness: theme.wallMetalness,
-    roughness: theme.wallRoughness,
-    side: THREE.DoubleSide,
-  });
+  const wallMat = (
+    theme.toon
+      ? toonMaterial(theme.wallColour)
+      : new THREE.MeshStandardMaterial({
+          color: theme.wallColour,
+          metalness: theme.wallMetalness,
+          roughness: theme.wallRoughness,
+          side: THREE.DoubleSide,
+        })
+  ) as THREE.MeshStandardMaterial;
+  wallMat.side = THREE.DoubleSide;
 
   for (let i = 0; i < pockets.length; i++) {
     const start = pockets[i] + C.POCKET_HALF_WIDTH;
@@ -136,11 +162,15 @@ export function buildStadium(theme: Theme): StadiumHandles {
   for (const angle of pockets) {
     for (const side of [-1, 1]) {
       const a = angle + side * C.POCKET_HALF_WIDTH;
-      const postMat = new THREE.MeshStandardMaterial({
-        color: theme.postColour,
-        emissive: theme.postColour,
-        emissiveIntensity: theme.postEmissive,
-      });
+      const postMat = (
+        theme.toon
+          ? toonMaterial(theme.postColour, theme.postEmissive * 0.4)
+          : new THREE.MeshStandardMaterial({
+              color: theme.postColour,
+              emissive: theme.postColour,
+              emissiveIntensity: theme.postEmissive,
+            })
+      ) as THREE.MeshStandardMaterial;
       posts.push(postMat);
       const post = new THREE.Mesh(
         new THREE.CylinderGeometry(0.012, 0.012, rimHeight * 1.5, 8),
@@ -165,7 +195,17 @@ export function buildStadium(theme: Theme): StadiumHandles {
     new THREE.CylinderGeometry(C.STADIUM_RADIUS * 1.32, C.STADIUM_RADIUS * 1.5, 0.16, 64),
     skirtMat,
   );
-  skirt.position.y = -0.02;
+  // Sunk until its top cap clears the bowl.
+  //
+  // CylinderGeometry is capped, so this housing carries a solid disc of radius
+  // 1.32 across its top. At the old y the cap sat at +0.06 while the dish floor
+  // — bowlHeight(r) = 0.2r² — is below 0.06 for every r < 0.548. The cap was
+  // therefore drawn *over the middle of the stadium*, and had been all along:
+  // in the dark themes the skirt and dish colours were close enough that
+  // nobody could see it, and on a bright painted dish it read as a black hole
+  // exactly where the fight happens. Now the cap sits under the lowest point
+  // of the bowl and can never win the depth test against the floor.
+  skirt.position.y = -0.14;
   skirt.receiveShadow = true;
   group.add(skirt);
 

@@ -18,8 +18,10 @@ import { Shockwave } from './shockwave';
 import type { ArenaSpec } from '../sim/arena';
 import { buildRail } from './rail';
 import type { RailHandles } from './rail';
+import { OutlineEffect } from 'three/examples/jsm/effects/OutlineEffect.js';
 import { buildAura } from './aura';
 import type { Aura } from './aura';
+import { contactShadow } from './toon';
 
 interface BeyVisual {
   group: THREE.Group;
@@ -32,6 +34,14 @@ interface BeyVisual {
   light: THREE.PointLight;
   /** Energy shell, present only in themes that use one. */
   aura: Aura | null;
+  /**
+   * Drawn contact shadow, used by the toon theme.
+   *
+   * Kept as a sibling of the top rather than a child of it: the group leans and
+   * precesses for wobble, and a parented shadow would tip up off the floor with
+   * it. This one stays flat on the dish and only follows the position.
+   */
+  shadow: THREE.Mesh | null;
   /** Free-running precession phase, so wobble doesn't look mechanical. */
   wobblePhase: number;
 }
@@ -43,6 +53,17 @@ interface BeyVisual {
  * keeps the physics stable while still looking like a real spinning top.
  */
 const clampUnit = (n: number): number => (n < 0 ? 0 : n > 1 ? 1 : n);
+
+/** Depth-first dispose, so rebuilding on a theme switch can't leak GPU memory. */
+function disposeTree(obj: THREE.Object3D): void {
+  obj.traverse((child) => {
+    const mesh = child as THREE.Mesh;
+    if (mesh.geometry) mesh.geometry.dispose();
+    const mat = mesh.material as THREE.Material | THREE.Material[] | undefined;
+    if (Array.isArray(mat)) mat.forEach((m) => m.dispose());
+    else mat?.dispose();
+  });
+}
 
 export class ArenaRenderer {
   readonly scene = new THREE.Scene();
@@ -66,6 +87,15 @@ export class ArenaRenderer {
   private rimB!: THREE.PointLight;
   private readonly shockwaves = new Shockwave();
   private composer: EffectComposer | null = null;
+  /**
+   * Inverted-hull outline pass. Created lazily on first toon use and then kept:
+   * it wraps the renderer rather than owning a render target, so leaving it
+   * allocated costs nothing when unused.
+   */
+  private outline: OutlineEffect | null = null;
+  /** Skins of the current round, so a toon switch can rebuild the meshes. */
+  private lastSkins: Record<string, string> = {};
+  private lastBeys: BeyState[] = [];
   private bloom: UnrealBloomPass | null = null;
   /** Seconds left of the decisive-blow blackout, when the theme uses one. */
   private blackout = 0;
@@ -99,6 +129,14 @@ export class ArenaRenderer {
     this.scene.add(this.shockwaves.group);
     this.addLights();
     this.resize();
+
+    // Dev-only handle on the live scene. Rendering bugs are the one class of
+    // bug you cannot reason your way to — three times now the cause of a
+    // visual has been the opposite of what it looked like — and being able to
+    // poke the real scene graph from the console beats another guess.
+    if (import.meta.env.DEV) {
+      (window as unknown as Record<string, unknown>).__arena = this;
+    }
   }
 
   /**
@@ -112,7 +150,19 @@ export class ArenaRenderer {
    */
   setTheme(id: string): void {
     const t = themeById(id);
+    const toonChanged = t.toon !== this.theme.toon;
     this.theme = t;
+
+    // Toon uses MeshToonMaterial, a different material *class* — the one case
+    // the "assign, never rebuild" rule can't cover. Rebuild the stadium and the
+    // tops, disposing the old ones so repeated switching doesn't leak.
+    if (toonChanged) {
+      this.scene.remove(this.stadium.group);
+      disposeTree(this.stadium.group);
+      this.stadium = buildStadium(t);
+      this.scene.add(this.stadium.group);
+      if (this.lastBeys.length) this.setBeys(this.lastBeys, this.lastSkins);
+    }
 
     (this.scene.background as THREE.Color).setHex(t.background);
     const fog = this.scene.fog as THREE.Fog;
@@ -229,15 +279,21 @@ export class ArenaRenderer {
    * under one of them.
    */
   setBeys(beys: BeyState[], skins: Record<string, string> = {}): void {
+    this.lastSkins = skins;
+    this.lastBeys = beys;
     for (const v of this.visuals.values()) {
       this.beyRoot.remove(v.group);
       this.beyRoot.remove(v.trail.line);
+      if (v.shadow) {
+        this.beyRoot.remove(v.shadow);
+        disposeTree(v.shadow);
+      }
     }
     this.visuals.clear();
 
     for (const b of beys) {
       const skin: Skin = skinById(skins[b.id] ?? 'frost');
-      const group = buildBeyMesh(b.build, skin);
+      const group = buildBeyMesh(b.build, skin, this.theme.toon);
       const trail = new Trail(skin.primary);
       trail.setOpacity(this.theme.trailOpacity);
 
@@ -253,6 +309,9 @@ export class ArenaRenderer {
       aura.sprite.visible = this.theme.aura;
       group.add(aura.sprite);
 
+      const shadow = this.theme.toon ? contactShadow(b.stats.radius) : null;
+      if (shadow) this.beyRoot.add(shadow);
+
       this.beyRoot.add(group);
       this.beyRoot.add(trail.line);
       this.visuals.set(b.id, {
@@ -260,6 +319,7 @@ export class ArenaRenderer {
         trail,
         light,
         aura,
+        shadow,
         wobblePhase: Math.random() * Math.PI * 2,
       });
     }
@@ -279,12 +339,21 @@ export class ArenaRenderer {
         v.group.rotation.z += dt * 4;
         v.trail.setVisible(false);
         if (v.aura) v.aura.sprite.visible = false;
+        if (v.shadow) v.shadow.visible = false;
         if (v.group.position.y < -1.5) v.group.visible = false;
         continue;
       }
 
       const p = beyWorldPosition(b.pos.x, b.pos.y);
       v.group.position.copy(p);
+
+      if (v.shadow) {
+        // Sits on the dish under the top, flat, tracking position only. The
+        // dish rises toward the rim, so the height has to come from the same
+        // bowl profile the top itself is placed on.
+        v.shadow.visible = true;
+        v.shadow.position.set(p.x, p.y + 0.004, p.z);
+      }
 
 
       // Spin about its own axis.
@@ -373,8 +442,23 @@ export class ArenaRenderer {
     this.shockwaves.update(dt);
     this.updateCamera(beys, dt);
 
-    if (this.theme.postBloom && this.composer) this.composer.render();
-    else this.renderer.render(this.scene, this.camera);
+    if (this.theme.toon) {
+      if (!this.outline) {
+        // Thick and near-black. Thin outlines read as anti-aliasing artefacts;
+        // the reference art uses a line heavy enough to be a design element in
+        // its own right, and that boldness is most of the cartoon signal.
+        this.outline = new OutlineEffect(this.renderer, {
+          defaultThickness: 0.014,
+          defaultColor: [0.02, 0.02, 0.05],
+          defaultAlpha: 1,
+        });
+      }
+      this.outline.render(this.scene, this.camera);
+    } else if (this.theme.postBloom && this.composer) {
+      this.composer.render();
+    } else {
+      this.renderer.render(this.scene, this.camera);
+    }
   }
 
   /**

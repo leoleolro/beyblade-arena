@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { toonMaterial } from './toon';
 
 /**
  * Skins: purely cosmetic, and deliberately so.
@@ -86,9 +87,15 @@ export function pickContrastingSkin(playerSkin: Skin): Skin {
 export function skinMaterial(
   skin: Skin,
   colour: number,
-  opts: { emissiveBoost?: number } = {},
+  opts: { emissiveBoost?: number; toon?: boolean } = {},
 ): THREE.Material {
   const boost = opts.emissiveBoost ?? 1;
+
+  // Cel shading overrides the finish entirely. A chrome or glass *material*
+  // under toon lighting just looks like a bug — the point of the toon theme is
+  // that every surface reads as flat bands, so the finish becomes irrelevant
+  // and only the colour survives.
+  if (opts.toon) return toonMaterial(colour, skin.finish === 'neon' ? 0.35 : 0.12);
 
   switch (skin.finish) {
     case 'chrome':
