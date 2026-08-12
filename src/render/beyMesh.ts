@@ -61,6 +61,16 @@ function buildClassicBey(build: BeyBuild, skin: Skin): THREE.Group {
 
   const { layer } = build;
   const r = layer.radius;
+  // Classic reads the beydex too.
+  //
+  // It used to build every layer from the same faceted cylinder in the skin's
+  // colour, so swapping beys in this theme changed the blade *count* and
+  // nothing else — ten designs rendered as one model in six palettes. The
+  // silhouette and palette now come from the design, exactly as in Anime;
+  // what stays classic is the *material* treatment (metalness/roughness
+  // MeshStandardMaterial, no cel bands, no ink outline), which is what gives
+  // this theme its character. The stadium and lighting are untouched.
+  const design = designByLayer(layer.id);
 
   // ---- driver: a slim cone that meets the floor at the group origin --------
   const tipHeight = r * 1.05;
@@ -109,7 +119,7 @@ function buildClassicBey(build: BeyBuild, skin: Skin): THREE.Group {
   const discY = tipHeight + r * 0.36;
   // Six radial segments rather than 24: the flat faces catch the light
   // differently as it turns, which is what makes the rotation readable.
-  const discMat = skinMaterial(skin, skin.secondary);
+  const discMat = skinMaterial(skin, design.secondary);
   const discMesh = new THREE.Mesh(
     new THREE.CylinderGeometry(r * 0.78, r * 0.88, discHeight, 6),
     discMat,
@@ -131,19 +141,24 @@ function buildClassicBey(build: BeyBuild, skin: Skin): THREE.Group {
 
   // ---- layer: the contact ring, plus one blade per contact point ----------
   const layerY = discY + discHeight * 0.5 + r * 0.2;
-  // The layer carries the skin's primary colour. Part identity is still
-  // readable from the blade count and silhouette, which the skin doesn't touch.
-  const layerMat = skinMaterial(skin, skin.primary);
+  // The layer carries the *design's* colour; the skin still owns the hit ring
+  // and the trail, so "which bey is that" and "whose is it" stay separable.
+  const layerMat = skinMaterial(skin, design.primary);
 
-  // Faceted core with a hard bevel. Matching the facet count to the blade count
-  // makes the whole layer read as one machined piece rather than a cylinder with
-  // things glued to it.
   const facets = Math.max(6, layer.blades * 2);
-  const core = new THREE.Mesh(
-    new THREE.CylinderGeometry(r * 0.62, r * 0.74, r * 0.34, facets),
-    layerMat,
+
+  // The design's own silhouette, extruded — the same 2D profile the Anime
+  // theme cuts, in a metallic material rather than a cel one. This is what
+  // makes a Fafnir read as a rounded spin-steal shield and a Valtryek as a
+  // three-winged attacker in *both* themes.
+  const coreGeo = new THREE.ExtrudeGeometry(
+    bladeSilhouette(layer.blades, r, design.blade),
+    { depth: r * 0.34, bevelEnabled: true, bevelThickness: r * 0.05,
+      bevelSize: r * 0.04, bevelOffset: 0, bevelSegments: 2, curveSegments: 8 },
   );
-  core.position.y = layerY;
+  const core = new THREE.Mesh(coreGeo, layerMat);
+  core.rotation.x = -Math.PI / 2;
+  core.position.y = layerY - r * 0.17;
   core.castShadow = true;
   layerGroup.add(core);
 
@@ -157,9 +172,10 @@ function buildClassicBey(build: BeyBuild, skin: Skin): THREE.Group {
 
   // The centre boss: a raised, faceted crown. This is the part that reads as a
   // "face" at a glance and gives the top an up direction.
+  const accentMat = skinMaterial(skin, design.accent);
   const boss = new THREE.Mesh(
     new THREE.ConeGeometry(r * 0.36, r * 0.3, facets),
-    layerMat,
+    accentMat,
   );
   boss.position.y = layerY + r * 0.3;
   boss.castShadow = true;
@@ -167,32 +183,14 @@ function buildClassicBey(build: BeyBuild, skin: Skin): THREE.Group {
 
   const bossRing = new THREE.Mesh(
     new THREE.TorusGeometry(r * 0.34, r * 0.05, 6, facets),
-    layerMat,
+    accentMat,
   );
   bossRing.rotation.x = Math.PI / 2;
   bossRing.position.y = layerY + r * 0.17;
   layerGroup.add(bossRing);
 
-  // Blades sit at the collision radius, so what you see is what hits.
-  //
-  // Raked wedges rather than upright boxes: each one is tapered along its length
-  // and tilted so it leads with an edge. A blade that visibly cuts into the
-  // direction of travel is most of what separates this from a cog.
-  const bladeGeo = new THREE.CylinderGeometry(r * 0.055, r * 0.3, r * 0.62, 4);
-  for (let i = 0; i < layer.blades; i++) {
-    const angle = (i / layer.blades) * Math.PI * 2;
-    const blade = new THREE.Mesh(bladeGeo, layerMat);
-    blade.position.set(Math.cos(angle) * r * 0.7, layerY, Math.sin(angle) * r * 0.7);
-
-    // Lay the wedge on its side pointing outward, then rake it back against the
-    // direction of spin so the leading edge is the thin one.
-    blade.rotation.order = 'YZX';
-    blade.rotation.y = -angle;
-    blade.rotation.z = -Math.PI / 2;
-    blade.rotation.x = 0.42;
-    blade.castShadow = true;
-    layerGroup.add(blade);
-  }
+  // The blades are the extruded silhouette above, not glued-on wedges — which
+  // is exactly why swapping designs now changes the shape in this theme.
 
   // A faint energy ring at the exact collision radius — reads as the hitbox.
   const ringMat = new THREE.MeshBasicMaterial({

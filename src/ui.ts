@@ -487,6 +487,71 @@ export class Ui {
    * on its own axis. A parts list tells you a build's numbers; this shows you
    * what you are actually assembling.
    */
+
+  /**
+   * Arena picker. A match setting, not a cosmetic: it changes the physics.
+   */
+  private arenaSection(): HTMLElement {
+    const g = this.game;
+      // Arena. Unlike skins and themes this changes the physics, so it is
+      // labelled as a match setting rather than sitting with the cosmetics.
+      const arenaRow = document.createElement('div');
+      arenaRow.className = 'slot';
+      arenaRow.innerHTML = '<h4>Arena — changes how the match plays</h4>';
+      const arenaChips = document.createElement('div');
+      arenaChips.className = 'chips';
+      for (const a of ARENAS) {
+        const chip = document.createElement('button');
+        chip.className = 'chip' + (g.arenaId === a.id ? ' on' : '');
+        chip.innerHTML = `<span>${escapeHtml(a.name)}<br><small>${escapeHtml(a.blurb)}</small></span>`;
+        chip.addEventListener('click', () => {
+          g.setArena(a.id);
+          this.render();
+        });
+        arenaChips.appendChild(chip);
+      }
+      arenaRow.appendChild(arenaChips);
+    return arenaRow;
+  }
+
+  /**
+   * Spin direction. Also a match setting — the two pairings measure completely
+   * differently, so this decides what kind of fight you get.
+   */
+  private spinSection(): HTMLElement {
+    const g = this.game;
+      // Spin direction. Measured, the two pairings play completely differently,
+      // so this is a real decision rather than a cosmetic toggle.
+      const spinRow = document.createElement('div');
+      spinRow.className = 'slot';
+      spinRow.innerHTML = '<h4>Spin direction — decides what kind of fight you get</h4>';
+      const spinChips = document.createElement('div');
+      spinChips.className = 'chips';
+      const spins: [1 | -1, string, string][] = [
+        [1, 'Right spin', 'clockwise'],
+        [-1, 'Left spin', 'counter-clockwise'],
+      ];
+      for (const [dir, label, note] of spins) {
+        const chip = document.createElement('button');
+        chip.className = 'chip' + (g.playerSpinDir === dir ? ' on' : '');
+        chip.innerHTML = `<span>${escapeHtml(label)}<br><small>${escapeHtml(note)}</small></span>`;
+        chip.addEventListener('click', () => {
+          g.playerSpinDir = dir;
+          this.render();
+        });
+        spinChips.appendChild(chip);
+      }
+      spinRow.appendChild(spinChips);
+      const spinNote = document.createElement('p');
+      spinNote.className = 'sub';
+      spinNote.style.margin = '10px 0 0';
+      spinNote.textContent =
+        'Match your rival’s spin for a quieter attrition race that stamina wins. ' +
+        'Oppose it for a longer run of violent exchanges where attack pays off.';
+      spinRow.appendChild(spinNote);
+    return spinRow;
+  }
+
   private explodedView(): HTMLElement {
     const g = this.game;
     const wrap = document.createElement('div');
@@ -851,6 +916,15 @@ export class Ui {
     }
     presetRow.appendChild(presetChips);
     panel.appendChild(presetRow);
+    // Match settings sit directly under the bey, before the parts.
+    //
+    // They used to be sections 6 and 8 of 9, below every part slot — far
+    // enough down that the X-Rail was reported as "disappeared" when it had
+    // simply never been scrolled to. Arena and spin direction both change how
+    // the match *plays*, so they belong with the choice of bey, not filed
+    // under cosmetics.
+    panel.appendChild(this.arenaSection());
+    panel.appendChild(this.spinSection());
 
     const slots: [string, { id: string; name: string; colour?: number; note: string }[], string][] = [
       [
@@ -966,25 +1040,6 @@ export class Ui {
     skinRow.appendChild(skinNote);
     panel.appendChild(skinRow);
 
-    // Arena. Unlike skins and themes this changes the physics, so it is
-    // labelled as a match setting rather than sitting with the cosmetics.
-    const arenaRow = document.createElement('div');
-    arenaRow.className = 'slot';
-    arenaRow.innerHTML = '<h4>Arena — changes how the match plays</h4>';
-    const arenaChips = document.createElement('div');
-    arenaChips.className = 'chips';
-    for (const a of ARENAS) {
-      const chip = document.createElement('button');
-      chip.className = 'chip' + (g.arenaId === a.id ? ' on' : '');
-      chip.innerHTML = `<span>${escapeHtml(a.name)}<br><small>${escapeHtml(a.blurb)}</small></span>`;
-      chip.addEventListener('click', () => {
-        g.setArena(a.id);
-        this.render();
-      });
-      arenaChips.appendChild(chip);
-    }
-    arenaRow.appendChild(arenaChips);
-    panel.appendChild(arenaRow);
 
     // Visual theme. Cosmetic and fully reversible — 'Arena' is the original
     // look, reproduced exactly.
@@ -1006,36 +1061,6 @@ export class Ui {
     themeRow.appendChild(themeChips);
     panel.appendChild(themeRow);
 
-    // Spin direction. Measured, the two pairings play completely differently,
-    // so this is a real decision rather than a cosmetic toggle.
-    const spinRow = document.createElement('div');
-    spinRow.className = 'slot';
-    spinRow.innerHTML = '<h4>Spin direction — decides what kind of fight you get</h4>';
-    const spinChips = document.createElement('div');
-    spinChips.className = 'chips';
-    const spins: [1 | -1, string, string][] = [
-      [1, 'Right spin', 'clockwise'],
-      [-1, 'Left spin', 'counter-clockwise'],
-    ];
-    for (const [dir, label, note] of spins) {
-      const chip = document.createElement('button');
-      chip.className = 'chip' + (g.playerSpinDir === dir ? ' on' : '');
-      chip.innerHTML = `<span>${escapeHtml(label)}<br><small>${escapeHtml(note)}</small></span>`;
-      chip.addEventListener('click', () => {
-        g.playerSpinDir = dir;
-        this.render();
-      });
-      spinChips.appendChild(chip);
-    }
-    spinRow.appendChild(spinChips);
-    const spinNote = document.createElement('p');
-    spinNote.className = 'sub';
-    spinNote.style.margin = '10px 0 0';
-    spinNote.textContent =
-      'Match your rival’s spin for a quieter attrition race that stamina wins. ' +
-      'Oppose it for a longer run of violent exchanges where attack pays off.';
-    spinRow.appendChild(spinNote);
-    panel.appendChild(spinRow);
 
     const row = document.createElement('div');
     row.className = 'row';
