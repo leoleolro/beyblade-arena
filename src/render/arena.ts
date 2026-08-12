@@ -23,6 +23,8 @@ import { Shockwave } from './shockwave';
 import type { ArenaSpec } from '../sim/arena';
 import { buildRail } from './rail';
 import type { RailHandles } from './rail';
+import { buildPit } from './pit';
+import type { PitHandles } from './pit';
 import { OutlineEffect } from 'three/examples/jsm/effects/OutlineEffect.js';
 import { buildAura } from './aura';
 import type { Aura } from './aura';
@@ -158,6 +160,8 @@ export class ArenaRenderer {
   private blackout = 0;
   /** The X-Rail ring, present only in arenas that have one. */
   private rail: RailHandles | null = null;
+  /** The Spike Pit hazard, present only in arenas that have one. */
+  private pit: PitHandles | null = null;
   /** Painted hall sphere, present only under the anime theme. */
   private backdrop: THREE.Mesh | null = null;
   /** Throttles rail sparks so a ride doesn't drain the whole particle pool. */
@@ -300,6 +304,12 @@ export class ArenaRenderer {
       this.scene.add(this.rail.group);
     }
     if (this.rail) this.rail.group.visible = !!arena.rail;
+
+    if (arena.pit && !this.pit) {
+      this.pit = buildPit(arena.pit.radius);
+      this.scene.add(this.pit.group);
+    }
+    if (this.pit) this.pit.group.visible = !!arena.pit;
   }
 
   /**
@@ -550,6 +560,21 @@ export class ArenaRenderer {
       mat.emissiveIntensity +=
         (this.rail.baseEmissive + flare - mat.emissiveIntensity) *
         Math.min(1, dt * 9);
+    }
+
+    // The pit only announces itself while it is actually taking spin: the
+    // drain needs unbroken dwell to ramp, so a hazard that pulsed constantly
+    // would teach the wrong rule. Driven off pitTime rather than mere
+    // presence, which is the same quantity the physics charges on.
+    if (this.pit && this.pit.group.visible) {
+      const worst = beys.reduce(
+        (m, b) => (b.alive ? Math.max(m, b.pitTime) : m),
+        0,
+      );
+      const bite = clampUnit(worst / 1.8);
+      const target = 0.45 + bite * 0.5 + (bite > 0 ? Math.sin(this.elapsed * 9) * 0.12 * bite : 0);
+      const mat = this.pit.ringMaterial;
+      mat.opacity += (target - mat.opacity) * Math.min(1, dt * 8);
     }
 
     // Crush the fill for a beat on the decisive blow, then ease it back.

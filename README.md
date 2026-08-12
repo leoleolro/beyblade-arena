@@ -604,7 +604,95 @@ Two implementation notes that matter more than they look:
   canvas silently stops drawing. Verified: clicking through six parts keeps the
   same canvas element and two total contexts.
 
+## The Spike Pit
+
+Three arenas now: the plain dish, the X-Rail, and the Spike Pit. The pit exists
+to fix a *measured* hole rather than to add a feature. Sweeping every preset
+against every other, win rates ran **32.5% to 59.2%** — and the worst archetype
+was pure attack. The reason is geography: the bowl is a parabola, so its centre
+is the calmest place on the board, and a low deep launch that parks there takes
+fewer contacts and outlasts. The game was quietly paying tops to do nothing.
+
+The pit charges rent on the safe square. Spin drains as the product of two
+ramps — **depth** (zero at the rim, full at the centre, so no radius is quietly
+optimal) and **dwell** (zero until 1.8s of *unbroken* occupancy, so crossing the
+middle to engage stays free). It is a gradient, not a wall; a hard edge would
+only relocate the camp to its perimeter.
+
+The tuning is the interesting part, because the response is **not monotonic**.
+The first attempt used a drain of 34 on the obvious assumption that a harsher
+tax means a flatter meta, and it made the spread *worse than the plain dish*
+(26.7 → 30.0). Sweeping properly:
+
+| drain | floor | ceiling | spread |
+|------:|------:|--------:|-------:|
+| plain | 32.5% | 59.2%   | 26.7   |
+| 6     | 36.7% | 64.2%   | 27.5   |
+| **12**| **41.7%** | **61.7%** | **20.0** |
+| 20    | 38.3% | 63.3%   | 25.0   |
+| 34    | 33.3% | 66.7%   | 33.3   |
+
+Past a certain strength the pit stops being a nerf to camping and becomes a
+*subsidy* to whichever build already never goes near the middle — so the harsher
+settings handed the game to the most mobile top. The useful value raises the
+floor nearly ten points while barely touching the ceiling: a flatter meta, not a
+different tyrant. `pit.test.ts` asserts the spread narrows, and that assertion is
+the arena's whole justification — if it ever fails the pit should be retuned or
+removed, not have the test relaxed.
+
+## The AI mixes now
+
+`pickMove` used to counter a committed opponent with probability 1. That is a
+pure strategy in a rock-paper-scissors triangle, and a pure strategy has an
+exploit: show a cheap move, watch the guaranteed counter, and the next few
+seconds are scripted. The champion's 3% misread made it a near-perfect counter
+machine, which sounds hard and plays as predictable.
+
+Difficulties now carry a `mix` (chance of declining a read it can see) and a
+`bait` (spending a cheap move purely to draw a reaction, gated on a meter lead
+big enough that the trade still leaves a charge in hand). `mix` *rises* with
+difficulty while `misread` falls — they look similar and are opposites: a
+misread is the AI being wrong, a mix is the AI being unpredictable on purpose.
+Measured, the champion now answers a repeated Charge with Block 53 / Charge 7 —
+unpredictable, still 88% correct.
+
+### A measurement that lied
+
+Worth recording because it nearly cost a day. A first version of the AI test sat
+the champion on one side of a mirror match and reported it losing 65% of the
+time, which read as damning evidence that mixing had crippled it. It had not.
+Instrumenting the rounds showed **neither AI activating a single move**, so
+their policies could not possibly have been the cause.
+
+The seat was. With no controller running at all:
+
+| condition | side A wins |
+|---|---|
+| opposite spin, angles 0/π | 88% |
+| same spin, angles 0/π | 48% |
+| opposite spin, same angle | 0% |
+
+Before finding that, an entire archetype-aware aggression system had been
+written to fix the phantom — and was reverted, because there was no evidence it
+helped and one measurement suggesting it hurt. The tests now average both
+seatings. The lesson is the old one in a new costume: a confounded measurement
+is worse than no measurement, because it is persuasive.
+
 ## Known gaps
+
+- **Opposite-spin matches carry a seat bias.** Same-spin mirrors are a fair 48%;
+  opposite-spin ones can run 88/12 on seat alone, with no AI involved. The
+  collision maths looks symmetric (aggressor share derives from closing
+  velocities), so the suspicion is emergent: opposite-spin tops orbit in
+  opposite directions and meet head-on with systematically different closing
+  speeds. Since the player always occupies seat 0, this distorts the
+  spin-direction choice that the game presents as a real strategic decision.
+  Not yet root-caused.
+- **The champion AI loses to the rookie in stamina and defence mirrors** (35%
+  and 15%). Pre-existing and identical with mixing on or off, so it is not the
+  mixing. `chooseSpinDir` and `chooseLaunch` branch on archetype but `pickMove`
+  does not, which is the obvious suspect — but the one attempt at fixing it made
+  things worse, so it needs measuring properly rather than another guess.
 
 - Skins vary colour and material but not **silhouette**. Blade count already
   differs per layer; distinct shapes per skin would push identification further.

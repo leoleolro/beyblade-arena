@@ -39,6 +39,35 @@ export interface RailSpec {
   releaseInward: number;
 }
 
+/**
+ * A hazard occupying the middle of the dish.
+ *
+ * This exists to fix a *measured* balance hole rather than to add a feature.
+ * Sweeping every preset against every other on the plain dish, win rates ran
+ * from 33% (pure attack) to 63% (balance), and the reason is geography: the
+ * bowl is a parabola, so its centre is the calmest place on the board. A low,
+ * deep launch parks there, takes fewer contacts, and outlasts. Attack builds
+ * carry high wander that pushes them out to the ridge where the damage is, so
+ * the game was quietly paying tops to do nothing.
+ *
+ * The pit charges rent on the safe square. It drains spin the longer a top
+ * stays inside, scaled by depth, so the centre becomes a place you pass
+ * through rather than a place you live. Crucially it is a *gradient*, not a
+ * wall — a hard edge would just move the camping spot to its perimeter.
+ */
+export interface PitSpec {
+  /** Radius of the hazard zone. */
+  radius: number;
+  /** Spin drained per second at the very centre. */
+  drain: number;
+  /**
+   * Seconds of grace before the drain reaches full strength, reset by leaving.
+   * Passing through must stay free — otherwise the pit punishes the attacker
+   * crossing the dish to engage, which is the opposite of the intent.
+   */
+  grace: number;
+}
+
 export interface ArenaSpec {
   id: string;
   name: string;
@@ -46,6 +75,7 @@ export interface ArenaSpec {
   /** Which visual theme suits it. The player can still override. */
   suggestedTheme: string;
   rail: RailSpec | null;
+  pit?: PitSpec | null;
 }
 
 export const STANDARD: ArenaSpec = {
@@ -75,7 +105,37 @@ export const XRAIL: ArenaSpec = {
   },
 };
 
-export const ARENAS: ArenaSpec[] = [STANDARD, XRAIL];
+export const SPIKE_PIT: ArenaSpec = {
+  id: 'spikepit',
+  name: 'Spike Pit',
+  blurb: 'the centre bites — camping the middle bleeds spin',
+  suggestedTheme: 'anime',
+  rail: null,
+  pit: {
+    // Comfortably inside the tornado ridge (0.82): the pit owns the calm
+    // middle without touching the orbit where contacts actually happen.
+    radius: 0.42,
+    // Searched, not guessed, and the response is NOT monotonic — the first
+    // attempt used 34 on the assumption that a harsher tax means a flatter
+    // meta, and it made the spread worse than the plain dish (26.7 -> 30.0).
+    //
+    // Sweeping drain against the full preset matrix:
+    //     6  floor 36.7  ceiling 64.2  spread 27.5   (too weak to bite)
+    //    12  floor 41.7  ceiling 61.7  spread 20.0   <- here
+    //    20  floor 38.3  ceiling 63.3  spread 25.0
+    //    34  floor 33.3  ceiling 66.7  spread 33.3   (rewards the mobile)
+    //
+    // The mechanism behind the curve: the pit taxes whoever sits in it, so
+    // past a certain strength it stops being a nerf to camping and becomes a
+    // *subsidy* to whichever build already never goes near the middle. The
+    // useful setting raises the floor (32.5 -> 41.7) while barely touching
+    // the ceiling — a flatter meta, not a different tyrant.
+    drain: 12,
+    grace: 1.8,
+  },
+};
+
+export const ARENAS: ArenaSpec[] = [STANDARD, XRAIL, SPIKE_PIT];
 
 export const arenaById = (id: string): ArenaSpec =>
   ARENAS.find((a) => a.id === id) ?? STANDARD;

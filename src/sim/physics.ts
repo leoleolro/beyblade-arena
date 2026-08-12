@@ -2,7 +2,7 @@ import * as C from './constants';
 import { clamp, dist, dot, len, norm, perp, rotate, vec } from './math';
 import type { Vec2 } from './math';
 import type { BeyState } from './types';
-import type { ArenaSpec, RailSpec } from './arena';
+import type { ArenaSpec, PitSpec, RailSpec } from './arena';
 import { STANDARD } from './arena';
 
 /**
@@ -92,6 +92,40 @@ export const spinNorm = (b: BeyState): number =>
  *  3. **Release** — the exit velocity is rotated toward the centre. The
  *     slingshot is the point; the speed is just how hard it arrives.
  */
+/**
+ * The Spike Pit: rent on the safe square.
+ *
+ * The drain is the product of two ramps, and both matter:
+ *
+ *  - **Depth.** Zero at the pit's edge, full at the centre. A cliff would only
+ *    relocate the camp to just outside the rim; a gradient means there is no
+ *    radius that is quietly optimal.
+ *  - **Dwell.** Zero until `grace` seconds of *unbroken* occupancy. Crossing
+ *    the middle to reach an opponent has to stay free, or the pit would punish
+ *    the aggression it exists to reward. Leaving resets the clock, so the pit
+ *    is escapable by playing — not by winning a stat check.
+ *
+ * Applied as spin loss rather than a force: pushing tops out physically would
+ * fight the precession model and make the orbit unreadable.
+ */
+function updatePit(b: BeyState, pit: PitSpec, dt: number): void {
+  const r = len(b.pos);
+  if (r >= pit.radius) {
+    b.pitTime = 0;
+    return;
+  }
+
+  b.pitTime += dt;
+  const depth = 1 - r / pit.radius;
+  const dwell = pit.grace <= 0 ? 1 : clamp(b.pitTime / pit.grace, 0, 1);
+  const loss = pit.drain * depth * dwell * dt;
+
+  const before = Math.abs(b.spin);
+  const after = Math.max(0, before - loss);
+  b.spin = after * Math.sign(b.spin);
+  b.pitDrained += before - after;
+}
+
 function updateRail(b: BeyState, rail: RailSpec, dt: number): void {
   b.railCooldown = Math.max(0, b.railCooldown - dt);
 
@@ -208,6 +242,7 @@ function integrate(b: BeyState, dt: number, arena: ArenaSpec): void {
   b.meter = clamp(b.meter + C.METER_GAIN_PER_SEC * dt, 0, 1);
 
   if (arena.rail) updateRail(b, arena.rail, dt);
+  if (arena.pit) updatePit(b, arena.pit, dt);
   if (b.moveTime > 0) {
     b.moveTime = Math.max(0, b.moveTime - dt);
     if (b.moveTime === 0) b.move = null;

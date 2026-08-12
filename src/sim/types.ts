@@ -134,6 +134,10 @@ export interface BeyState {
   railCooldown: number;
   /** Rail engagements this round — shown in the breakdown. */
   railRides: number;
+  /** Unbroken seconds spent inside the Spike Pit, if the arena has one. */
+  pitTime: number;
+  /** Total spin the pit has taken off this top — shown in the breakdown. */
+  pitDrained: number;
   /** Whether this top's launch landed in the perfect band. */
   perfectLaunch: boolean;
   /** Clashes this top was the aggressor in — shown in the round breakdown. */

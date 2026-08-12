@@ -28,6 +28,26 @@ const PROFILE: Record<
     reactionTime: number;
     /** Chance it counters with the wrong move entirely. */
     misread: number;
+    /**
+     * Chance it declines a counter it *can* see, and plays something else.
+     *
+     * This is not a handicap — it is what stops the AI from being solvable.
+     * Countering a read every single time is a pure strategy, and a pure
+     * strategy in a rock-paper-scissors triangle has an exploit: commit a
+     * cheap move, watch the guaranteed counter come out, and you know what
+     * the next few seconds hold. Mixing removes the certainty without
+     * removing the skill, so a good read still pays more often than not.
+     *
+     * Note this rises with difficulty while `misread` falls. They look
+     * similar and are opposites: a misread is the AI being wrong, a mix is
+     * the AI being unpredictable on purpose.
+     */
+    mix: number;
+    /**
+     * Chance it spends meter on a cheap move purely to draw a reaction, when
+     * it holds a meter lead it can afford to burn.
+     */
+    bait: number;
   }
 > = {
   rookie: {
@@ -36,6 +56,11 @@ const PROFILE: Record<
     engageRange: 1.2,
     reactionTime: 0.85,
     misread: 0.45,
+    // A rookie is already unpredictable by accident; mixing on purpose on top
+    // of a 45% misread would just be noise, and baiting is a plan it does not
+    // have yet.
+    mix: 0,
+    bait: 0,
   },
   blader: {
     counterPick: 0.5,
@@ -43,6 +68,8 @@ const PROFILE: Record<
     engageRange: 0.6,
     reactionTime: 0.35,
     misread: 0.18,
+    mix: 0.15,
+    bait: 0.12,
   },
   champion: {
     counterPick: 1,
@@ -50,6 +77,11 @@ const PROFILE: Record<
     engageRange: 0.45,
     reactionTime: 0.12,
     misread: 0.03,
+    // The champion is the one that most needs this. Its 3% misread made it a
+    // near-perfect counter machine, which sounds hard but plays as
+    // predictable: bait it once and the rest of the round is scripted.
+    mix: 0.28,
+    bait: 0.3,
   },
 };
 
@@ -171,10 +203,12 @@ export class AiController {
   ): MoveKind | null {
     const afford = (k: MoveKind): boolean => me.meter >= MOVES[k].cost;
 
-    // Direct counter to a committed opponent.
+    // Direct counter to a committed opponent — but not every time. Declining
+    // the read is what keeps the AI from being solvable; see `mix`.
     if (foe.moveTime > 0.25 && foe.move) {
       const counter = MOVE_COUNTERS[foe.move];
-      if (afford(counter)) return counter;
+      if (afford(counter) && this.rng() >= p.mix) return counter;
+      // Having declined, fall through and play the board instead of the read.
     }
 
     // Nothing to counter. Close and aggressive, or hurt and looking for space.
@@ -185,6 +219,23 @@ export class AiController {
     if (distance < p.engageRange && afford('charge') && this.worthIt(me, foe)) {
       return 'charge';
     }
+
+    // The bait. Spend a cheap move with nothing to counter and no opening, so
+    // the opponent burns a counter on it — which is only a good trade with a
+    // meter lead big enough that the exchange still leaves a charge in hand.
+    //
+    // Gated on the opponent being close enough to react: a feint nobody is
+    // near enough to see is just wasted meter.
+    const meterLead = me.meter - foe.meter;
+    if (
+      meterLead > 0.3 &&
+      me.meter >= MOVES.charge.cost + MOVES.dodge.cost &&
+      distance < p.engageRange * 1.6 &&
+      this.rng() < p.bait
+    ) {
+      return 'dodge';
+    }
+
     // Bank the meter rather than spend it badly.
     return null;
   }
