@@ -729,6 +729,29 @@ originals read as a single slab: it is a second, blunter cut of the *same* edge
 grammar, rotated a half blade-step so its blades fill the upper tier's cutaways
 rather than hiding behind them.
 
+### Surface hardware
+
+Changing the outline was only half of it — the blade *faces* were still flat
+colour with painted ring lines, so from above a top read as a printed disc.
+Each edge grammar now carries the surface treatment that belongs to it, as real
+geometry rather than paint:
+
+- `blade` — raised radial ribs tapering out along each blade, plus a bright
+  accent chip at the contact point: the bit that actually strikes.
+- `wave` — vent slots cut along the scallop, tied together by a raised arc band.
+- `hook` — plates stepping outward and upward, so the face reads as scaled.
+- `flame` — fins raked progressively harder along the lick, so the surface
+  agrees with the outline about which way the flame is blowing.
+
+Tying the detail to the edge grammar rather than making it a separate field is
+deliberate: a scalloped layer wearing hard machined ridges reads as two designs
+bolted together. Cel shading pays for this more than a lit renderer would,
+because `OutlineEffect` inks every one of these pieces individually — the
+detail survives at battle distance as linework even when the shading flattens.
+
+Everything sits strictly inside the contact radius, so *what you see is what
+hits* still holds: none of it widens the silhouette the sim collides on.
+
 ## Known gaps
 
 - **The champion AI loses to the rookie in stamina and defence mirrors** (35%
@@ -738,10 +761,11 @@ rather than hiding behind them.
   chasing the seat-bias confound above and had to be reverted, so this needs
   measuring properly rather than another guess. Note the confound is now gone,
   so a re-measurement would finally be trustworthy.
-- **Blade surface detail is silhouette-only.** The edge grammar changed the
-  outline; the blade *faces* are still flat colour plus painted ring lines.
-  Ridges, vents and panel breaks as real geometry on the blade tier are the
-  next step toward the reference art.
+- **The garage picker shows names, not beys.** Ten designs now differ in
+  silhouette, tiering and surface hardware, and the picker still represents
+  each as a text chip with a colour dot. A small rendered thumbnail per bey
+  would let the work actually sell the choice — `beydex.ts` is pure data plus
+  canvas drawing precisely so it can be reused there.
 - Skins vary colour and material but not silhouette.
 - The tutorial is explanatory, not interactive.
 - The garage labels sit at fixed thirds rather than tracking projected screen

@@ -321,6 +321,11 @@ function buildToonBey(build: BeyBuild, skin: Skin): THREE.Group {
   layerMesh.castShadow = true;
   layerGroup.add(layerMesh);
 
+  // Surface hardware on the blade faces. The edge grammar changed the
+  // outline; without this the faces stay flat colour and the layer still
+  // reads as a printed disc rather than a moulded part.
+  addBladeDetail(layerGroup, design, blades, r, layerBottom + layerDepth);
+
   // The under-ring tier: a thinner, blunter silhouette in its own colour,
   // rotated a half blade-step so its blades peek out of the main tier's
   // cutaways. This is most of the side-view "layered hardware" read, and the
@@ -701,6 +706,143 @@ function buildToonDisc(parent: THREE.Group, discId: string, r: number): number {
   }
 
   return discY;
+}
+
+/**
+ * Surface hardware on the blade faces.
+ *
+ * The edge grammar gave each layer its own outline, but the faces were still
+ * flat colour with painted ring lines — so from above a top read as a printed
+ * disc rather than a moulded part. Real hardware breaks its faces up: ridges
+ * running out along each blade, slots cut into the plastic, plates that
+ * overlap. Cel shading rewards this more than a lit renderer would, because
+ * `OutlineEffect` inks every one of these pieces individually.
+ *
+ * The detail follows the *edge grammar* rather than being a separate field —
+ * a scalloped layer with hard machined ridges on it would read as two designs
+ * bolted together. Each treatment is the natural surface for its outline:
+ *
+ *  - `blade` raised radial ridges, tapering out along the blade. Machined.
+ *  - `wave`  recessed slots following the scallop. Vented plastic.
+ *  - `hook`  overlapping plates stepping outward. Scaled and organic.
+ *  - `flame` swept fins raked back against the spin. Blown backwards.
+ *
+ * Everything sits strictly inside the contact radius, so `what you see is what
+ * hits` still holds — none of this widens the silhouette the sim collides on.
+ */
+function addBladeDetail(
+  parent: THREE.Group,
+  design: BeyDesign,
+  blades: number,
+  r: number,
+  faceY: number,
+): void {
+  const step = (Math.PI * 2) / blades;
+  // A step darker than the plastic, so the hardware reads as a change in
+  // surface rather than as a second colour competing with the design.
+  const dark = new THREE.Color(design.primary).multiplyScalar(0.62).getHex();
+  const light = new THREE.Color(design.primary)
+    .lerp(new THREE.Color(0xffffff), 0.3)
+    .getHex();
+  const detailMat = setOutline(toonMaterial(dark), { thickness: BEY_OUTLINE * 0.55 });
+  const accentMat = setOutline(toonMaterial(design.accent, 0.1), {
+    thickness: BEY_OUTLINE * 0.55,
+  });
+  const liftMat = setOutline(toonMaterial(light), { thickness: BEY_OUTLINE * 0.55 });
+
+  for (let i = 0; i < blades; i++) {
+    const a = i * step;
+
+    switch (design.blade.edge) {
+      case 'blade': {
+        // Two ridges per blade, the outer one shorter, both raked to sit on
+        // the blade rather than in the gap between blades.
+        for (const [frac, len, wide] of [
+          [0.3, 0.34, 0.05],
+          [0.46, 0.22, 0.035],
+        ] as const) {
+          const ang = a + step * frac;
+          const mid = r * 0.68;
+          const ridge = new THREE.Mesh(
+            new THREE.BoxGeometry(r * len, r * 0.05, r * wide),
+            detailMat,
+          );
+          ridge.position.set(Math.cos(ang) * mid, faceY, Math.sin(ang) * mid);
+          ridge.rotation.y = -ang;
+          parent.add(ridge);
+        }
+        // A bright chip at the contact point — the bit that actually strikes.
+        const tipAng = a + step * 0.5;
+        const chip = new THREE.Mesh(
+          new THREE.BoxGeometry(r * 0.1, r * 0.06, r * 0.12),
+          accentMat,
+        );
+        chip.position.set(Math.cos(tipAng) * r * 0.86, faceY, Math.sin(tipAng) * r * 0.86);
+        chip.rotation.y = -tipAng;
+        parent.add(chip);
+        break;
+      }
+
+      case 'wave': {
+        // Slots cut along the scallop. Cylinders rather than boxes so the
+        // vents curve with the surface they sit in.
+        for (const frac of [0.34, 0.5, 0.66]) {
+          const ang = a + step * frac;
+          const slot = new THREE.Mesh(
+            new THREE.CylinderGeometry(r * 0.045, r * 0.045, r * 0.05, 8),
+            detailMat,
+          );
+          slot.position.set(Math.cos(ang) * r * 0.72, faceY, Math.sin(ang) * r * 0.72);
+          parent.add(slot);
+        }
+        // A raised band arcing across the lobe, tying the vents together.
+        const band = new THREE.Mesh(
+          new THREE.TorusGeometry(r * 0.58, r * 0.028, 6, 10, step * 0.7),
+          accentMat,
+        );
+        band.rotation.x = Math.PI / 2;
+        band.rotation.z = -(a + step * 0.15);
+        band.position.y = faceY;
+        parent.add(band);
+        break;
+      }
+
+      case 'hook': {
+        // Overlapping plates stepping outward, each a little higher than the
+        // last, so the face reads as scaled rather than smooth.
+        for (let k = 0; k < 3; k++) {
+          const ang = a + step * (0.26 + k * 0.13);
+          const rad = r * (0.56 + k * 0.11);
+          const plate = new THREE.Mesh(
+            new THREE.BoxGeometry(r * 0.16, r * 0.04 + k * r * 0.012, r * 0.1),
+            k === 2 ? accentMat : detailMat,
+          );
+          plate.position.set(Math.cos(ang) * rad, faceY + k * r * 0.012, Math.sin(ang) * rad);
+          plate.rotation.y = -ang + 0.24;
+          parent.add(plate);
+        }
+        break;
+      }
+
+      case 'flame': {
+        // Fins raked back against the direction of the lick, so the surface
+        // agrees with the outline about which way the flame is blowing.
+        for (let k = 0; k < 3; k++) {
+          const ang = a + step * (0.24 + k * 0.16);
+          const rad = r * (0.6 + k * 0.08);
+          const fin = new THREE.Mesh(
+            new THREE.BoxGeometry(r * 0.22 - k * r * 0.04, r * 0.05, r * 0.03),
+            k === 1 ? liftMat : detailMat,
+          );
+          fin.position.set(Math.cos(ang) * rad, faceY, Math.sin(ang) * rad);
+          // Raked progressively harder along the lick.
+          fin.rotation.y = -ang - 0.3 - k * 0.16;
+          parent.add(fin);
+        }
+        break;
+      }
+    }
+  }
 }
 
 /**
