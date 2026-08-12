@@ -322,11 +322,35 @@ export class Battle {
       );
       const best = falling[0];
       const next = falling[1];
+      // Compared with a tolerance, and that tolerance is load-bearing rather
+      // than defensive.
+      //
+      // A perfectly mirrored round — same build both sides, launched at
+      // opposite angles with opposite spin — stays mirrored to about 1e-16
+      // through the whole match, because the physics preserves the symmetry
+      // exactly. Both tops then reach defeat on the *same step* with spins
+      // separated only by floating-point dust, which traces back to sin(pi)
+      // being 1.22e-16 rather than 0 at launch.
+      //
+      // A strict `>` treated that dust as a real result, so a coin-flip
+      // finish was decided by IEEE754 rounding — and always in the same
+      // direction. Measured, the top launched at angle 0 won 88% of mirror
+      // matches, and up to 100% at some launch angles. The physics was never
+      // at fault; the comparison was.
+      const spinGap = Math.abs(best.bey.spin) - Math.abs(next.bey.spin);
+      const scale = Math.max(Math.abs(best.bey.spin), Math.abs(next.bey.spin), 1);
+      const decisive = spinGap > scale * 1e-9;
       const strictlyBetter =
-        SEVERITY[best.reason] < SEVERITY[next.reason] ||
-        Math.abs(best.bey.spin) > Math.abs(next.bey.spin);
+        SEVERITY[best.reason] < SEVERITY[next.reason] || decisive;
       // A top that physically left the stadium can never be the survivor.
-      if (best.reason !== 'knockout' && strictlyBetter) falling.shift();
+      if (best.reason !== 'knockout' && strictlyBetter) {
+        falling.shift();
+      } else if (best.reason !== 'knockout' && SEVERITY[best.reason] === SEVERITY[next.reason]) {
+        // A genuine dead heat. Rather than restoring the old 29% draw rate,
+        // break it on the seeded RNG: deterministic for replays, and fair in
+        // aggregate instead of fair-looking and biased.
+        falling.splice(this.rng() < 0.5 ? 0 : 1, 1);
+      }
     }
 
     for (const f of falling) {

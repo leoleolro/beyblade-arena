@@ -678,21 +678,76 @@ helped and one measurement suggesting it hurt. The tests now average both
 seatings. The lesson is the old one in a new costume: a confounded measurement
 is worse than no measurement, because it is persuasive.
 
+## The seat bias, and where it actually was
+
+A mirror match — same build both sides, opposite angles, opposite spin — is
+symmetric under reflection about the y-axis: it maps each top exactly onto the
+other. Neither seat can deserve to win. One did, taking 88% of them, and up to
+100% at some launch angles, with no AI running at all.
+
+Three hypotheses were wrong before the right one. The tangential smash *looked*
+asymmetric under opposite spin, but swapping labels flips both the normal and
+the tangent and the expressions map onto each other exactly. Array order was
+ruled out by swapping it (identical result). Pockets were ruled out by their
+4-fold symmetry.
+
+What settled it was measuring instead of reasoning: instrument the round and
+assert the mirror relationship every frame. The error held at **3.6e-16 for the
+entire match** — the physics preserves the symmetry perfectly and never
+amplifies it. Which meant both tops were reaching defeat on the *same step*,
+separated only by floating-point dust, ultimately from `sin(pi)` evaluating to
+1.22e-16 rather than 0 at launch.
+
+The bug was in the simultaneous-defeat tiebreak, which compared the two spins
+with a strict `>`. That treated 1e-16 of IEEE754 rounding as a real result, and
+always in the same direction. It now compares with a relative tolerance and
+breaks genuine dead heats on the seeded RNG — deterministic for replays, fair in
+aggregate, and without resurrecting the 29% draw rate the tiebreak was added to
+kill. Mirror matches now run 48–53% across every launch angle and archetype
+(`fairness.test.ts`).
+
+The lesson is the expensive one: an "obviously asymmetric" piece of code cost
+three wrong diagnoses, and a five-line instrumentation harness found the real
+cause immediately. Reach for the measurement first.
+
+## Silhouette grammar
+
+Every layer used to be cut from one curve language, so the ten designs differed
+in proportion but never in *kind* — they read as recolours. There are now four
+genuinely different constructions, chosen per design:
+
+| profile | character | used by |
+|---|---|---|
+| `blade` | straight run to a hard point, deep undercut — cut metal | Valtryek, Spryzen, Cross X |
+| `wave` | continuous scallop, no corner anywhere — moulded plastic | Fafnir, Aegis, Steel Leon |
+| `hook` | edge bulges past contact radius then curls back into a barb | Luinor, Cobalt Drake |
+| `flame` | long slow rise, short sharp fall — blown backwards | Ragnaruk, Crimson Phoenix |
+
+Every design also carries an `underRing` now, not just the player-designed four.
+That tier is what made Crimson Phoenix read as assembled hardware while the
+originals read as a single slab: it is a second, blunter cut of the *same* edge
+grammar, rotated a half blade-step so its blades fill the upper tier's cutaways
+rather than hiding behind them.
+
 ## Known gaps
 
-- **Opposite-spin matches carry a seat bias.** Same-spin mirrors are a fair 48%;
-  opposite-spin ones can run 88/12 on seat alone, with no AI involved. The
-  collision maths looks symmetric (aggressor share derives from closing
-  velocities), so the suspicion is emergent: opposite-spin tops orbit in
-  opposite directions and meet head-on with systematically different closing
-  speeds. Since the player always occupies seat 0, this distorts the
-  spin-direction choice that the game presents as a real strategic decision.
-  Not yet root-caused.
 - **The champion AI loses to the rookie in stamina and defence mirrors** (35%
   and 15%). Pre-existing and identical with mixing on or off, so it is not the
   mixing. `chooseSpinDir` and `chooseLaunch` branch on archetype but `pickMove`
-  does not, which is the obvious suspect — but the one attempt at fixing it made
-  things worse, so it needs measuring properly rather than another guess.
+  does not, which is the obvious suspect — but one attempt at fixing it was
+  chasing the seat-bias confound above and had to be reverted, so this needs
+  measuring properly rather than another guess. Note the confound is now gone,
+  so a re-measurement would finally be trustworthy.
+- **Blade surface detail is silhouette-only.** The edge grammar changed the
+  outline; the blade *faces* are still flat colour plus painted ring lines.
+  Ridges, vents and panel breaks as real geometry on the blade tier are the
+  next step toward the reference art.
+- Skins vary colour and material but not silhouette.
+- The tutorial is explanatory, not interactive.
+- The garage labels sit at fixed thirds rather than tracking projected screen
+  positions, so they drift when the model is rotated steeply.
+- The ladder ends. No endless mode or ranked ladder after Zeph.
+- Bundle is ~700 kB (182 kB gzipped), almost entirely Three.js.
 
 - Skins vary colour and material but not **silhouette**. Blade count already
   differs per layer; distinct shapes per skin would push identification further.
@@ -705,4 +760,3 @@ is worse than no measurement, because it is persuasive.
 - The ladder ends. After Zeph there's no endless mode, no ranked ladder and no
   daily challenge — and the deterministic seeded sim makes a seeded daily run
   nearly free, so that's the obvious next step.
-- Bundle is ~570 kB (147 kB gzipped), almost entirely Three.js.

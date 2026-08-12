@@ -327,10 +327,15 @@ function buildToonBey(build: BeyBuild, skin: Skin): THREE.Group {
   // half-step stagger is what the reference art does — the under-blades fill
   // the gaps, they don't hide behind the uppers.
   if (design.underRing !== undefined) {
+    // The under-tier is deliberately a *softer* cut of the same grammar: same
+    // edge language so the two tiers read as one design, blunter numbers so
+    // it reads as the structural layer underneath rather than a second set of
+    // blades competing with the first.
     const underStyle: BladeStyle = {
       root: Math.min(0.92, design.blade.root + 0.1),
       belly: design.blade.belly * 0.7,
       cut: design.blade.cut * 0.5,
+      edge: design.blade.edge,
     };
     const underDepth = layerDepth * 0.38;
     // Slight emissive lift fakes translucency — cel shading has no
@@ -764,6 +769,7 @@ function bladeSilhouette(blades: number, r: number, style: BladeStyle): THREE.Sh
   const root = r * style.root;
   const px = (rad: number, ang: number): number => Math.cos(ang) * rad;
   const py = (rad: number, ang: number): number => Math.sin(ang) * rad;
+  const pt = (rad: number, ang: number): [number, number] => [px(rad, ang), py(rad, ang)];
 
   const leadR = root + (r - root) * 0.92 * style.belly;
   const cutR = root - (r - root) * 0.32 * style.cut;
@@ -773,17 +779,75 @@ function bladeSilhouette(blades: number, r: number, style: BladeStyle): THREE.Sh
     if (i === 0) shape.moveTo(px(root, a), py(root, a));
     else shape.lineTo(px(root, a), py(root, a));
 
-    const lead = a + step * 0.2;
-    const tip0 = a + step * 0.46;
-    shape.quadraticCurveTo(px(leadR, lead), py(leadR, lead), px(r, tip0), py(r, tip0));
+    switch (style.edge) {
+      case 'blade': {
+        // Cut metal: a straight run out to a hard point, a short flat at the
+        // contact radius, then a deep concave undercut. The straight leading
+        // line is the whole character — any curve on it reads as moulded
+        // plastic instead of a machined edge.
+        shape.lineTo(...pt(leadR, a + step * 0.14));
+        shape.lineTo(...pt(r, a + step * 0.44));
+        shape.lineTo(...pt(r, a + step * 0.58));
+        shape.quadraticCurveTo(...pt(cutR, a + step * 0.82), ...pt(root, a + step));
+        break;
+      }
 
-    const tipC = a + step * 0.55;
-    const tip1 = a + step * 0.64;
-    shape.quadraticCurveTo(px(r, tipC), py(r, tipC), px(r, tip1), py(r, tip1));
+      case 'wave': {
+        // Moulded plastic: one continuous scallop with no corner anywhere.
+        // Both control points sit outside their chords, so the profile swells
+        // out and settles back without ever pinching — the defensive read.
+        const midR = (leadR + r) / 2;
+        shape.quadraticCurveTo(...pt(midR, a + step * 0.18), ...pt(r, a + step * 0.5));
+        shape.quadraticCurveTo(
+          ...pt(midR, a + step * 0.82),
+          ...pt(root, a + step),
+        );
+        break;
+      }
 
-    const cut = a + step * 0.8;
-    const end = a + step;
-    shape.quadraticCurveTo(px(cutR, cut), py(cutR, cut), px(root, end), py(root, end));
+      case 'hook': {
+        // A claw. The edge bulges past the contact radius early, then curls
+        // back *inside* it before the undercut, so each blade finishes with a
+        // visible barb rather than a tip.
+        shape.quadraticCurveTo(
+          ...pt(leadR, a + step * 0.16),
+          ...pt(r, a + step * 0.42),
+        );
+        shape.quadraticCurveTo(
+          ...pt(r * 1.0, a + step * 0.54),
+          ...pt(r * 0.86, a + step * 0.64),
+        );
+        // The barb: a short reverse curve tucking under the tip.
+        shape.quadraticCurveTo(
+          ...pt(r * 0.95, a + step * 0.7),
+          ...pt(cutR, a + step * 0.86),
+        );
+        shape.quadraticCurveTo(...pt(cutR, a + step * 0.94), ...pt(root, a + step));
+        break;
+      }
+
+      case 'flame': {
+        // Asymmetric lick: a long slow rise and a short sharp fall, so the
+        // whole profile looks blown backwards. Three rising control points
+        // rather than one is what keeps the rise from reading as a plain arc.
+        shape.quadraticCurveTo(
+          ...pt(root + (r - root) * 0.45, a + step * 0.12),
+          ...pt(root + (r - root) * 0.72, a + step * 0.3),
+        );
+        shape.quadraticCurveTo(
+          ...pt(leadR, a + step * 0.46),
+          ...pt(r, a + step * 0.62),
+        );
+        // The fall: short, and cutting well inside the root for the notch
+        // between licks.
+        shape.quadraticCurveTo(
+          ...pt(r * 0.72, a + step * 0.74),
+          ...pt(cutR, a + step * 0.84),
+        );
+        shape.quadraticCurveTo(...pt(root * 0.98, a + step * 0.93), ...pt(root, a + step));
+        break;
+      }
+    }
   }
   shape.closePath();
   return shape;

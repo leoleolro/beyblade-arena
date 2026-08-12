@@ -15,6 +15,24 @@ import * as THREE from 'three';
  * canvas can go (layer faces, picker chips, victory cards).
  */
 
+/**
+ * The silhouette grammar a layer is cut from.
+ *
+ * One curve language across every design made all ten read as recolours of
+ * each other — the shapes differed in proportion but never in *kind*. These
+ * are genuinely different constructions:
+ *
+ *  - `blade`  straight leading edge into a hard point, then a deep undercut.
+ *             Reads as cut metal. Attack.
+ *  - `wave`   continuous sinusoidal scalloping with no corners anywhere. Reads
+ *             as moulded plastic. Defence and spin-steal.
+ *  - `hook`   leading edge that bulges then curls back on itself, so each
+ *             blade ends in a claw. Reads as aggressive and organic.
+ *  - `flame`  asymmetric licks: a long slow rise and a short sharp fall, so
+ *             the profile looks like it is being blown backwards.
+ */
+export type EdgeProfile = 'blade' | 'wave' | 'hook' | 'flame';
+
 export interface BladeStyle {
   /** Root circle as a fraction of the collision radius. High = round shield. */
   root: number;
@@ -22,6 +40,8 @@ export interface BladeStyle {
   belly: number;
   /** How deep the trailing undercut bites toward the centre. */
   cut: number;
+  /** Which curve language this layer is cut from. */
+  edge: EdgeProfile;
 }
 
 export interface BeyDesign {
@@ -89,7 +109,9 @@ export const BEYDEX: BeyDesign[] = [
     spinDir: 1,
     // Three broad swept wings, aggressive pinwheel.
     chip: 'sticker',
-    blade: { root: 0.6, belly: 1.0, cut: 1.0 },
+    // cut-metal wings over a lighter blue tier
+    underRing: 0x2b6fd4,
+    blade: { root: 0.6, belly: 1.0, cut: 1.0, edge: 'blade' },
   },
   {
     layerId: 'ragnaruk',
@@ -102,7 +124,9 @@ export const BEYDEX: BeyDesign[] = [
     spinDir: 1,
     // Two undulating flame wings — wide, smooth arcs with the mass at the ends.
     chip: 'sticker',
-    blade: { root: 0.68, belly: 1.15, cut: 0.7 },
+    // fire licks over a yellow flame tier
+    underRing: 0xf2cf2a,
+    blade: { root: 0.68, belly: 1.15, cut: 0.7, edge: 'flame' },
   },
   {
     layerId: 'spryzen',
@@ -114,7 +138,9 @@ export const BEYDEX: BeyDesign[] = [
     letter: 'S',
     spinDir: 1,
     chip: 'sticker',
-    blade: { root: 0.62, belly: 0.95, cut: 0.9 },
+    // twin cut blades over the blue underside
+    underRing: 0x2c3f9f,
+    blade: { root: 0.62, belly: 0.95, cut: 0.9, edge: 'blade' },
   },
   {
     layerId: 'luinor',
@@ -127,7 +153,9 @@ export const BEYDEX: BeyDesign[] = [
     spinDir: -1,
     // Jagged high-recoil silhouette: deep cuts, hard bellies.
     chip: 'sticker',
-    blade: { root: 0.58, belly: 1.1, cut: 1.2 },
+    // clawed dragon wings over an azure tier
+    underRing: 0x3a7bd5,
+    blade: { root: 0.58, belly: 1.1, cut: 1.2, edge: 'hook' },
   },
   {
     layerId: 'fafnir',
@@ -140,7 +168,9 @@ export const BEYDEX: BeyDesign[] = [
     spinDir: -1,
     // Nearly round spin-steal shield: tiny nubs, no wings.
     chip: 'sticker',
-    blade: { root: 0.86, belly: 0.35, cut: 0.25 },
+    // smooth spin-steal scallops over teal
+    underRing: 0x2ec4b6,
+    blade: { root: 0.86, belly: 0.35, cut: 0.25, edge: 'wave' },
   },
   {
     layerId: 'aegis',
@@ -153,7 +183,9 @@ export const BEYDEX: BeyDesign[] = [
     spinDir: 1,
     // A defensive wall: near-circular with shallow scallops.
     chip: 'sticker',
-    blade: { root: 0.9, belly: 0.3, cut: 0.2 },
+    // shield scallops over a mint tier
+    underRing: 0x57c4a8,
+    blade: { root: 0.9, belly: 0.3, cut: 0.2, edge: 'wave' },
   },
 
   // ------------------------------------------------------------------------
@@ -176,7 +208,7 @@ export const BEYDEX: BeyDesign[] = [
     chip: 'dark',
     underRing: 0x4d78e8,
     crest: 'xsword',
-    blade: { root: 0.56, belly: 1.1, cut: 1.15 },
+    blade: { root: 0.56, belly: 1.1, cut: 1.15, edge: 'blade' },
   },
   {
     layerId: 'phoenix',
@@ -191,7 +223,7 @@ export const BEYDEX: BeyDesign[] = [
     spinDir: 1,
     chip: 'dark',
     underRing: 0xf0c020,
-    blade: { root: 0.64, belly: 1.2, cut: 0.85 },
+    blade: { root: 0.64, belly: 1.2, cut: 0.85, edge: 'flame' },
   },
   {
     layerId: 'leon',
@@ -207,7 +239,7 @@ export const BEYDEX: BeyDesign[] = [
     chip: 'dark',
     underRing: 0x23262b,
     metal: true,
-    blade: { root: 0.7, belly: 0.8, cut: 0.6 },
+    blade: { root: 0.7, belly: 0.8, cut: 0.6, edge: 'wave' },
   },
   {
     layerId: 'drake',
@@ -223,7 +255,7 @@ export const BEYDEX: BeyDesign[] = [
     chip: 'dark',
     underRing: 0x1a2f8f,
     metal: true,
-    blade: { root: 0.74, belly: 0.9, cut: 0.8 },
+    blade: { root: 0.74, belly: 0.9, cut: 0.8, edge: 'hook' },
   },
 ];
 
