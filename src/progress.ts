@@ -53,14 +53,22 @@ export class Progress {
       const parsed = JSON.parse(raw) as Partial<ProgressData>;
       // Merge onto a fresh object so a save written by an older build — or a
       // hand-edited one — can't leave a field undefined and crash the garage.
+      // Unlock lists are UNIONED with the starting set rather than replaced:
+      // when a new build grows the starting roster (the player-designed layer
+      // line, for instance), an old save must gain it too — the old behaviour
+      // kept whatever list was saved and silently locked players out of parts
+      // the game now says everyone starts with.
       const base = fresh();
+      const union = (a: string[], b?: string[]): string[] => [
+        ...new Set([...a, ...(b ?? [])]),
+      ];
       return {
         ...base,
         ...parsed,
-        layers: parsed.layers?.length ? parsed.layers : base.layers,
-        discs: parsed.discs?.length ? parsed.discs : base.discs,
-        drivers: parsed.drivers?.length ? parsed.drivers : base.drivers,
-        skins: parsed.skins?.length ? parsed.skins : base.skins,
+        layers: union(base.layers, parsed.layers),
+        discs: union(base.discs, parsed.discs),
+        drivers: union(base.drivers, parsed.drivers),
+        skins: union(base.skins, parsed.skins),
       };
     } catch {
       return fresh();

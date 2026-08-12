@@ -570,6 +570,23 @@ export class Ui {
     row.appendChild(how);
     panel.appendChild(row);
 
+    // The style switch, on the front door. It also lives in the garage, but a
+    // toggle between two whole looks is a decision people make from the home
+    // screen — buried at the bottom of the garage it read as "can't switch".
+    const styleRow = document.createElement('div');
+    styleRow.className = 'chips home-style';
+    for (const t of THEMES) {
+      const chip = document.createElement('button');
+      chip.className = 'chip' + (g.themeId === t.id ? ' on' : '');
+      chip.innerHTML = `<span>${escapeHtml(t.name)}<br><small>${escapeHtml(t.blurb)}</small></span>`;
+      chip.addEventListener('click', () => {
+        g.setTheme(t.id);
+        this.render();
+      });
+      styleRow.appendChild(chip);
+    }
+    panel.appendChild(styleRow);
+
     // Career state, so the home screen answers "where was I?".
     const d = g.progress.data;
     const career = document.createElement('div');

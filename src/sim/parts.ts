@@ -33,6 +33,17 @@ export const LAYERS: LayerPart[] = [
   { id: 'fafnir',    name: 'Fafnir',    kind: 'layer', archetype: 'stamina', mass: 0.40, radius: 0.0988, attack: 0.74, defense: 1.00, burstResist: 1.18, spinSteal: 0.62, blades: 6, colour: 0x22c55e },
   // Defense: a wall that cannot finish anyone.
   { id: 'aegis',     name: 'Aegis',     kind: 'layer', archetype: 'defense', mass: 0.54, radius: 0.1092, attack: 0.68, defense: 1.55, burstResist: 1.26, spinSteal: 0.0, blades: 8, colour: 0xa855f7 },
+
+  // The player-designed line. Stats sit close to the archetype anchors above —
+  // these exist for their looks (see beydex.ts), and giving them novel numbers
+  // would reopen a balance question the anchors already answered. Deliberately
+  // NOT in the AI's PRESETS pool: the ladder rivals keep their identities, and
+  // the pacing/balance suites sweep PRESETS, so the sim's measured behaviour is
+  // untouched by their existence.
+  { id: 'crossx',    name: 'Cross X',   kind: 'layer', archetype: 'attack',  mass: 0.44, radius: 0.1080, attack: 1.45, defense: 0.79, burstResist: 0.90, spinSteal: 0.0, blades: 3, colour: 0x1d4fd8 },
+  { id: 'phoenix',   name: 'Phoenix',   kind: 'layer', archetype: 'attack',  mass: 0.46, radius: 0.1060, attack: 1.32, defense: 0.86, burstResist: 0.98, spinSteal: 0.0, blades: 3, colour: 0xc01822 },
+  { id: 'leon',      name: 'Leon',      kind: 'layer', archetype: 'defense', mass: 0.55, radius: 0.1080, attack: 0.82, defense: 1.46, burstResist: 1.24, spinSteal: 0.0, blades: 3, colour: 0xc7ccd2 },
+  { id: 'drake',     name: 'Drake',     kind: 'layer', archetype: 'balance', mass: 0.47, radius: 0.1000, attack: 1.08, defense: 1.00, burstResist: 1.02, spinSteal: 0.0, blades: 3, colour: 0x2a3f9f },
 ];
 
 export const DISCS: DiscPart[] = [

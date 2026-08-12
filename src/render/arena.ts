@@ -508,9 +508,25 @@ export class ArenaRenderer {
       // invisible at these speeds.
       if (this.theme.toon && h.strength >= C.HITSTOP_THRESHOLD) {
         this.projected.copy(at).project(this.camera);
+        // Design primaries feed the clash-tone frame style; the sim only
+        // carries ids, and BeyDesign colours are numeric, hence the lookup
+        // and hex conversion here.
+        const beyA = this.lastBeys.find((b) => b.id === h.a);
+        const beyB = this.lastBeys.find((b) => b.id === h.b);
+        const cssHex = (n: number): string => `#${n.toString(16).padStart(6, '0')}`;
         this.impactFrame.trigger(
           (this.projected.x * 0.5 + 0.5) * 100,
           (0.5 - this.projected.y * 0.5) * 100,
+          {
+            strength: h.strength,
+            crit: h.crit,
+            colourA: cssHex(
+              beyA ? designByLayer(beyA.build.layer.id).primary : 0xffffff,
+            ),
+            colourB: cssHex(
+              beyB ? designByLayer(beyB.build.layer.id).primary : 0xffffff,
+            ),
+          },
         );
       }
     }

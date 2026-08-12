@@ -1216,6 +1216,9 @@ body.theme-anime .coach.on {
   pointer-events: none;
   z-index: 40;
   overflow: hidden;
+  /* The flash-cut style repaints the entire viewport for two frames; contain
+     keeps that paint from invalidating anything outside the layer. */
+  contain: strict;
 }
 
 .impact-frame {
@@ -1231,4 +1234,10 @@ body.theme-anime .coach.on {
 
 @media (prefers-reduced-motion: reduce) {
   .impact-frame { display: none; }
+}
+
+/* Style switch on the home screen — centred under the main buttons. */
+.home-style {
+  justify-content: center;
+  margin-top: 18px;
 }

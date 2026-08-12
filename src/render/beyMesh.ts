@@ -264,7 +264,13 @@ function buildToonBey(build: BeyBuild, skin: Skin): THREE.Group {
   buildToonDriver(driverGroup, build.driver.id, r);
   const discY = buildToonDisc(discGroup, build.disc.id, r);
 
-  // ---- energy layer: extruded blade silhouette + sticker face --------------
+  // ---- energy layer: tiered, bevelled construction -------------------------
+  //
+  // "It's a flat piece still... from a side view the blades shouldn't be just
+  // a straight vertical line" — correct, and the reference hardware agrees.
+  // Real layers are a STACK: a translucent under-ring peeking out beneath the
+  // main blades, a main blade tier whose walls curve (moulded plastic swells
+  // at the waist), and for some designs a raised armor crest above the face.
   const layerBottom = r * TOON.layerBottom;
   const layerDepth = r * TOON.layerDepth;
   const layerY = layerBottom + layerDepth / 2;
@@ -287,12 +293,22 @@ function buildToonBey(build: BeyBuild, skin: Skin): THREE.Group {
   // orbit, deep wobble). The side-wall hull already inks the silhouette.
   noOutline(faceMat);
 
-  // ExtrudeGeometry material groups: index 0 is the caps, index 1 the walls.
+  // The curved wall. Bevel geometry facts, from three's source: with
+  // bevelOffset 0 the CAPS keep the original contour — so the face texture's
+  // ±r mapping survives — while the wall between them expands by bevelSize at
+  // the shape plane. The profile therefore swells at the waist and tucks back
+  // in at the face and the underside: a moulded edge, not an extruded slab.
+  const bevelT = layerDepth * 0.16;
+  const mainDepth = layerDepth - bevelT * 2;
+  // ExtrudeGeometry material groups: index 0 is the caps, index 1 the walls
+  // (bevel faces belong to the walls).
   const geo = new THREE.ExtrudeGeometry(bladeSilhouette(blades, r, design.blade), {
-    depth: layerDepth,
-    // No bevel: the outline carries the edge, and a bevel would push cap
-    // vertices outside the shape and break the face texture's ±r mapping.
-    bevelEnabled: false,
+    depth: mainDepth,
+    bevelEnabled: true,
+    bevelThickness: bevelT,
+    bevelSize: r * 0.04,
+    bevelOffset: 0,
+    bevelSegments: 3,
     curveSegments: 10,
   });
   const layerMesh = new THREE.Mesh(geo, [faceMat, sideMat]);
@@ -300,9 +316,62 @@ function buildToonBey(build: BeyBuild, skin: Skin): THREE.Group {
   // camera. It mirrors the profile in plan view, but the face texture is
   // authored in the same shape space, so paint and geometry mirror together.
   layerMesh.rotation.x = -Math.PI / 2;
-  layerMesh.position.y = layerBottom;
+  // The bottom bevel dips bevelT below the mesh origin.
+  layerMesh.position.y = layerBottom + bevelT;
   layerMesh.castShadow = true;
   layerGroup.add(layerMesh);
+
+  // The under-ring tier: a thinner, blunter silhouette in its own colour,
+  // rotated a half blade-step so its blades peek out of the main tier's
+  // cutaways. This is most of the side-view "layered hardware" read, and the
+  // half-step stagger is what the reference art does — the under-blades fill
+  // the gaps, they don't hide behind the uppers.
+  if (design.underRing !== undefined) {
+    const underStyle: BladeStyle = {
+      root: Math.min(0.92, design.blade.root + 0.1),
+      belly: design.blade.belly * 0.7,
+      cut: design.blade.cut * 0.5,
+    };
+    const underDepth = layerDepth * 0.38;
+    // Slight emissive lift fakes translucency — cel shading has no
+    // transmission, but translucent plastic reads as "lit from inside".
+    const underMat = setOutline(
+      toonMaterial(design.underRing, 0.22),
+      { thickness: BEY_OUTLINE * 0.7 },
+    );
+    const underGeo = new THREE.ExtrudeGeometry(
+      bladeSilhouette(blades, r * 0.97, underStyle),
+      { depth: underDepth, bevelEnabled: false, curveSegments: 8 },
+    );
+    const under = new THREE.Mesh(underGeo, underMat);
+    under.rotation.x = -Math.PI / 2;
+    under.rotation.z = Math.PI / blades; // the half-step stagger
+    under.position.y = layerBottom - underDepth * 0.55;
+    under.castShadow = true;
+    layerGroup.add(under);
+  }
+
+  // Raised armor crest: an extruded gold X spanning the face. Geometry rather
+  // than paint because the reference's crest visibly stands off the layer —
+  // it catches its own outline and its own cel band.
+  if (design.crest === 'xsword') {
+    const crestMat = setOutline(
+      toonMaterial(design.accent, 0.12),
+      { thickness: BEY_OUTLINE * 0.7 },
+    );
+    const crest = new THREE.Mesh(
+      new THREE.ExtrudeGeometry(xCrestShape(r), {
+        depth: r * 0.07,
+        bevelEnabled: false,
+        curveSegments: 4,
+      }),
+      crestMat,
+    );
+    crest.rotation.x = -Math.PI / 2;
+    crest.position.y = layerBottom + layerDepth;
+    crest.castShadow = true;
+    layerGroup.add(crest);
+  }
 
   // A faint energy ring at the exact collision radius — reads as the hitbox,
   // and carries the OWNER's colour (see the design/skin split above).
@@ -630,6 +699,46 @@ function buildToonDisc(parent: THREE.Group, discId: string, r: number): number {
 }
 
 /**
+ * The raised X crest: four flared arms at the diagonals, as one closed shape.
+ * Arm proportions follow the reference art — arms reach just past the chip
+ * bezel and the tips flare wider than the shafts.
+ */
+function xCrestShape(r: number): THREE.Shape {
+  const shape = new THREE.Shape();
+  const armLen = r * 0.56;
+  const shaftHalf = r * 0.07;
+  const tipHalf = r * 0.13;
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+    const cos = Math.cos(a);
+    const sin = Math.sin(a);
+    // Perpendicular for the arm's width.
+    const pxn = -sin;
+    const pyn = cos;
+    const rootR = r * 0.1;
+    const p = (along: number, side: number): [number, number] => [
+      cos * along + pxn * side,
+      sin * along + pyn * side,
+    ];
+    const [x0, y0] = p(rootR, -shaftHalf);
+    const [x1, y1] = p(armLen * 0.72, -shaftHalf);
+    const [x2, y2] = p(armLen, -tipHalf);
+    const [x3, y3] = p(armLen, tipHalf);
+    const [x4, y4] = p(armLen * 0.72, shaftHalf);
+    const [x5, y5] = p(rootR, shaftHalf);
+    if (i === 0) shape.moveTo(x0, y0);
+    else shape.lineTo(x0, y0);
+    shape.lineTo(x1, y1);
+    shape.lineTo(x2, y2);
+    shape.lineTo(x3, y3);
+    shape.lineTo(x4, y4);
+    shape.lineTo(x5, y5);
+  }
+  shape.closePath();
+  return shape;
+}
+
+/**
  * The layer's blade profile: `blades` sweeping wedges around a core circle,
  * shaped by the design's BladeStyle. The silhouette IS the design — Burst
  * layers are recognised by their cut-out — so the three style numbers move it
@@ -709,7 +818,15 @@ function layerFaceTexture(design: BeyDesign, blades: number, r: number): THREE.C
     const hex = (c: number): string => `#${c.toString(16).padStart(6, '0')}`;
 
     // Base coat = blade tips; only the region outside the body disc survives.
-    ctx.fillStyle = hex(design.secondary);
+    //
+    // Metal designs take a darkened steel rather than `secondary`: on those,
+    // `secondary` is the *detail* colour (the lion's eyes, the drake's flame)
+    // and painting the blade tips with it turned a brushed-steel layer into a
+    // blue-and-white one.
+    const tipCol = design.metal
+      ? `#${new THREE.Color(design.primary).multiplyScalar(0.62).getHexString()}`
+      : hex(design.secondary);
+    ctx.fillStyle = tipCol;
     ctx.fillRect(-r, -r, 2 * r, 2 * r);
 
     // Body disc, lifted toward white: the face is unlit, so any brightness the
@@ -753,16 +870,33 @@ function layerFaceTexture(design: BeyDesign, blades: number, r: number): THREE.C
     ctx.arc(0, 0, r * 0.6, 0, Math.PI * 2);
     ctx.stroke();
 
-    // The beast crest, big: its disc spans the whole inner face. The transform
-    // chain (y-flipped canvas → extrude cap UVs → the -π/2 mesh rotation) nets
-    // out to a 180° turn, verified on screen: without the counter-rotation the
-    // V rendered as an A. The rotate cancels it so the crest reads upright
-    // from the camera's side of the dish.
+    // Metal layers carry rivet detail on the face — paint, not geometry, at
+    // this scale. One rivet pair per blade, riding the body ring.
+    if (design.metal) {
+      ctx.fillStyle = '#7d838c';
+      for (let i = 0; i < blades; i++) {
+        for (const f of [0.14, 0.3]) {
+          const a = i * step + step * f;
+          ctx.beginPath();
+          ctx.arc(Math.cos(a) * r * 0.64, Math.sin(a) * r * 0.64, r * 0.022, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    }
+
+    // The beast crest. Sticker chips span the whole inner face; dark chips are
+    // a smaller centre medallion — the reference art's black-and-gold chip
+    // reads as a jewel set into the layer, not a print across it.
+    //
+    // The transform chain (y-flipped canvas → extrude cap UVs → the -π/2 mesh
+    // rotation) nets out to a 180° turn, verified on screen: without the
+    // counter-rotation the V rendered as an A. The rotate cancels it so the
+    // crest reads upright from the camera's side of the dish.
     ctx.save();
     ctx.scale(1, -1);
     ctx.rotate(Math.PI);
     const emblem = beastEmblem(design);
-    const eSize = r * 1.1;
+    const eSize = design.chip === 'dark' ? r * 0.85 : r * 1.1;
     ctx.drawImage(emblem, -eSize / 2, -eSize / 2, eSize, eSize);
     ctx.restore();
   }

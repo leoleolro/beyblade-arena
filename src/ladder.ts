@@ -114,7 +114,9 @@ export const LADDER: Rival[] = [
 
 /** What the player starts with — enough to build something real, not everything. */
 export const STARTING_UNLOCKS: Required<Unlocks> = {
-  layers: ['valtryek', 'spryzen'],
+  // The crossx/phoenix/leon/drake line is the player's own designs — locking
+  // someone out of their own beys would be absurd, so they start owned.
+  layers: ['valtryek', 'spryzen', 'crossx', 'phoenix', 'leon', 'drake'],
   discs: ['gravity', 'heavy'],
   drivers: ['atomic', 'xtreme'],
   skins: ['frost', 'ember'],

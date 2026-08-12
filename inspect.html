@@ -1,0 +1,33 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Bey inspector</title>
+    <style>
+      body { margin: 0; background: #0b1322; color: #dce6f7;
+             font-family: ui-sans-serif, system-ui, sans-serif; }
+      #bar { position: fixed; top: 0; left: 0; right: 0; padding: 8px 12px;
+             display: flex; gap: 10px; align-items: center; z-index: 5;
+             background: rgba(6,11,24,0.8); font-size: 13px; }
+      button { background: #1b2b48; color: #dce6f7; border: 1px solid #375179;
+               border-radius: 6px; padding: 5px 10px; cursor: pointer; }
+      button.on { background: #2b6fd4; }
+      canvas { display: block; }
+    </style>
+  </head>
+  <body>
+    <div id="bar">
+      <span>pitch</span>
+      <button data-pitch="0.02">side</button>
+      <button data-pitch="0.35">low</button>
+      <button data-pitch="0.62" class="on">3/4</button>
+      <button data-pitch="1.35">top</button>
+      <span style="margin-left:14px">spin</span>
+      <button id="spin" class="on">on</button>
+    </div>
+    <div id="picker" style="position:fixed;top:44px;left:0;right:0;padding:6px 12px;
+         display:flex;gap:8px;flex-wrap:wrap;z-index:5;
+         background:rgba(6,11,24,0.8);font-size:12px"></div>
+    <script type="module" src="/src/inspect.ts"></script>
+  </body>
+</html>

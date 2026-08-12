@@ -440,10 +440,74 @@ The mesh code consumes it:
   sitting in a *dark* painted hall (a gradient on an inverted sphere), because
   the source material lights the bowl and lets everything else fall away.
 
-The garage gained a **whole-bey picker**: six canonical presets (matching the
-rival ladder's builds) that set layer, disc, driver, matching skin and the
-bey's canonical spin direction in one click — picking Fafnir *means* picking
-left spin. The per-part slots remain below for tinkerers.
+The garage gained a **whole-bey picker**: presets that set layer, disc, driver,
+matching skin and the bey's canonical spin direction in one click — picking
+Fafnir *means* picking left spin. The per-part slots remain below for tinkerers.
+
+### The owner's own line
+
+Four designs of the project owner's — **Cross X**, **Crimson Phoenix**,
+**Steel Leon**, **Cobalt Drake** — ship as first-class beys: sim layers in
+`parts.ts`, entries in the beydex, and presets in the picker. They start
+unlocked, because locking someone out of their own designs would be absurd,
+and `Progress.load` now *unions* saved unlock lists with the starting roster
+rather than replacing them — the old behaviour would have kept an existing
+save's list and silently hidden the new beys from anyone who had already
+played.
+
+Their stats deliberately sit on the existing archetype anchors, and they stay
+out of the AI's `PRESETS` pool. Both choices protect the same thing: the
+balance and pacing suites sweep `PRESETS`, so adding ten beys to the roster
+changes nothing the sim was measured on.
+
+They also drove three engine changes, because their construction is genuinely
+different from the first six:
+
+- **Tiered layers.** The complaint was exact: *"from a side view, the blades
+  shouldn't be just a straight vertical line at the edge."* They weren't
+  wrong — the layer was one `ExtrudeGeometry` with `bevelEnabled: false`, so
+  its wall was a literal vertical extrusion. Now the wall is bevelled at both
+  ends (with `bevelOffset: 0`, so the *caps* keep the original contour and the
+  face texture's ±r mapping survives while the waist swells), and a second
+  **under-ring tier** sits below it, rotated a half blade-step so its blades
+  fill the upper tier's cutaways instead of hiding behind them.
+- **Raised crests.** Cross X's gold X is extruded geometry standing above the
+  face, not paint — it catches its own outline and its own cel band.
+- **Dark chips.** A `chip: 'sticker' | 'dark'` mode on `BeyDesign`: black face,
+  triple-stroke gold bezel, beast drawn larger in accent colours, and a small
+  gold letter tucked at the chip's bottom edge. The six originals are pinned to
+  `'sticker'` and render bit-identically.
+
+One bug worth recording, because it came from a naming collision rather than
+from maths: `secondary` means "the second plastic colour" for the original six
+and the face texture paints blade tips with it — but for the metal designs I'd
+defined it as the *detail* colour (Leon's eyes, Drake's flame). Steel Leon
+therefore rendered blue-and-white instead of brushed steel. Metal designs now
+derive their tip paint from a darkened `primary`. A field that means two things
+is a bug waiting for its second reader.
+
+### Impact frames
+
+The first version was one drawing — 40 white wedges — and it read as canned
+within a few matches. There are now four styles: white burst, ink burst (the
+classic manga read, and the one that actually works on a near-white floor), a
+two-colour clash tone carrying both beys' design primaries, and a `flash-cut`
+reserved for crits that inverts the full screen for one pre-frame before
+resolving. A style never repeats back to back, and wedge count, jitter,
+rotation, inner radius and lifetime are all re-rolled per hit. Measured over
+300 triggers: an even 103/103/94 split with zero back-to-back repeats.
+
+The style switch also replaced the old white screen pulse under the anime
+theme — a cut and a fade on the same hit undercut each other.
+
+### /inspect.html
+
+A dev-only bench (not linked from the game, not in the production bundle) that
+renders any bey full-frame with a pitch control. It exists because the
+questions that keep coming up about these meshes — *is the side profile flat?
+do these two read as different?* — are only answerable by looking at a model
+held still, big, from a chosen angle. The garage canvas is too small and the
+arena is moving. It found the Steel Leon colour bug in about a minute.
 
 ### What the cartoon look actually cost
 
