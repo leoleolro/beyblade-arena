@@ -827,6 +827,25 @@ One structural note: no stroked circles anywhere. `preserveAspectRatio="none"`
 scales stroke width anisotropically, so every ring is a filled two-contour
 polygon instead.
 
+## Picker thumbnails
+
+The picker used to represent each bey as a text chip with a colour dot, so
+choosing a bey was choosing a *name* — none of the silhouette, tiering or
+palette work was visible at the one moment it should matter.
+
+Each preset now draws its own plan view, and the important part is that it is
+drawn from the *same* `bladeSilhouette` the mesh is extruded from, sampled via
+`Shape.getPoints`. A preview drawn separately is a second implementation of the
+design and will drift; sharing the source means a thumbnail cannot advertise a
+shape the model does not have. It paints in the same order the mesh stacks —
+under-ring (with the same half-blade-step stagger), blade tier, accent ring,
+chip — because that ordering is what makes the tiering read.
+
+Canvas2D rather than a WebGL preview per chip, deliberately: ten live renderers
+would exhaust the browser's ~16 context limit on their own, and the plan view is
+the honest angle anyway — it is where the blade profile reads, and roughly what
+the battle camera shows.
+
 ## Known gaps
 
 - **The champion AI loses to the rookie in stamina and defence mirrors** (35%
@@ -836,11 +855,6 @@ polygon instead.
   chasing the seat-bias confound above and had to be reverted, so this needs
   measuring properly rather than another guess. Note the confound is now gone,
   so a re-measurement would finally be trustworthy.
-- **The garage picker shows names, not beys.** Ten designs now differ in
-  silhouette, tiering and surface hardware, and the picker still represents
-  each as a text chip with a colour dot. A small rendered thumbnail per bey
-  would let the work actually sell the choice — `beydex.ts` is pure data plus
-  canvas drawing precisely so it can be reused there.
 - Skins vary colour and material but not silhouette.
 - The tutorial is explanatory, not interactive.
 - The garage labels sit at fixed thirds rather than tracking projected screen

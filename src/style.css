@@ -1241,3 +1241,29 @@ body.theme-anime .coach.on {
   justify-content: center;
   margin-top: 18px;
 }
+
+/* ------------------------------------------------------------- bey chips */
+
+/* The preset chips carry a drawn plan view of the bey, so they need to stack
+   image over label rather than sit on the icon+text row the part chips use. */
+.chip.bey-chip {
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px 12px;
+  text-align: center;
+  min-width: 118px;
+}
+
+.chip.bey-chip .bey-thumb {
+  display: block;
+  /* Locked so a chip's height never depends on whether its canvas has painted
+     yet, which otherwise reflows the whole picker on first render. */
+  width: 64px;
+  height: 64px;
+}
+
+.chip.bey-chip.locked-part .bey-thumb {
+  filter: grayscale(1);
+  opacity: 0.45;
+}

@@ -949,7 +949,7 @@ function xCrestShape(r: number): THREE.Shape {
  * Every ratio is of `step`, so the same math holds from Ragnaruk's 2 blades
  * to Aegis's 8. Peak radius is exactly r: what you see is what hits.
  */
-function bladeSilhouette(blades: number, r: number, style: BladeStyle): THREE.Shape {
+export function bladeSilhouette(blades: number, r: number, style: BladeStyle): THREE.Shape {
   const shape = new THREE.Shape();
   const step = (Math.PI * 2) / blades;
   const root = r * style.root;

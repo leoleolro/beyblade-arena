@@ -1,6 +1,7 @@
 import type { Game } from './game';
 import { DISCS, DRIVERS, LAYERS, deriveStats, makeBuild } from './sim/parts';
-import { BEY_PRESETS, designByLayer } from './render/beydex';
+import { BEY_PRESETS } from './render/beydex';
+import { beyThumb } from './render/beyThumb';
 import * as C from './sim/constants';
 import { SKINS, skinById } from './render/skins';
 import type { Channel } from './audio';
@@ -884,7 +885,6 @@ export class Ui {
     const presetChips = document.createElement('div');
     presetChips.className = 'chips';
     for (const p of BEY_PRESETS) {
-      const design = designByLayer(p.layerId);
       const owned =
         g.progress.has('layers', p.layerId) &&
         g.progress.has('discs', p.discId) &&
@@ -897,11 +897,16 @@ export class Ui {
       const chip = document.createElement('button');
       chip.className = 'chip' + (active ? ' on' : '') + (owned ? '' : ' locked-part');
       chip.disabled = !owned;
-      chip.innerHTML = `
-        <span class="dot" style="background:${hex(design.primary)};box-shadow:0 0 0 2px ${hex(design.accent)}"></span>
-        <span>${escapeHtml(p.name)}<br><small>${escapeHtml(
-          `${p.spinDir === -1 ? 'left spin' : 'right spin'} · ${p.discId} · ${p.driverId}`,
-        )}</small></span>`;
+      // A drawn plan view rather than a colour dot. Ten designs differ in
+      // silhouette, tiering and palette, and a dot advertised none of it —
+      // picking a bey was picking a name.
+      chip.classList.add('bey-chip');
+      chip.appendChild(beyThumb(p.layerId, 64));
+      const label = document.createElement('span');
+      label.innerHTML = `${escapeHtml(p.name)}<br><small>${escapeHtml(
+        `${p.spinDir === -1 ? 'left spin' : 'right spin'} · ${p.discId} · ${p.driverId}`,
+      )}</small>`;
+      chip.appendChild(label);
       if (!owned) chip.title = 'Beat more bladers to unlock its parts';
       chip.addEventListener('click', () => {
         if (!owned) return;
