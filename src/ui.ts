@@ -63,6 +63,11 @@ export class Ui {
   private garageCanvas: HTMLCanvasElement | null = null;
   /** Eased speed-line opacity, so it swells instead of snapping. */
   private speedEase = 0;
+  /**
+   * Which garage tab is open. UI state, not game state — it must not persist
+   * into a save or affect anything the sim can see.
+   */
+  private garageTab: 'collection' | 'workshop' = 'collection';
 
   constructor(root: HTMLElement, game: Game) {
     this.root = root;
@@ -92,6 +97,7 @@ export class Ui {
     }
 
     this.root.appendChild(this.scoreboard());
+    this.root.appendChild(this.quitButton());
     this.root.appendChild(this.fighters());
 
     if (g.screen === 'battle') {
@@ -175,6 +181,23 @@ export class Ui {
     this.root.appendChild(el);
     // Remove itself when the hold ends; the result panel takes over from here.
     window.setTimeout(() => el.remove(), 1400);
+  }
+
+  /**
+   * Leave the match. Present on every in-match screen, because there was no
+   * way out of a battle at all — once launched, the only exit was to finish.
+   *
+   * Deliberately small and cornered rather than a prominent button: it must be
+   * findable when wanted and ignorable otherwise, and a large "quit" competing
+   * with the move bar would get hit by accident mid-clash.
+   */
+  private quitButton(): HTMLElement {
+    const el = document.createElement('button');
+    el.className = 'quit-btn';
+    el.innerHTML = '<span>Quit</span><small>Esc</small>';
+    el.title = 'Abandon this match and return to the garage';
+    el.addEventListener('click', () => this.game.quitToGarage());
+    return el;
   }
 
   /** Flash a move button that the player couldn't afford. */
@@ -857,6 +880,16 @@ export class Ui {
 
     panel.appendChild(this.explodedView());
 
+    // Two tabs, because the garage was doing two psychologically opposite
+    // jobs at once. Picking a finished bey is choosing an *identity*;
+    // assembling one from parts is tuning a machine. Presented as one long
+    // scroll, players could not tell which of the two they were looking at —
+    // the reported symptom was not knowing where the prebuilt beys were
+    // versus where you build your own.
+    const collection = document.createElement('div');
+    const workshop = document.createElement('div');
+    workshop.hidden = true;
+
     // Who you're up against. A named rival with a known build is a problem you
     // can prepare for, which is the entire point of the garage.
     if (!g.progress.cleared) {
@@ -920,7 +953,7 @@ export class Ui {
       presetChips.appendChild(chip);
     }
     presetRow.appendChild(presetChips);
-    panel.appendChild(presetRow);
+    collection.appendChild(presetRow);
     // Match settings sit directly under the bey, before the parts.
     //
     // They used to be sections 6 and 8 of 9, below every part slot — far
@@ -928,8 +961,8 @@ export class Ui {
     // simply never been scrolled to. Arena and spin direction both change how
     // the match *plays*, so they belong with the choice of bey, not filed
     // under cosmetics.
-    panel.appendChild(this.arenaSection());
-    panel.appendChild(this.spinSection());
+    collection.appendChild(this.arenaSection());
+    collection.appendChild(this.spinSection());
 
     const slots: [string, { id: string; name: string; colour?: number; note: string }[], string][] = [
       [
@@ -996,7 +1029,7 @@ export class Ui {
         chips.appendChild(chip);
       }
       sec.appendChild(chips);
-      panel.appendChild(sec);
+      workshop.appendChild(sec);
     }
 
     // Derived stats, so the player can see what a swap actually did.
@@ -1010,7 +1043,7 @@ export class Ui {
       <span>Burst resist <b>${s.burstResist.toFixed(2)}</b></span>
       <span>Spin retention <b>${s.spinRetention.toFixed(2)}</b></span>
       <span>Aggression <b>${s.wander.toFixed(2)}</b></span>`;
-    panel.appendChild(stat);
+    workshop.appendChild(stat);
 
     // Skins. Purely cosmetic — the rival is always forced to a contrasting hue,
     // which is what makes the two tops readable without ownership markers.
@@ -1043,8 +1076,31 @@ export class Ui {
     skinNote.textContent =
       'Your rival is always given the most contrasting finish available, so the two tops stay easy to tell apart mid-battle.';
     skinRow.appendChild(skinNote);
-    panel.appendChild(skinRow);
+    workshop.appendChild(skinRow);
 
+
+    // The switch itself sits above both panes so it is the first thing read
+    // after the bey preview.
+    const tabs = document.createElement('div');
+    tabs.className = 'garage-tabs';
+    const mkTab = (label: string, note: string, key: 'collection' | 'workshop'): void => {
+      const b = document.createElement('button');
+      b.className = 'garage-tab' + (this.garageTab === key ? ' on' : '');
+      b.innerHTML = `<b>${escapeHtml(label)}</b><small>${escapeHtml(note)}</small>`;
+      b.addEventListener('click', () => {
+        this.garageTab = key;
+        this.render();
+      });
+      tabs.appendChild(b);
+    };
+    mkTab('Collection', 'your beys, arena and spin', 'collection');
+    mkTab('Workshop', 'build one from parts', 'workshop');
+
+    collection.hidden = this.garageTab !== 'collection';
+    workshop.hidden = this.garageTab !== 'workshop';
+    panel.appendChild(tabs);
+    panel.appendChild(collection);
+    panel.appendChild(workshop);
 
     // Visual theme. Cosmetic and fully reversible — 'Arena' is the original
     // look, reproduced exactly.

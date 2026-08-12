@@ -221,6 +221,35 @@ export class Game {
   }
 
   /**
+   * Abandon whatever is in progress and go back.
+   *
+   * There was no way out of a battle at all: once you launched, the only exit
+   * was to finish the match. Every screen a player can reach has to have a way
+   * back out of it, and a game that traps you in a fight you have stopped
+   * wanting is training you to close the tab.
+   *
+   * The match is discarded rather than paused. A half-finished match resumed
+   * later would need its rival, scores and round state persisted, and none of
+   * that is worth carrying for a feature whose whole job is "let me leave".
+   * Ladder progress only moves on a *finished* match, so quitting costs the
+   * player nothing except the match they chose to walk away from.
+   */
+  quitToGarage(): void {
+    if (this.screen === 'home' || this.screen === 'garage') return;
+    this.audio.stopWhines();
+    this.hitstop = 0;
+    this.finishHold = 0;
+    // Rebuild against the current rival so the garage's "next opponent" card
+    // and the arena behind it agree with each other again.
+    this.battle = this.makeBattle(this.playerBuild, this.currentRival.build());
+    this.renderer.setBeys(this.battle.beys, {
+      [PLAYER_ID]: this.playerSkinId,
+      [AI_ID]: this.rivalSkinId,
+    });
+    this.setScreen('garage');
+  }
+
+  /**
    * How many battles the player has finished. Coaching prompts only appear in
    * the first couple of matches — a tutorial that never stops is a nag.
    */

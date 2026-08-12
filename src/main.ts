@@ -32,6 +32,15 @@ window.addEventListener('keydown', (e) => {
   // Any real key press counts as the gesture that unblocks audio.
   game.audio.resume();
 
+  // Escape leaves whatever is in progress. Every screen the player can reach
+  // needs a way back out; a battle you cannot quit trains people to close the
+  // tab instead.
+  if (e.code === 'Escape') {
+    e.preventDefault();
+    game.quitToGarage();
+    return;
+  }
+
   if (e.code === 'Space' && game.screen === 'launch') {
     e.preventDefault();
     game.launch();
