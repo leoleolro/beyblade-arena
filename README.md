@@ -752,6 +752,81 @@ detail survives at battle distance as linework even when the shading flattens.
 Everything sits strictly inside the contact radius, so *what you see is what
 hits* still holds: none of it widens the silhouette the sim collides on.
 
+## Cel metal
+
+`MeshToonMaterial` has no metalness channel and no specular term at all, which
+is why a gold forge disc rendered as flat yellow and the Classic theme looked
+more metallic for free — MeshStandardMaterial hands it a real specular lobe.
+Cel art solves this differently, and the two things it actually draws are a
+**banded** highlight (a hard chip of light that snaps between levels; a smooth
+Blinn-Phong falloff is the strongest "this is CG" signal there is) and a
+**fresnel rim** tinted with the metal rather than white, so gold edges warm and
+steel edges cool.
+
+Implemented as an `onBeforeCompile` patch on a real MeshToonMaterial, which
+keeps the lights, gradientMap, shadows and fog working untouched. Measured
+off-screen against a plain `toonMaterial` control on a gold sphere: peak
+luminance 172 → 244, with the lobe landing in the core (+5.5) and the fresnel
+only at grazing angles (+4.1). On a cube the control renders the ramp's 3 flat
+plateaus and the metal renders a discrete 4th — a plateau, not a gradient.
+
+`OutlineEffect` is unaffected, and that was checked rather than assumed:
+`getOutlineMaterialFromCache` builds a *fresh* BackSide ShaderMaterial keyed on
+the original's uuid and copies across a fixed list of properties that includes
+neither `onBeforeCompile` nor `customProgramCacheKey`. Measured: 254 hull
+pixels for a plastic cube, 254 for the same cube in metal, 0 with `noOutline`.
+
+Only some parts take it, and that restraint is the effect: the forge disc, the
+accent hardware (contact chips, bands, the X crest) and the walls of designs
+flagged `metal: true`. A top where every surface carries a specular chip reads
+as chrome-plated and stops saying "this bit is metal" about anything.
+
+## Why a spinning top looked like a picket fence
+
+Reported as "these blade vertical lines around the beyblade". The cause was
+aliasing, not the blur texture. `b.angle += b.spin * dt * 0.05` at
+`SPIN_REF = 900` advances **0.75 rad per frame**, and against a blade step of
+`2π/blades` no blade count lands anywhere trackable:
+
+| layer | blades | steps advanced per frame | result |
+|---|---|---|---|
+| Aegis | 8 | 0.955 | crawls *backwards* — a frozen fence |
+| Fafnir | 6 | 0.716 | reverse strobe |
+| Spryzen | 4 | 0.477 | sits on Nyquist — maximum shimmer |
+
+The fence was drawn with the layer's own inked side walls. And the blur disc
+could not have hidden it: at radius `1.15r` and height `1.25r`, the sight line
+from a 34° camera to the near blade tip crosses the disc plane at `1.28r` —
+*outside* the disc, so the near half of the fence was drawn in front of it.
+
+Fixed by removing the thing that aliases rather than dressing it: the blur body
+is now rotationally symmetric (a symmetric disc cannot alias), motion is
+carried by a single glint on its own pivot counter-rotated to a drawn 3.4 rad/s,
+and **afterimage ghosts** share the real layer's geometry at quarter-blade-step
+offsets so blades + ghosts sit at 4× blade count and close the gaps the fence
+was made of. The disc is domed and view-angle faded so it stops reading as a
+flat plate, and the layer's ink thickness tapers to 45% at full blur — taking
+the pen away from the fence.
+
+## Impact frames, take two
+
+Reported as repetitive twice. The first pass varied palette and jitter inside a
+single radial-wedge drawing, and measured evenly across four styles — which was
+the wrong axis, because every frame was the same *composition* recoloured.
+
+There are now six genuinely different pictures: radial burst, speed-line sheet
+with a hole punched at the clash, shattered pane, concentric shock rings, ink
+vignette, and a crit-only negative slam. Tone (ink / paper / inverted / bey
+colours) is rolled independently on top. Anti-repetition remembers the last
+**two** compositions, not one — with a set this small, A B A B never repeats
+back-to-back and still reads as a loop. Measured over 600 triggers:
+`{radial 101, sheet 108, shatter 117, rings 100, vignette 110, slam 64}`, with
+zero repeats at distance 1 or 2 and the slam never firing on a non-crit.
+
+One structural note: no stroked circles anywhere. `preserveAspectRatio="none"`
+scales stroke width anisotropically, so every ring is a filled two-contour
+polygon instead.
+
 ## Known gaps
 
 - **The champion AI loses to the rookie in stamina and defence mirrors** (35%

@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import type { BeyBuild } from '../sim/types';
 import { skinMaterial } from './skins';
 import type { Skin } from './skins';
-import { noOutline, setOutline, toonMaterial } from './toon';
+import { metalToonMaterial, noOutline, setOutline, toonMaterial } from './toon';
+import type { MetalToonOptions } from './toon';
 import { beastEmblem, designByLayer } from './beydex';
 import type { BeyDesign, BladeStyle } from './beydex';
 
@@ -276,8 +277,11 @@ function buildToonBey(build: BeyBuild, skin: Skin): THREE.Group {
   // Side walls keep the skin pipeline's finish but wear the design's colour;
   // this is also the material the arena flashes on hits, so it is the one
   // exported as layerMat.
+  // `design.metal` marks the bare-metal layers (Steel Leon, Cobalt Drake),
+  // whose side walls are brushed steel rather than moulded plastic — they take
+  // the banded highlight and rim; every other design's walls stay flat.
   const sideMat = setOutline(
-    skinMaterial(skin, design.primary, { toon: true }),
+    skinMaterial(skin, design.primary, { toon: true, metal: design.metal }),
     { thickness: BEY_OUTLINE },
   );
   // The face is unlit for the same reason the dish is: anime stickers are
@@ -363,8 +367,11 @@ function buildToonBey(build: BeyBuild, skin: Skin): THREE.Group {
   // than paint because the reference's crest visibly stands off the layer —
   // it catches its own outline and its own cel band.
   if (design.crest === 'xsword') {
+    // Gold armour, not painted plastic: the crest is the loudest piece of
+    // hardware on the top and the one the eye lands on first, so it carries
+    // the metal treatment even on a plastic design.
     const crestMat = setOutline(
-      toonMaterial(design.accent, 0.12),
+      metalToonMaterial(design.accent, { ...LAYER_METAL, emissive: 0.12 }),
       { thickness: BEY_OUTLINE * 0.7 },
     );
     const crest = new THREE.Mesh(
@@ -412,9 +419,34 @@ function buildToonBey(build: BeyBuild, skin: Skin): THREE.Group {
   return group;
 }
 
-/** Toon material with the bey-weight outline, in one call. */
+/** Toon material with the bey-weight outline, in one call. Plastic. */
 const inked = (colour: number, emissive = 0): THREE.Material =>
   setOutline(toonMaterial(colour, emissive), { thickness: BEY_OUTLINE });
+
+/**
+ * Which parts get the metal treatment, and why it is only some of them.
+ *
+ * A Burst top is mostly plastic. The forge disc is the one part that is
+ * genuinely machined metal, and the layer's accent hardware — contact chips,
+ * armour crests, raised bands — is plated jewellery bolted onto plastic.
+ * Everything else keeps the flat `toonMaterial`. That contrast IS the effect:
+ * a top where every surface carries a specular chip reads as chrome-plated,
+ * which is both wrong and, worse, stops saying "this bit is metal" about
+ * anything.
+ *
+ * Two profiles, because the families are different objects. The disc is a big
+ * flat machined face, so its highlight is a small hard chip. Layer hardware is
+ * small and curved, and a disc-tight lobe on it strobes as the top spins —
+ * softer gloss, stronger rim, since at 34° the rim is most of what is visible.
+ */
+const DISC_METAL: MetalToonOptions = { gloss: 56, specular: 0.36, rim: 0.26 };
+const LAYER_METAL: MetalToonOptions = { gloss: 34, specular: 0.3, rim: 0.32 };
+
+/** Forge-disc material: cel metal with the bey-weight outline, in one call. */
+const forged = (colour: number, emissive = 0): THREE.Material =>
+  setOutline(metalToonMaterial(colour, { ...DISC_METAL, emissive }), {
+    thickness: BEY_OUTLINE,
+  });
 
 /**
  * Drivers, each with the real part's silhouette.
@@ -600,12 +632,12 @@ function buildToonDisc(parent: THREE.Group, discId: string, r: number): number {
       // Compact thick ring, mass packed at the centre, four armour bosses.
       const ringMesh = new THREE.Mesh(
         new THREE.CylinderGeometry(r * 0.62, r * 0.58, r * 0.2, 16),
-        inked(0xa8adb4, 0.06),
+        forged(0xa8adb4, 0.06),
       );
       ringMesh.position.y = discY;
       ringMesh.castShadow = true;
       parent.add(ringMesh);
-      const bossMat = inked(0x878d96);
+      const bossMat = forged(0x878d96);
       for (let i = 0; i < 4; i++) {
         const a = (i / 4) * Math.PI * 2;
         const boss = new THREE.Mesh(
@@ -623,14 +655,14 @@ function buildToonDisc(parent: THREE.Group, discId: string, r: number): number {
       // than Heavy. The 8-segment cylinder IS the octagonal silhouette.
       const plate = new THREE.Mesh(
         new THREE.CylinderGeometry(r * 0.74, r * 0.72, r * 0.12, 8),
-        inked(0xb9bec5, 0.06),
+        forged(0xb9bec5, 0.06),
       );
       plate.position.y = discY;
       plate.castShadow = true;
       parent.add(plate);
       const hub = new THREE.Mesh(
         new THREE.CylinderGeometry(r * 0.36, r * 0.34, r * 0.16, 8),
-        inked(0x9aa1ab),
+        forged(0x9aa1ab),
       );
       hub.position.y = discY;
       parent.add(hub);
@@ -641,14 +673,14 @@ function buildToonDisc(parent: THREE.Group, discId: string, r: number): number {
       // shallow cones back to back.
       const top = new THREE.Mesh(
         new THREE.CylinderGeometry(r * 0.4, r * 0.8, r * 0.07, 24),
-        inked(0xc6cad1, 0.08),
+        forged(0xc6cad1, 0.08),
       );
       top.position.y = discY + r * 0.035;
       top.castShadow = true;
       parent.add(top);
       const bottom = new THREE.Mesh(
         new THREE.CylinderGeometry(r * 0.8, r * 0.4, r * 0.07, 24),
-        inked(0xb3b9c2),
+        forged(0xb3b9c2),
       );
       bottom.position.y = discY - r * 0.035;
       parent.add(bottom);
@@ -659,12 +691,12 @@ function buildToonDisc(parent: THREE.Group, discId: string, r: number): number {
       // corners — the attacking disc visibly wants to hit things.
       const core = new THREE.Mesh(
         new THREE.CylinderGeometry(r * 0.56, r * 0.52, r * 0.14, 3),
-        inked(0xb0b5bc, 0.06),
+        forged(0xb0b5bc, 0.06),
       );
       core.position.y = discY;
       core.castShadow = true;
       parent.add(core);
-      const flapMat = inked(0xd94840);
+      const flapMat = forged(0xd94840);
       for (let i = 0; i < 3; i++) {
         // CylinderGeometry's 3 segments put corners at these angles; the flaps
         // must ride the corners, not the flats, to read as extensions of them.
@@ -685,12 +717,12 @@ function buildToonDisc(parent: THREE.Group, discId: string, r: number): number {
       // clearly the tallest band of the five.
       const base = new THREE.Mesh(
         new THREE.CylinderGeometry(r * 0.56, r * 0.52, r * 0.14, 12),
-        inked(0x9ba1a9, 0.05),
+        forged(0x9ba1a9, 0.05),
       );
       base.position.y = discY;
       base.castShadow = true;
       parent.add(base);
-      const lobeMat = inked(0x8a9099);
+      const lobeMat = forged(0x8a9099);
       for (let i = 0; i < 6; i++) {
         const a = (i / 6) * Math.PI * 2;
         const lobe = new THREE.Mesh(new THREE.SphereGeometry(r * 0.14, 10, 8), lobeMat);
@@ -742,11 +774,25 @@ function addBladeDetail(
   const light = new THREE.Color(design.primary)
     .lerp(new THREE.Color(0xffffff), 0.3)
     .getHex();
-  const detailMat = setOutline(toonMaterial(dark), { thickness: BEY_OUTLINE * 0.55 });
-  const accentMat = setOutline(toonMaterial(design.accent, 0.1), {
-    thickness: BEY_OUTLINE * 0.55,
-  });
-  const liftMat = setOutline(toonMaterial(light), { thickness: BEY_OUTLINE * 0.55 });
+  // Ridges, slots, plates and fins are the surface of whatever the blade is
+  // made of — plastic on most designs, steel on a `metal: true` one — so they
+  // follow the wall rather than picking a treatment of their own. Getting this
+  // wrong is what would turn a moulded Valtryek wing into chrome.
+  const surface = (c: number, emissive = 0): THREE.Material =>
+    design.metal
+      ? metalToonMaterial(c, { ...LAYER_METAL, emissive })
+      : toonMaterial(c, emissive);
+
+  const detailMat = setOutline(surface(dark), { thickness: BEY_OUTLINE * 0.55 });
+  // Contact chips, bands and outer plates are the layer's jewellery: plated
+  // hardware on every design, so these are metal unconditionally. They are also
+  // the pieces that strike, which puts the highlight exactly where the eye
+  // already is during a clash.
+  const accentMat = setOutline(
+    metalToonMaterial(design.accent, { ...LAYER_METAL, emissive: 0.1 }),
+    { thickness: BEY_OUTLINE * 0.55 },
+  );
+  const liftMat = setOutline(surface(light), { thickness: BEY_OUTLINE * 0.55 });
 
   for (let i = 0; i < blades; i++) {
     const a = i * step;

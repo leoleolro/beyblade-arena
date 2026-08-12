@@ -386,11 +386,14 @@ export class ArenaRenderer {
         : new Trail(skin.primary);
       trail.setOpacity(this.theme.trailOpacity);
 
-      // Toon only: motion is drawn, not simulated — at high spin the blur disc
-      // is the top, and the detailed mesh shrinks slightly underneath it.
+      // Toon only: motion is drawn, not simulated — at high spin the blur is
+      // the top, and the detailed mesh shrinks slightly underneath it. The blur
+      // reads the layer group because its afterimages are copies of that exact
+      // silhouette, sharing its geometry.
       const design = designByLayer(b.build.layer.id);
+      const parts = group.userData.parts as BeyParts;
       const blur = this.theme.toon
-        ? buildSpinBlur(design.primary, design.secondary, b.stats.radius)
+        ? buildSpinBlur(design, b.stats.radius, parts.layer, b.build.layer.blades)
         : null;
       if (blur) group.add(blur.mesh);
 
@@ -415,7 +418,7 @@ export class ArenaRenderer {
         group,
         trail,
         blur,
-        parts: group.userData.parts as BeyParts,
+        parts,
         light,
         aura,
         shadow,
@@ -467,9 +470,10 @@ export class ArenaRenderer {
       v.group.rotation.x = Math.sin(v.wobblePhase) * lean;
       v.group.rotation.z = Math.cos(v.wobblePhase) * lean;
 
-      // Hand the silhouette to the blur disc at high spin; at low spin the
-      // detail returns at full size and its wobble carries the frame. Shrink
-      // rather than hide, so hints of the blades stay visible in the streaks.
+      // Hand the silhouette to the blur at high spin; at low spin the detail
+      // returns at full size and its wobble carries the frame. Shrink rather
+      // than hide: the afterimages stay at full radius, so the shrink is what
+      // opens the gap between the solid top and its own smear.
       const blurK = v.blur ? v.blur.update(sn, dt) : 0;
       const detail = 1 - blurK * 0.18;
       v.parts.layer.scale.setScalar(detail);

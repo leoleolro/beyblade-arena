@@ -45,6 +45,216 @@ export function toonMaterial(colour: number, emissive = 0): THREE.Material {
   });
 }
 
+// ---------------------------------------------------------------------------
+// Cel metal
+// ---------------------------------------------------------------------------
+
+/**
+ * Cel-shaded metal: banded diffuse plus the two cues `MeshToonMaterial` lacks.
+ *
+ * `MeshToonMaterial` has no metalness channel and no specular term at all, so
+ * a gold forge disc renders as flat yellow and brushed steel as flat grey. The
+ * Classic theme only looks more metallic because MeshStandardMaterial hands it
+ * a real specular lobe. Cel art solves the same problem differently, and the
+ * two things it actually draws are:
+ *
+ *  1. A **banded** specular lobe — a hard-edged chip of light that snaps
+ *     between levels. A smooth Blinn-Phong falloff is the single strongest
+ *     "this is CG" signal there is; the snap is what reads as painted metal.
+ *  2. A **fresnel rim**, also banded, tinted with the metal rather than white,
+ *     so gold edges warm and steel edges cool.
+ *
+ * Implemented as an `onBeforeCompile` patch on a real MeshToonMaterial rather
+ * than a ShaderMaterial, which is what keeps the lights, the gradientMap, the
+ * shadow maps and the fog working untouched.
+ *
+ * **OutlineEffect still inks these.** Verified by reading r185's
+ * `examples/jsm/effects/OutlineEffect.js`: it does not clone or recompile the
+ * source material. `getOutlineMaterialFromCache` builds a *fresh* BackSide
+ * ShaderMaterial keyed on `originalMaterial.uuid`, swaps it onto the mesh for
+ * the hull pass, and copies across exactly `userData.outlineParameters`,
+ * `opacity`, `visible`, `transparent`, `fog`, `toneMapped`,
+ * `premultipliedAlpha`, `displacementMap` and `version`. Neither
+ * `onBeforeCompile` nor `customProgramCacheKey` is on that list, so the ink
+ * pass cannot see this patch at all — a metal part outlines identically to a
+ * plastic one, and `setOutline` keeps working on the result because the return
+ * type is still an ordinary Material. Measured: 254 hull pixels for a plastic
+ * cube, 254 for the same cube in metal, 0 once `noOutline` is applied.
+ */
+export interface MetalToonOptions {
+  /** Emissive lift. Same meaning as `toonMaterial`'s second argument. */
+  emissive?: number;
+  /** Highlight tightness. Higher = a smaller, harder chip of light. */
+  gloss?: number;
+  /** Highlight brightness. */
+  specular?: number;
+  /** Rim brightness. */
+  rim?: number;
+  /** Rim falloff. Higher = the rim hugs the silhouette more tightly. */
+  rimPower?: number;
+  /** Highlight colour. Defaults to the base lifted most of the way to white. */
+  specTint?: number;
+  /** Rim colour. Defaults to the base barely lifted, so it keeps the metal's hue. */
+  rimTint?: number;
+}
+
+const WHITE = new THREE.Color(0xffffff);
+
+/**
+ * Program cache key.
+ *
+ * `onBeforeCompile` makes the shader source depend on something three cannot
+ * see, and its default key — `onBeforeCompile.toString()` — is both expensive
+ * and a lie under a minifier, which can collapse two different closures to the
+ * same text. A constant is correct here only because every metal material emits
+ * *byte-identical* source: gloss, thresholds, strengths and tints are all
+ * uniforms, and there is not one `#define` among them. Bake anything into the
+ * source text and this key has to carry it.
+ */
+const CEL_METAL_KEY = 'metalToon/1';
+
+/**
+ * Injected straight after `#include <lights_toon_pars_fragment>`, which is
+ * where `RE_Direct_Toon` and the `RE_Direct` macro are defined. Overriding the
+ * macro rather than hand-rolling a light loop is what buys the shadow term and
+ * every light type for free.
+ */
+const CEL_METAL_PARS = /* glsl */ `
+uniform vec3 celSpecColour;
+uniform vec3 celRimColour;
+// Packed as x: gloss/power, y: low band threshold, z: high band threshold,
+// w: strength. Two vec4s instead of eight scalars, because uniform slots are
+// the one thing this patch actually spends.
+uniform vec4 celSpec;
+uniform vec4 celRim;
+
+// Three levels: 0, 0.38, 1. step(), never smoothstep() — the discontinuity is
+// the effect, and softening it puts the CG read straight back.
+float celBand( const in float v, const in float lo, const in float hi ) {
+	return step( lo, v ) * 0.38 + step( hi, v ) * 0.62;
+}
+
+void RE_Direct_MetalToon( const in IncidentLight directLight, const in vec3 geometryPosition, const in vec3 geometryNormal, const in vec3 geometryViewDir, const in vec3 geometryClearcoatNormal, const in ToonMaterial material, inout ReflectedLight reflectedLight ) {
+
+	// The gradientMap banding is untouched: this adds a lobe on top of the flat
+	// diffuse, it does not replace it.
+	RE_Direct_Toon( directLight, geometryPosition, geometryNormal, geometryViewDir, geometryClearcoatNormal, material, reflectedLight );
+
+	vec3 celH = normalize( directLight.direction + geometryViewDir );
+	float celLobe = pow( saturate( dot( geometryNormal, celH ) ), celSpec.x );
+	// N·H stays positive at grazing angles for a light *behind* the surface,
+	// which put a hot chip on the shadow side of the disc. Gate on N·L.
+	float celLit = step( 0.0, dot( geometryNormal, directLight.direction ) );
+
+	// directLight.color arrives already multiplied by the shadow term — see
+	// lights_fragment_begin — so the highlight is shadowed for free.
+	reflectedLight.directSpecular += directLight.color * celSpecColour *
+		( celBand( celLobe, celSpec.y, celSpec.z ) * celSpec.w * celLit );
+
+}
+
+#undef RE_Direct
+#define RE_Direct RE_Direct_MetalToon
+`;
+
+/**
+ * Replaces meshtoon's `outgoingLight` line, which sums diffuse and emissive
+ * only — the toon shader has no specular slot to sum, so the banded lobe would
+ * otherwise be computed and thrown away.
+ *
+ * `geometryNormal` and `geometryViewDir` are declared by
+ * `lights_fragment_begin` earlier in main, so the rim rides along for free.
+ */
+const CEL_METAL_OUTGOING = /* glsl */ `
+	// The rim is deliberately light-independent: it is a drawn element, the same
+	// way the contact shadow under a top is drawn rather than projected. It
+	// lands just inside the OutlineEffect hull, which is exactly where cel art
+	// puts it — bright edge, then black line.
+	float celFresnel = pow( saturate( 1.0 - dot( geometryNormal, geometryViewDir ) ), celRim.x );
+	vec3 celRimLight = celRimColour * ( celBand( celFresnel, celRim.y, celRim.z ) * celRim.w );
+
+	vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + reflectedLight.directSpecular + celRimLight + totalEmissiveRadiance;
+`;
+
+const TOON_PARS_ANCHOR = '#include <lights_toon_pars_fragment>';
+const OUTGOING_ANCHOR =
+  'vec3 outgoingLight = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse + totalEmissiveRadiance;';
+
+/**
+ * Throws rather than warns. A missing anchor means a three upgrade renamed a
+ * chunk and every metal part has silently reverted to flat toon — which is the
+ * precise regression this material exists to fix, and invisible from the
+ * outside. three is pinned, so this can only fire on a deliberate upgrade, and
+ * it fires on the first frame of the Anime theme rather than in a screenshot.
+ */
+function mustReplace(src: string, anchor: string, replacement: string): string {
+  if (!src.includes(anchor)) {
+    throw new Error(`metalToonMaterial: three's toon fragment shader no longer contains "${anchor}"`);
+  }
+  return src.replace(anchor, replacement);
+}
+
+/** Cel-shaded metal in the given colour. See the block comment above. */
+export function metalToonMaterial(
+  colour: number,
+  opts: MetalToonOptions = {},
+): THREE.MeshToonMaterial {
+  const base = new THREE.Color(colour);
+  const mat = new THREE.MeshToonMaterial({
+    color: colour,
+    gradientMap: toonRamp(),
+    emissive: base.clone().multiplyScalar(opts.emissive ?? 0),
+  });
+
+  // Built here, not inside onBeforeCompile, for two reasons: the callback does
+  // not run until the material's first frame, and three clones the uniform set
+  // per material, so these objects have to be per-material to stay tunable.
+  const uniforms = {
+    celSpecColour: {
+      value:
+        opts.specTint !== undefined
+          ? new THREE.Color(opts.specTint)
+          : base.clone().lerp(WHITE, 0.72),
+    },
+    celRimColour: {
+      value:
+        opts.rimTint !== undefined
+          ? new THREE.Color(opts.rimTint)
+          : base.clone().lerp(WHITE, 0.3),
+    },
+    // Thresholds are tuned against the Anime key light (directional, intensity
+    // 2.2) with no tone mapping: the top band clips past white, which is what
+    // makes the chip read as metal now that bloom is off. Measured on a gold
+    // sphere, peak luminance 172 flat → 244 with the lobe.
+    celSpec: {
+      value: new THREE.Vector4(opts.gloss ?? 42, 0.28, 0.62, opts.specular ?? 0.32),
+    },
+    celRim: {
+      value: new THREE.Vector4(opts.rimPower ?? 2.4, 0.42, 0.68, opts.rim ?? 0.3),
+    },
+  };
+
+  mat.onBeforeCompile = (shader): void => {
+    for (const [name, uniform] of Object.entries(uniforms)) shader.uniforms[name] = uniform;
+    shader.fragmentShader = mustReplace(
+      shader.fragmentShader,
+      TOON_PARS_ANCHOR,
+      TOON_PARS_ANCHOR + CEL_METAL_PARS,
+    );
+    shader.fragmentShader = mustReplace(
+      shader.fragmentShader,
+      OUTGOING_ANCHOR,
+      CEL_METAL_OUTGOING,
+    );
+  };
+  mat.customProgramCacheKey = (): string => CEL_METAL_KEY;
+
+  // Live handles, so a hit flash or a finisher can push the highlight without
+  // rebuilding the material.
+  mat.userData.cel = uniforms;
+  return mat;
+}
+
 /**
  * The dish: **unlit**, painted, and immune to the lighting entirely.
  *

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { toonMaterial } from './toon';
+import { metalToonMaterial, toonMaterial } from './toon';
 
 /**
  * Skins: purely cosmetic, and deliberately so.
@@ -87,7 +87,7 @@ export function pickContrastingSkin(playerSkin: Skin): Skin {
 export function skinMaterial(
   skin: Skin,
   colour: number,
-  opts: { emissiveBoost?: number; toon?: boolean } = {},
+  opts: { emissiveBoost?: number; toon?: boolean; metal?: boolean } = {},
 ): THREE.Material {
   const boost = opts.emissiveBoost ?? 1;
 
@@ -95,7 +95,15 @@ export function skinMaterial(
   // under toon lighting just looks like a bug — the point of the toon theme is
   // that every surface reads as flat bands, so the finish becomes irrelevant
   // and only the colour survives.
-  if (opts.toon) return toonMaterial(colour, skin.finish === 'neon' ? 0.35 : 0.12);
+  if (opts.toon) {
+    const emissive = skin.finish === 'neon' ? 0.35 : 0.12;
+    // `metal` marks the bare-metal designs, whose walls are brushed steel
+    // rather than moulded plastic. The finish still decides the emissive lift,
+    // so a neon skin on a metal layer stays a neon metal layer.
+    return opts.metal
+      ? metalToonMaterial(colour, { emissive, gloss: 34, specular: 0.3, rim: 0.32 })
+      : toonMaterial(colour, emissive);
+  }
 
   switch (skin.finish) {
     case 'chrome':
