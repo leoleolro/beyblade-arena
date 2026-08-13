@@ -90,6 +90,18 @@ export interface BeyDesign {
   crest?: 'xsword';
   /** Bare-metal layer: the side walls read as brushed steel, not plastic. */
   metal?: boolean;
+  /**
+   * Top-face treatment.
+   *
+   * Absent, the face is flat and carries bolted-on hardware (see
+   * `addBladeDetail`). `'wave'` moulds the face instead: the extruded cap is
+   * displaced into smooth radial crests and shaded as cel metal, so the
+   * highlight sweeps across the ridges as the top spins. Only the `wave` edge
+   * grammar takes it — a scalloped outline and a rippled face are the same
+   * moulding decision, and a machined `blade` layer with a rippled face would
+   * read as two designs bolted together.
+   */
+  surface?: 'wave';
 }
 
 /**
@@ -170,6 +182,7 @@ export const BEYDEX: BeyDesign[] = [
     chip: 'sticker',
     // smooth spin-steal scallops over teal
     underRing: 0x2ec4b6,
+    surface: 'wave',
     blade: { root: 0.86, belly: 0.35, cut: 0.25, edge: 'wave' },
   },
   {
@@ -185,6 +198,7 @@ export const BEYDEX: BeyDesign[] = [
     chip: 'sticker',
     // shield scallops over a mint tier
     underRing: 0x57c4a8,
+    surface: 'wave',
     blade: { root: 0.9, belly: 0.3, cut: 0.2, edge: 'wave' },
   },
 
@@ -239,6 +253,9 @@ export const BEYDEX: BeyDesign[] = [
     chip: 'dark',
     underRing: 0x23262b,
     metal: true,
+    // The strongest read of the three: bare steel already, so the moulded
+    // crests get the banded highlight on the walls as well as the face.
+    surface: 'wave',
     blade: { root: 0.7, belly: 0.8, cut: 0.6, edge: 'wave' },
   },
   {
