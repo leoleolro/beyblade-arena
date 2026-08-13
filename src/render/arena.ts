@@ -129,6 +129,21 @@ export class ArenaRenderer {
   private readonly impactFrame = new ImpactFrame();
   /** Scratch for projecting hit points to the screen; no per-hit allocation. */
   private readonly projected = new THREE.Vector3();
+  /**
+   * Seconds until another impact frame may fire.
+   *
+   * Reported as "the impact frames are happening too much". The gate was the
+   * hitstop threshold alone, and heavy clashes are not rare — an opposite-spin
+   * exchange lands several in a row, so the screen was being cut on almost
+   * every meaningful contact. A cut that happens constantly is not a cut, it
+   * is a strobe, and it stops marking anything as important.
+   *
+   * Two gates now: a refractory period so consecutive hits in one exchange
+   * produce one frame rather than four, and a bar above the hitstop threshold
+   * so ordinary heavy hits keep their hitstop and sparks without also
+   * repainting the screen.
+   */
+  private frameCooldown = 0;
   private readonly visuals = new Map<string, BeyVisual>();
   private readonly beyRoot = new THREE.Group();
 
@@ -166,6 +181,8 @@ export class ArenaRenderer {
   private backdrop: THREE.Mesh | null = null;
   /** Throttles rail sparks so a ride doesn't drain the whole particle pool. */
   private railSparkClock = 0;
+  /** Scratch for rider bearings; reused so the rail costs no allocation. */
+  private readonly railAngles: number[] = [];
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -249,6 +266,9 @@ export class ArenaRenderer {
     }
 
     applyStadiumTheme(this.stadium, t);
+    // The rail carries emissive metal in the lit themes and banded cel metal in
+    // the anime one; a hot emissive with no bloom behind it just clips white.
+    this.rail?.setToon(t.toon);
 
     this.hemi.color.setHex(t.hemiSky);
     this.hemi.groundColor.setHex(t.hemiGround);
@@ -303,7 +323,10 @@ export class ArenaRenderer {
       this.rail = buildRail(arena.rail.radius);
       this.scene.add(this.rail.group);
     }
-    if (this.rail) this.rail.group.visible = !!arena.rail;
+    if (this.rail) {
+      this.rail.group.visible = !!arena.rail;
+      this.rail.setToon(this.theme.toon);
+    }
 
     if (arena.pit && !this.pit) {
       this.pit = buildPit(arena.pit.radius);
@@ -430,6 +453,7 @@ export class ArenaRenderer {
   /** Mirror one frame of sim state. `dt` is real elapsed seconds. */
   update(beys: BeyState[], hits: HitEvent[], dt: number): void {
     this.elapsed += dt;
+    this.frameCooldown = Math.max(0, this.frameCooldown - dt);
 
     for (const b of beys) {
       const v = this.visuals.get(b.id);
@@ -520,7 +544,12 @@ export class ArenaRenderer {
       // threshold as hitstop: the sim freezes for a beat and this is the frame
       // it freezes on. Camera matrices are one frame stale here, which is
       // invisible at these speeds.
-      if (this.theme.toon && h.strength >= C.HITSTOP_THRESHOLD) {
+      // Crits always earn one; otherwise the hit has to clear a bar well above
+      // hitstop AND the refractory window has to have expired.
+      const frameWorthy =
+        h.crit || h.strength >= C.IMPACT_FRAME_THRESHOLD;
+      if (this.theme.toon && frameWorthy && this.frameCooldown <= 0) {
+        this.frameCooldown = C.IMPACT_FRAME_COOLDOWN;
         this.projected.copy(at).project(this.camera);
         // Design primaries feed the clash-tone frame style; the sim only
         // carries ids, and BeyDesign colours are numeric, hence the lookup
@@ -564,6 +593,13 @@ export class ArenaRenderer {
       mat.emissiveIntensity +=
         (this.rail.baseEmissive + flare - mat.emissiveIntensity) *
         Math.min(1, dt * 9);
+
+      // The travelling highlight rides the actual bearing of whoever is locked
+      // on, so the rail visibly carries the top around rather than merely
+      // glowing while it happens.
+      this.railAngles.length = 0;
+      for (const b of riders) this.railAngles.push(Math.atan2(b.pos.y, b.pos.x));
+      this.rail.update(dt, this.elapsed, this.railAngles);
     }
 
     // The pit only announces itself while it is actually taking spin: the

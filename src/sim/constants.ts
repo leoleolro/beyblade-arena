@@ -277,6 +277,24 @@ export const DODGE_SAFE_RADIUS = 0.72;
 
 /** Impact strength above which the presentation layer freezes for hitstop. */
 export const HITSTOP_THRESHOLD = 1.6;
+
+/**
+ * Impact strength that earns a full-screen manga frame.
+ *
+ * Deliberately well above HITSTOP_THRESHOLD. Hitstop marks "that hurt" and is
+ * common; the frame marks "that mattered" and must not be. Measured over the
+ * balance sweep, hits clear 1.6 several times per exchange but 2.6 only on a
+ * genuine heavy connect, which is the beat worth cutting on.
+ */
+export const IMPACT_FRAME_THRESHOLD = 2.6;
+
+/**
+ * Refractory period between manga frames, seconds.
+ *
+ * An opposite-spin exchange lands a burst of hits inside about a second; one
+ * frame should represent that exchange, not four stacked on top of each other.
+ */
+export const IMPACT_FRAME_COOLDOWN = 1.2;
 /** Seconds of freeze on a heavy clash. */
 export const HITSTOP_DURATION = 0.09;
 
