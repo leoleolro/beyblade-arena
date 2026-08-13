@@ -1,4 +1,5 @@
 import { LADDER, STARTING_UNLOCKS } from './ladder';
+import { matchReward } from './economy';
 import type { Unlocks } from './ladder';
 
 /**
@@ -25,6 +26,8 @@ export interface ProgressData {
   /** Best consecutive match wins. */
   bestStreak: number;
   streak: number;
+  /** Spendable currency. Earned only — there is no purchase path. */
+  coins: number;
 }
 
 const fresh = (): ProgressData => ({
@@ -37,6 +40,9 @@ const fresh = (): ProgressData => ({
   losses: 0,
   bestStreak: 0,
   streak: 0,
+  // Enough for one Scrap Crate on a fresh save, so the mechanic is discovered
+  // by using it rather than by reading about it.
+  coins: 60,
 });
 
 export class Progress {
@@ -92,6 +98,28 @@ export class Progress {
     return (this.data[kind] as string[]).includes(id);
   }
 
+  /** Spend, if affordable. Returns false and changes nothing otherwise. */
+  spend(amount: number): boolean {
+    if (this.data.coins < amount) return false;
+    this.data.coins -= amount;
+    this.save();
+    return true;
+  }
+
+  credit(amount: number): void {
+    this.data.coins += amount;
+    this.save();
+  }
+
+  /** Grant an unlock. Returns false when it was already owned. */
+  grant(kind: keyof Unlocks, id: string): boolean {
+    const list = this.data[kind] as string[];
+    if (list.includes(id)) return false;
+    list.push(id);
+    this.save();
+    return true;
+  }
+
   get cleared(): boolean {
     return this.data.rung >= LADDER.length;
   }
@@ -103,6 +131,9 @@ export class Progress {
    */
   recordMatch(won: boolean): Unlocks {
     const gained: Unlocks = {};
+    // Paid before the streak is mutated below, so a win is rewarded for the
+    // streak it *extended* rather than the one it started.
+    this.data.coins += matchReward(won, this.data.streak);
     if (won) {
       this.data.wins += 1;
       this.data.streak += 1;

@@ -13,6 +13,8 @@ import type { Fighter } from './sim/battle';
 import * as C from './sim/constants';
 import { DEFAULT_BUILD } from './sim/parts';
 import type { BeyBuild, LaunchParams, MoveKind } from './sim/types';
+import { crateById, rollCrate } from './economy';
+import type { CrateResult } from './economy';
 
 /** Screens the player moves through. */
 export type Screen =
@@ -56,6 +58,17 @@ export class Game {
   rivalSkinId = 'ember';
 
   readonly progress = new Progress();
+  /**
+   * Randomness for crate rolls.
+   *
+   * Deliberately NOT the sim's seeded PRNG. The sim is seeded so a match
+   * replays identically, which is exactly the wrong property here — a crate
+   * whose outcome is a pure function of a stored seed can be re-rolled by
+   * reloading before the reveal finishes, and a save-scummable crate is not a
+   * crate. Unpredictability is the mechanic.
+   */
+  private readonly crateRng: () => number = Math.random;
+
   /** Visual theme id. Cosmetic only; 'arena' is the untouched original look. */
   themeId = loadThemeId();
   /**
@@ -215,6 +228,41 @@ export class Game {
   }
 
   /** Move between the non-battle screens. */
+  /** Spendable coins. Read-only to the UI; only the economy mutates them. */
+  get coins(): number {
+    return this.progress.data.coins;
+  }
+
+  canAfford(crateId: string): boolean {
+    const crate = crateById(crateId);
+    return crate !== undefined && this.progress.data.coins >= crate.cost;
+  }
+
+  /**
+   * Buy and roll one crate. Returns null when it could not be afforded, so a
+   * double-click cannot open two crates for the price of one.
+   *
+   * The unlock is granted here rather than when the reveal animation finishes:
+   * a player who closes the tab mid-reveal has already paid, and losing the
+   * item because the animation did not complete would be the worst possible
+   * failure mode. The reveal is a presentation of a result that has already
+   * happened.
+   */
+  openCrate(crateId: string): CrateResult | null {
+    const crate = crateById(crateId);
+    if (!crate) return null;
+    if (!this.progress.spend(crate.cost)) return null;
+
+    const result = rollCrate(
+      crate,
+      (kind, id) => this.progress.has(kind, id),
+      this.crateRng,
+    );
+    if (result.duplicate) this.progress.credit(result.refund);
+    else this.progress.grant(result.reward.kind, result.reward.id);
+    return result;
+  }
+
   goTo(screen: 'home' | 'howto' | 'garage'): void {
     this.audio.resume();
     this.setScreen(screen);
