@@ -44,6 +44,43 @@ export const LAYERS: LayerPart[] = [
   { id: 'phoenix',   name: 'Phoenix',   kind: 'layer', archetype: 'attack',  mass: 0.46, radius: 0.1060, attack: 1.32, defense: 0.86, burstResist: 0.98, spinSteal: 0.0, blades: 3, colour: 0xc01822 },
   { id: 'leon',      name: 'Leon',      kind: 'layer', archetype: 'defense', mass: 0.55, radius: 0.1080, attack: 0.82, defense: 1.46, burstResist: 1.24, spinSteal: 0.0, blades: 3, colour: 0xc7ccd2 },
   { id: 'drake',     name: 'Drake',     kind: 'layer', archetype: 'balance', mass: 0.47, radius: 0.1000, attack: 1.08, defense: 1.00, burstResist: 1.02, spinSteal: 0.0, blades: 3, colour: 0x2a3f9f },
+
+  // The vampire. The one layer in the catalog with `sameSteal`: it absorbs in
+  // *every* matchup, not only against an opposite-spin opponent, so there is no
+  // launch that denies it its mechanic (see constants.ts, spin steal).
+  //
+  // Turning Fafnir's dial up cannot produce this, which is why the mechanic had
+  // to widen rather than the number. Measured on this exact stat line with
+  // sameSteal off, spinSteal 0.62 / 0.88 / 1.00 scores 39.6% / 39.8% / 39.4%
+  // on spread/needle and 45.2% / 48.1% / 48.5% on wall/bastion — a flat dial,
+  // because SPIN_STEAL_MITIGATION saturates at 45% and SPIN_STEAL_GAIN scales
+  // off the absorber's own (deliberately low) attack. Opening the same-spin
+  // matchup instead moves it four times as far: sameSteal 0 / 0.30 / 0.60 /
+  // 1.00 gives 48.1% / 56.7% / 62.9% / 63.7% on wall/bastion. 0.30 is the
+  // largest value that still lands under the catalog's existing peak.
+  //
+  // The price is burstResist 0.88, the softest in the catalog. Absorption is
+  // spin-only — physics.ts adds burst charge *after* the steal maths and steal
+  // never touches it — so the answer to a top whose spin keeps climbing is to
+  // stop playing the spin game and burst it. That is measured, not asserted:
+  // over 480 fights against the six anchors, nosferu/wall/bastion loses 70.2%
+  // of its losses to burst against fafnir/wall/bastion's 38.3%. attack 0.80
+  // keeps it from also being the thing that kills you: it wins by outlasting,
+  // never by hitting.
+  //
+  // Out of PRESETS for the same reason as the line above: the rivals keep their
+  // identities and the pacing/balance suites keep sweeping the six anchors, so
+  // the sim's measured behaviour is unchanged by this layer existing. Swept
+  // against all six anyway, every disc x driver, 80 seeds a pairing: best
+  // nosferu/wall/bastion 56.7%, worst nosferu/blitz/xtreme 21.5%. That ceiling
+  // is under the existing legal peak (fafnir/wall/bastion 59.2%) and the spread
+  // is the tightest in the catalog — the same grid gives luinor 20.2–89.2%,
+  // valtryek 19.6–90.4%, fafnir 16.9–69.4%, aegis 7.1–71.5%.
+  //
+  // Spin direction still decides the fight, which is the point of keeping the
+  // same-spin rate at 0.30 rather than 1.0: same-spin it absorbs 9.9% of its
+  // launch spin per fight and wins 39.4%; opposite-spin, 34.2% and 70.0%.
+  { id: 'nosferu',   name: 'Nosferu',   kind: 'layer', archetype: 'stamina', mass: 0.40, radius: 0.1020, attack: 0.80, defense: 0.90, burstResist: 0.88, spinSteal: 0.88, sameSteal: 0.30, blades: 6, colour: 0x9b1c3c },
 ];
 
 export const DISCS: DiscPart[] = [
@@ -87,6 +124,7 @@ export function deriveStats(build: BeyBuild): BeyStats {
     defense: l.defense * d.stability,
     burstResist: l.burstResist * dr.burstResist,
     spinSteal: l.spinSteal,
+    sameSteal: l.sameSteal ?? 0,
     friction: dr.friction,
     spinRetention: dr.spinRetention * d.spinRetention,
     stability: d.stability,

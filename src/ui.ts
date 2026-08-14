@@ -6,7 +6,7 @@ import { shopSection } from './render/shopSection';
 import * as C from './sim/constants';
 import { SKINS, skinById } from './render/skins';
 import type { Channel } from './audio';
-import { THEMES } from './render/theme';
+import { THEMES, themeById } from './render/theme';
 import { GarageView } from './render/garageView';
 import { LADDER } from './ladder';
 import { ARENAS } from './sim/arena';
@@ -935,7 +935,12 @@ export class Ui {
       // silhouette, tiering and palette, and a dot advertised none of it —
       // picking a bey was picking a name.
       chip.classList.add('bey-chip');
-      chip.appendChild(beyThumb(p.layerId, 64));
+      // The chip draws the design set the active theme actually renders —
+      // Classic has its own (see classicdex), so an anime chip in Classic would
+      // advertise a bey the player will not get.
+      chip.appendChild(
+        beyThumb(p.layerId, 64, themeById(g.themeId).toon ? 'anime' : 'classic'),
+      );
       const label = document.createElement('span');
       label.innerHTML = `${escapeHtml(p.name)}<br><small>${escapeHtml(
         `${p.spinDir === -1 ? 'left spin' : 'right spin'} · ${p.discId} · ${p.driverId}`,

@@ -213,6 +213,9 @@ export class Game {
       [AI_ID]: this.rivalSkinId,
     });
     this.renderer.setArena(arenaById(this.arenaId));
+    // Purely visual: drops both tops into the dish and swings the camera round
+    // to the player's entry side. Must follow setBeys, which clears it.
+    this.renderer.start(playerAngle);
     this.audio.resume();
     this.audio.launch(this.lockedPower);
     this.setScreen('battle');

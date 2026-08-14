@@ -368,9 +368,33 @@ export const PERFECT_LAUNCH_SPIN_BONUS = 0.14;
  *
  * A layer with `spinSteal` bites into an opponent turning the *other* way and
  * converts part of that contact back into its own rotation — the top looks like
- * it is dying, then climbs back with every further clash. It only works in
- * opposite-spin matchups, which is what stops it being a free stat and gives
- * the spin-direction choice real weight.
+ * it is dying, then climbs back with every further clash. As a rule it only
+ * works in opposite-spin matchups, which is what stops it being a free stat and
+ * gives the spin-direction choice real weight.
+ *
+ * The rule now has exactly one named exception: a layer may declare
+ * `sameSteal`, a fraction of its rate that survives a *same*-spin clash. That
+ * exists because the rule made a true vampire unbuildable rather than merely
+ * expensive — an opponent could deny the whole mechanic by matching spin, and
+ * the counter-play was "pick the other launch button", which is not a decision.
+ * Turning the existing dial up does not substitute: on one fixed stat line,
+ * spinSteal 0.62 / 0.88 / 1.00 moved the win rate 45.2% / 48.1% / 48.5% (480
+ * fights each against the six PRESETS), because SPIN_STEAL_MITIGATION saturates
+ * at 45% and SPIN_STEAL_GAIN scales off the absorber's own (deliberately low)
+ * attack. The same-spin axis moves it four times as far per point spent.
+ *
+ * It is per-layer and not a global factor on purpose. Handed to Fafnir at 0.50
+ * — what a global would do — fafnir/wall/bastion climbs from 59.2% to 77.9% on
+ * that same yardstick, past the 0.72 ceiling sim.test.ts enforces, and
+ * steal.test.ts's "absorbs nothing from a same-spin opponent" stops being true
+ * of the layer the whole mechanic was written around. Declared per layer,
+ * Fafnir and Luinor come out of the sweep bit-identical (48.3% and 62.7%,
+ * before and after) and the gate stays absolute for all ten other layers, so
+ * the catalog-wide principle above still holds — one bey breaks it, by name.
+ *
+ * Absorption is spin-only in either matchup: burst charge is applied after this
+ * maths and steal never touches it. That is the intended answer to a top whose
+ * spin will not go down — stop trading spin with it and burst it instead.
  */
 
 /** Fraction of the damage dealt that the absorber converts into its own spin. */

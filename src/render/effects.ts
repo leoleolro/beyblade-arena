@@ -35,8 +35,22 @@ export class SparkBurst {
   private readonly life: Float32Array;
   private readonly max: number;
   private cursor = 0;
+  /** Scratch for the directional cone basis; keeps `spawn` allocation-free. */
+  private readonly dir = new THREE.Vector3();
+  private readonly side = new THREE.Vector3();
 
-  constructor(max = 600) {
+  /**
+   * 1200, up from 600.
+   *
+   * The pool is a ring buffer, so an over-subscribed pool does not drop the new
+   * sparks — it evicts the *oldest live* ones. A rail ride now streams 14
+   * particles every 0.012s (see arena.ts), which is ~1170 particles per second
+   * against a spark lifetime of 0.35–0.65s: at 600 the stream alone laps the
+   * buffer roughly twice a second, so a clash landing mid-ride had its sparks
+   * deleted within a few frames by the grind behind it. 1200 holds ~1s of
+   * worst-case rail stream plus a full 72-particle finisher burst on top.
+   */
+  constructor(max = 1200) {
     this.max = max;
     this.positions = new Float32Array(max * 3);
     this.velocities = new Float32Array(max * 3);
@@ -82,11 +96,45 @@ export class SparkBurst {
     mat.size = size;
   }
 
-  /** Spawn `count` sparks at a world position, scaled by hit strength. */
-  spawn(at: THREE.Vector3, strength: number, count = 24): void {
-    // Clamp the strength term: a heavy opposite-spin clash can register an
-    // impact of 5+, which uncapped throws sparks clean out of the stadium.
-    const speed = 0.35 + Math.min(strength, 2.5) * 0.26;
+  /**
+   * Spawn `count` sparks at a world position, scaled by hit strength.
+   *
+   * With no `along`, the burst is isotropic — the clash behaviour, unchanged.
+   * Pass `along` for a *stream*: grinding metal throws sparks in a narrow cone
+   * off the contact, and an isotropic puff at the same rate reads as smoke
+   * rather than as friction. `cone` is the half-angle of that spread in
+   * radians.
+   */
+  spawn(
+    at: THREE.Vector3,
+    strength: number,
+    count = 24,
+    along?: THREE.Vector3,
+    cone = 0.32,
+  ): void {
+    // Clamp the strength term so a hit cannot throw sparks clean out of the
+    // stadium. The clamp was 2.5, which is only a shade above the
+    // impact-frame bar of 2.6 — every hit worth watching hit the ceiling and
+    // came out looking identical to every other. 4.5 is just under the
+    // hardest impacts the sim produces (opposite-spin crits register 5+), so
+    // the range a player can actually see now spans the range the sim rolls.
+    // Measured spawn speed at the top of the range: 0.35 + 4.5*0.26 = 1.52,
+    // versus 1.0 before; sparks travel ~0.5 units in their ~0.5s life, which
+    // is half the dish and still lands inside the rim.
+    const speed = 0.35 + Math.min(strength, 4.5) * 0.26;
+
+    if (along) {
+      this.dir.copy(along);
+      if (this.dir.lengthSq() < 1e-8) this.dir.set(1, 0, 0);
+      this.dir.normalize();
+      // Ground-plane perpendicular. A full orthonormal basis is overkill: the
+      // stream is always roughly horizontal and the vertical spread comes from
+      // the same upward bias the isotropic burst uses.
+      this.side.set(-this.dir.z, 0, this.dir.x);
+      if (this.side.lengthSq() < 1e-8) this.side.set(0, 0, 1);
+      this.side.normalize();
+    }
+
     for (let i = 0; i < count; i++) {
       const idx = this.cursor;
       this.cursor = (this.cursor + 1) % this.max;
@@ -96,12 +144,24 @@ export class SparkBurst {
       this.positions[idx * 3 + 2] = at.z;
 
       // Bias upward so sparks arc off the dish rather than sink into it.
-      const theta = Math.random() * Math.PI * 2;
       const up = 0.35 + Math.random() * 0.8;
-      const radial = speed * (0.4 + Math.random() * 0.8);
-      this.velocities[idx * 3] = Math.cos(theta) * radial;
-      this.velocities[idx * 3 + 1] = up * speed;
-      this.velocities[idx * 3 + 2] = Math.sin(theta) * radial;
+      if (along) {
+        const yaw = (Math.random() - 0.5) * 2 * cone;
+        const mag = speed * (0.55 + Math.random() * 0.85);
+        const c = Math.cos(yaw);
+        const s = Math.sin(yaw);
+        this.velocities[idx * 3] = (this.dir.x * c + this.side.x * s) * mag;
+        // Flatter than the burst: a grind sprays along the surface, and a
+        // stream that lofts as hard as a clash reads as an explosion.
+        this.velocities[idx * 3 + 1] = up * speed * 0.6;
+        this.velocities[idx * 3 + 2] = (this.dir.z * c + this.side.z * s) * mag;
+      } else {
+        const theta = Math.random() * Math.PI * 2;
+        const radial = speed * (0.4 + Math.random() * 0.8);
+        this.velocities[idx * 3] = Math.cos(theta) * radial;
+        this.velocities[idx * 3 + 1] = up * speed;
+        this.velocities[idx * 3 + 2] = Math.sin(theta) * radial;
+      }
       this.life[idx] = 0.35 + Math.random() * 0.3;
     }
   }

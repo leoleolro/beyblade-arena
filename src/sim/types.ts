@@ -32,6 +32,13 @@ export interface LayerPart {
    * makes the spin-direction choice matter.
    */
   spinSteal: number;
+  /**
+   * Fraction of `spinSteal` that still works in a *same*-spin matchup, 0–1.
+   * Omitted (the catalog-wide default) means the opposite-spin gate above is
+   * absolute, which is the rule for every layer but the vampire — see the
+   * spin-steal block in constants.ts for why exactly one exception exists.
+   */
+  sameSteal?: number;
   /** Number of contact blades — purely visual. */
   blades: number;
   colour: number;
@@ -85,6 +92,7 @@ export interface BeyStats {
   defense: number;
   burstResist: number;
   spinSteal: number;
+  sameSteal: number;
   friction: number;
   spinRetention: number;
   stability: number;
@@ -120,6 +128,16 @@ export interface BeyState {
   defeat: Defeat | null;
   /** Set on the frame a collision happens, for spark effects. Decays to 0. */
   hitFlash: number;
+  /**
+   * Set to 1 on the frame this top absorbed spin, decaying like `hitFlash`, so
+   * the renderer can draw the drain without re-deriving it from a spin delta —
+   * a delta cannot tell absorption apart from a clash the top happened to win.
+   *
+   * Optional because a top that never absorbs never has one: the field is
+   * written by the collision step, not seeded at launch. Read it as
+   * `stealPulse ?? 0`.
+   */
+  stealPulse?: number;
   /** Move charge in [0, 1]. Each move costs a different slice of it. */
   meter: number;
   /** The move currently active, or null. */

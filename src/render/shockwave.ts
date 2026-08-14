@@ -25,7 +25,14 @@ export class Shockwave {
     for (let i = 0; i < POOL; i++) {
       const mesh = new THREE.Mesh(
         // Unit ring, scaled at spawn — one geometry for the whole pool.
-        new THREE.RingGeometry(0.86, 1, 48),
+        // 0.94, not the original 0.86. The ring is scaled by its OUTER
+        // radius, so the band's world thickness grows with the span: at 0.86 a
+        // span of 1.55 draws a band 0.217 units wide, and against a 2.0-wide
+        // dish that is a 38px white bar sweeping the frame. Seen in the browser
+        // as two fog-like arcs that read as a rendering fault rather than as a
+        // shock. At 0.94 the same span draws 0.093 — a rim, which is what a
+        // shockwave is. 64 segments because a thinner ring shows facets sooner.
+        new THREE.RingGeometry(0.94, 1, 64),
         new THREE.MeshBasicMaterial({
           color: 0xffffff,
           transparent: true,
@@ -77,7 +84,16 @@ export class Shockwave {
       const t = 1 - this.life[i] / 0.34;
       const eased = 1 - (1 - t) * (1 - t);
       mesh.scale.setScalar(0.05 + eased * this.span[i]);
-      mat.opacity = (1 - t) * 0.85;
+      // Quadratic fade at 0.55 peak, down from a linear 0.85.
+      //
+      // The ring is additive, so at 0.85 white it clears the bloom threshold
+      // along its whole circumference and smears into a solid band. Squaring
+      // the fade matters as much as the peak: a linear fade keeps the ring
+      // clearly visible through the second half of its life, which is exactly
+      // when it is largest and furthest from the hit that caused it. Bisected
+      // in the browser — with the trail zeroed the arcs were still there, so
+      // this, not the ribbon, was what read as fog banks across the frame.
+      mat.opacity = (1 - t) * (1 - t) * 0.55;
     }
   }
 }

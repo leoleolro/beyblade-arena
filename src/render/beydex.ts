@@ -66,7 +66,8 @@ export interface BeyDesign {
     | 'xsword'
     | 'phoenix'
     | 'lion'
-    | 'drakehead';
+    | 'drakehead'
+    | 'batwing';
   /** Big roman letter on the face sticker, as on the real ones. */
   letter: string;
   /** Canonical spin direction: Fafnir and Luinor lines spin LEFT. */
@@ -274,6 +275,28 @@ export const BEYDEX: BeyDesign[] = [
     metal: true,
     blade: { root: 0.74, belly: 0.9, cut: 0.8, edge: 'hook' },
   },
+
+  // The vampire. Built out of the spin-steal grammar on purpose: `wave` is the
+  // near-round, cornerless outline this file already assigns to absorbers, and
+  // `surface: 'wave'` (only legal alongside it) moulds the face into the same
+  // ripples — so the bey that drains you reads as one continuous rubber shell
+  // rather than a bladed weapon. Blood crimson over near-black with a gold
+  // bezel, the only design in the catalog whose accent is warmer than its
+  // primary, which is what keeps the bat legible on the dark chip.
+  {
+    layerId: 'nosferu',
+    canonName: 'Sanguine Nosferu',
+    primary: 0x9b1c3c,
+    secondary: 0x2a1020,
+    accent: 0xd4a017,
+    motif: 'batwing',
+    letter: 'N',
+    spinDir: -1,
+    chip: 'dark',
+    underRing: 0x5e1030,
+    surface: 'wave',
+    blade: { root: 0.82, belly: 0.42, cut: 0.3, edge: 'wave' },
+  },
 ];
 
 export const designByLayer = (layerId: string): BeyDesign =>
@@ -312,6 +335,12 @@ export const BEY_PRESETS: BeyPreset[] = [
   { name: 'Crimson Phoenix', layerId: 'phoenix', discId: 'spread', driverId: 'volcanic', spinDir: 1, skinId: 'ember' },
   { name: 'Steel Leon', layerId: 'leon', discId: 'wall', driverId: 'xtreme', spinDir: 1, skinId: 'solar' },
   { name: 'Cobalt Drake', layerId: 'drake', discId: 'heavy', driverId: 'orbit', spinDir: 1, skinId: 'frost' },
+  // Spread + Needle is the absorber's loadout — it has to still be turning for
+  // the drain to have anything to drain with. Left spin is the whole point:
+  // most of the roster spins right, so this is the pick that puts the vampire
+  // in the opposite-spin matchup it wants. Void's carbon finish over a
+  // near-black secondary is the only skin dark enough not to fight the crimson.
+  { name: 'Sanguine Nosferu', layerId: 'nosferu', discId: 'spread', driverId: 'needle', spinDir: -1, skinId: 'void' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -746,6 +775,80 @@ export function beastEmblem(design: BeyDesign, size = 256): HTMLCanvasElement {
       ctx.beginPath();
       ctx.arc(16 * s, -20 * s, 4.5 * s, 0, Math.PI * 2);
       ctx.fill();
+      break;
+    }
+    case 'batwing': {
+      // Bat with wings spread the full width of the chip. The whole read is in
+      // the trailing edge: one long convex sweep out to the tip, then three
+      // concave scallops back to the body, each control point pulled *inside*
+      // the chord so the membrane looks stretched between finger bones. Drawn
+      // wings-first so the torso pins their roots.
+      //
+      // The wingtip sits at 86 authored px: times the 1.15 dark-chip scale that
+      // is 99, just inside the 104px inner gold ring. Drawn at 96 (the width
+      // the shape wants) the tips cross the bezel and the mark reads as
+      // clipped, so this is the widest a spread wing can be on this chip.
+      for (const dir of [-1, 1] as const) {
+        ctx.beginPath();
+        ctx.moveTo(dir * 8 * s, -16 * s);
+        ctx.quadraticCurveTo(dir * 44 * s, -64 * s, dir * 86 * s, -44 * s); // leading edge
+        ctx.quadraticCurveTo(dir * 66 * s, -32 * s, dir * 62 * s, -4 * s); // outer scallop
+        ctx.quadraticCurveTo(dir * 46 * s, -20 * s, dir * 38 * s, 6 * s);
+        ctx.quadraticCurveTo(dir * 25 * s, -14 * s, dir * 13 * s, 2 * s);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      }
+      // Torso, tapering to a point — a hanging bat, not a standing beast.
+      ctx.beginPath();
+      ctx.moveTo(-15 * s, -8 * s);
+      ctx.quadraticCurveTo(-13 * s, 26 * s, 0, 38 * s);
+      ctx.quadraticCurveTo(13 * s, 26 * s, 15 * s, -8 * s);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      // Ears before the head, so the skull covers their bases.
+      for (const dir of [-1, 1] as const) {
+        ctx.beginPath();
+        ctx.moveTo(dir * 5 * s, -30 * s);
+        ctx.lineTo(dir * 21 * s, -62 * s);
+        ctx.lineTo(dir * 25 * s, -26 * s);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      }
+      // Skull a step lighter than the wings — same trick the lion uses, and the
+      // reason the face still separates at chip size.
+      ctx.fillStyle = lighten(design.accent, 0.22);
+      ctx.beginPath();
+      ctx.ellipse(0, -20 * s, 20 * s, 17 * s, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      // Eyes: narrow wedges raked inward and down, for the glare.
+      ctx.fillStyle = hex(design.primary);
+      for (const dir of [-1, 1] as const) {
+        ctx.beginPath();
+        ctx.moveTo(dir * 4 * s, -22 * s);
+        ctx.lineTo(dir * 15 * s, -27 * s);
+        ctx.lineTo(dir * 15 * s, -19 * s);
+        ctx.lineTo(dir * 4 * s, -16 * s);
+        ctx.closePath();
+        ctx.fill();
+      }
+      // Fangs, hung off the jawline over the torso: the one detail that says
+      // vampire rather than bat, so they get bone white rather than a tint.
+      ctx.fillStyle = '#f2f0ea';
+      ctx.strokeStyle = ink;
+      ctx.lineWidth = 2.5 * s;
+      for (const dir of [-1, 1] as const) {
+        ctx.beginPath();
+        ctx.moveTo(dir * 3 * s, -8 * s);
+        ctx.lineTo(dir * 9 * s, -8 * s);
+        ctx.lineTo(dir * 5 * s, 6 * s);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      }
       break;
     }
   }

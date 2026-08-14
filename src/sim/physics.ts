@@ -238,6 +238,7 @@ function integrate(b: BeyState, dt: number, arena: ArenaSpec): void {
   b.tilt = clamp(speed * 0.06 + (1 - sn) * 0.22, 0, 0.42);
   b.burst = Math.max(0, b.burst - C.BURST_RECOVERY * dt);
   b.hitFlash = Math.max(0, b.hitFlash - dt * 3.5);
+  b.stealPulse = Math.max(0, (b.stealPulse ?? 0) - dt * 3.5);
   b.age += dt;
   b.meter = clamp(b.meter + C.METER_GAIN_PER_SEC * dt, 0, 1);
 
@@ -531,11 +532,14 @@ function resolvePair(a: BeyState, b: BeyState, rng: () => number): HitEvent | nu
   const reflectToA = rawB * mvB.reflect * shareA * (perfectB ? C.PERFECT_BLOCK_REFLECT_MULT : 1);
   const reflectToB = rawA * mvA.reflect * shareB * (perfectA ? C.PERFECT_BLOCK_REFLECT_MULT : 1);
 
-  // Spin absorption. Only against an opponent turning the other way: in a
-  // same-spin clash the blades travel together at the contact point and there
-  // is nothing to bite into.
-  const stealA = opposite ? a.stats.spinSteal : 0;
-  const stealB = opposite ? b.stats.spinSteal : 0;
+  // Spin absorption. Against an opponent turning the other way the blades meet
+  // head-on and the absorber bites in at full rate. In a same-spin clash the
+  // blades travel together at the contact point, so only a layer that declares
+  // `sameSteal` gets anything at all — and only that fraction of its rate.
+  // With sameSteal 0 (every layer but the vampire) this is exactly the old
+  // opposite-only gate, bit for bit.
+  const stealA = opposite ? a.stats.spinSteal : a.stats.spinSteal * a.stats.sameSteal;
+  const stealB = opposite ? b.stats.spinSteal : b.stats.spinSteal * b.stats.sameSteal;
 
   // The absorber both takes less and converts part of what it dealt into its
   // own rotation — the signature "it was nearly dead and it's climbing back".
@@ -554,9 +558,13 @@ function resolvePair(a: BeyState, b: BeyState, rng: () => number): HitEvent | nu
   b.spin =
     Math.min(stealCapB, Math.max(0, Math.abs(b.spin) - netLossB + gainB)) * (dirB || 1);
 
-  // Surfaced so the round breakdown can show absorption happening.
+  // Surfaced so the round breakdown can show absorption happening. The pulse is
+  // the same signal for the frame the renderer draws the drain on — set to 1
+  // only when spin actually moved, so a 0-steal layer never flickers.
   a.spinStolen += gainA;
   b.spinStolen += gainB;
+  if (gainA > 0) a.stealPulse = 1;
+  if (gainB > 0) b.stealPulse = 1;
 
   a.burst += ((impact * C.BURST_PER_HIT * atkB * aggrB) / burstResA) * settle;
   b.burst += ((impact * C.BURST_PER_HIT * atkA * aggrA) / burstResB) * settle;

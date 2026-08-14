@@ -1,6 +1,6 @@
-import { bladeSilhouette } from './beyMesh';
+import { CLASSIC, bladeSilhouette } from './beyMesh';
 import { beastEmblem, designByLayer } from './beydex';
-import type { BeyDesign } from './beydex';
+import { classicByLayer } from './classicdex';
 import { LAYERS } from '../sim/parts';
 
 /**
@@ -26,7 +26,6 @@ import { LAYERS } from '../sim/parts';
 /** Sampled outline of a silhouette, in canvas pixels, centred on the origin. */
 function tracePath(
   ctx: CanvasRenderingContext2D,
-  design: BeyDesign,
   blades: number,
   radius: number,
   style: Parameters<typeof bladeSilhouette>[2],
@@ -45,8 +44,10 @@ function tracePath(
     else ctx.lineTo(x, y);
   }
   ctx.closePath();
-  void design;
 }
+
+/** Which design set the chip should advertise. */
+export type ThumbTheme = 'anime' | 'classic';
 
 const hex = (c: number): string => `#${c.toString(16).padStart(6, '0')}`;
 
@@ -63,6 +64,7 @@ export function drawBeyThumb(
   canvas: HTMLCanvasElement,
   layerId: string,
   size = 72,
+  theme: ThumbTheme = 'anime',
 ): void {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   canvas.width = size * dpr;
@@ -73,7 +75,6 @@ export function drawBeyThumb(
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
 
-  const design = designByLayer(layerId);
   const blades = LAYERS.find((l) => l.id === layerId)?.blades ?? 3;
 
   ctx.setTransform(dpr, 0, 0, dpr, (size * dpr) / 2 / dpr, (size * dpr) / 2 / dpr);
@@ -83,12 +84,18 @@ export function drawBeyThumb(
   const R = size * 0.44;
   const ink = '#0a0a12';
 
+  if (theme === 'classic') {
+    drawClassicThumb(ctx, layerId, blades, R, size, ink);
+    return;
+  }
+
+  const design = designByLayer(layerId);
+
   // Under-ring tier: a blunter cut of the same grammar, staggered half a blade
   // step so its blades sit in the upper tier's gaps.
   if (design.underRing !== undefined) {
     tracePath(
       ctx,
-      design,
       blades,
       R * 0.97,
       {
@@ -107,7 +114,7 @@ export function drawBeyThumb(
   }
 
   // Blade tier.
-  tracePath(ctx, design, blades, R, design.blade, 0);
+  tracePath(ctx, blades, R, design.blade, 0);
   ctx.fillStyle = hex(design.primary);
   ctx.fill();
   ctx.strokeStyle = ink;
@@ -142,10 +149,84 @@ export function drawBeyThumb(
   ctx.drawImage(chip, -cs / 2, -cs / 2, cs, cs);
 }
 
+/**
+ * The Classic plan view.
+ *
+ * A separate painter rather than a palette swap, because the two themes build
+ * genuinely different objects and a chip that shows anime construction for a
+ * top rendered in classic construction is lying to the player at the exact
+ * moment they are choosing. Classic has no under-ring tier, no sticker face and
+ * no beast emblem — its layer is one extruded solid with a faceted cone boss —
+ * so what shows through the blade cutaways is the DISC, and the centre is
+ * hardware, not a crest.
+ *
+ * Proportions come from `CLASSIC` in beyMesh, so the chip tracks the mesh.
+ */
+function drawClassicThumb(
+  ctx: CanvasRenderingContext2D,
+  layerId: string,
+  blades: number,
+  R: number,
+  size: number,
+  ink: string,
+): void {
+  const design = classicByLayer(layerId);
+  const ds = CLASSIC.discScale;
+  const facets = Math.max(6, blades * 2);
+
+  const polygon = (radius: number, sides: number, turn: number): void => {
+    ctx.beginPath();
+    for (let i = 0; i < sides; i++) {
+      const a = (i / sides) * Math.PI * 2 + turn;
+      const x = Math.cos(a) * radius;
+      const y = Math.sin(a) * radius;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+  };
+
+  // The disc, seen through the layer's undercuts — the six flat facets are the
+  // mesh's own six radial segments.
+  polygon(R * 0.88 * ds, 6, Math.PI / 6);
+  ctx.fillStyle = hex(design.secondary);
+  ctx.fill();
+  ctx.strokeStyle = ink;
+  ctx.lineWidth = size * 0.022;
+  ctx.stroke();
+
+  // The layer, at the same scale the extrude uses.
+  tracePath(ctx, blades, R * (design.layerScale ?? CLASSIC.layerScale), design.blade, 0);
+  ctx.fillStyle = hex(design.primary);
+  ctx.fill();
+  ctx.strokeStyle = ink;
+  ctx.lineWidth = size * 0.03;
+  ctx.stroke();
+
+  // Boss ring, then the boss cone's own facet count on top of it: from directly
+  // above that is exactly what the two accent meshes project to.
+  ctx.strokeStyle = hex(design.accent);
+  ctx.lineWidth = size * 0.03;
+  ctx.beginPath();
+  ctx.arc(0, 0, R * 0.375, 0, Math.PI * 2);
+  ctx.stroke();
+
+  polygon(R * 0.36, facets, 0);
+  ctx.fillStyle = hex(design.accent);
+  ctx.fill();
+  ctx.strokeStyle = ink;
+  ctx.lineWidth = size * 0.022;
+  ctx.stroke();
+}
+
 /** Convenience: a ready-made canvas element for a layer. */
-export function beyThumb(layerId: string, size = 72): HTMLCanvasElement {
+export function beyThumb(
+  layerId: string,
+  size = 72,
+  theme: ThumbTheme = 'anime',
+): HTMLCanvasElement {
   const canvas = document.createElement('canvas');
   canvas.className = 'bey-thumb';
-  drawBeyThumb(canvas, layerId, size);
+  drawBeyThumb(canvas, layerId, size, theme);
   return canvas;
 }

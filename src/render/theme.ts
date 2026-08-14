@@ -20,8 +20,21 @@
  * separate cosmetic slots in the product sense too.
  *
  * There used to be three attempts at the anime look (beam / overdrive / toon).
- * They are consolidated into ANIME; the retired ids must keep resolving — see
- * LEGACY_ANIME_IDS — because they live in players' localStorage.
+ * Beam and Toon are consolidated into ANIME; the retired ids must keep
+ * resolving — see LEGACY_ANIME_IDS — because they live in players'
+ * localStorage.
+ *
+ * OVERDRIVE was consolidated away with them and that was a mistake. Folding it
+ * into ANIME assumed the cartoon look was a strict superset, and it is not:
+ * cel shading deletes glow by construction (flat bands cannot bleed), so
+ * everything OVERDRIVE was — glowing lights, bloom, auras and speed lines over
+ * a *3D* arena — had no home in either survivor. Players read that as "the
+ * effects are gone", which is exactly what happened. It is back as its own
+ * theme, and the picker now covers three distinct answers rather than two:
+ *
+ *   Arena     — clean, technical, readable. No glow. The reference look.
+ *   Overdrive — the same 3D world lit up: bloom, per-top lights, impact.
+ *   Anime     — not 3D at all: cel bands, ink lines, drawn motion.
  */
 
 export interface Theme {
@@ -242,15 +255,118 @@ export const ANIME: Theme = {
   bodyClass: 'theme-anime',
 };
 
-export const THEMES: Theme[] = [ARENA, ANIME];
+/**
+ * Overdrive: the 3D arena with the lights on.
+ *
+ * Restored verbatim from the pre-consolidation literal, with two deliberate
+ * deviations, both noted at their fields: `toon` (the flag postdates this
+ * theme, and Overdrive is emphatically not a cartoon) and `trailOpacity` (the
+ * trail primitive changed underneath it).
+ *
+ * Anime draws power *around* a fighter rather than on them, cuts to speed lines
+ * when something moves fast, and blows the frame white on a decisive hit. This
+ * theme does all three over real geometry: an energy aura per top, a radial
+ * speed-line overlay driven by actual speed, a full-screen impact flash, and
+ * bloom hot enough that the emissive parts genuinely glow instead of merely
+ * being bright. The per-top lights are the load-bearing part — at 2.1 the tops
+ * light the arena rather than the arena lighting them, which is the whole
+ * difference between "a dark scene" and "a Gundam fight".
+ */
+export const OVERDRIVE: Theme = {
+  id: 'overdrive',
+  name: 'Overdrive',
+  blurb: '3D with the lights on — glow, bloom, impact',
+
+  background: 0x05010f,
+  fogColour: 0x0a0320,
+  fogNear: 2.8,
+  fogFar: 6.8,
+
+  dishColour: 0x140a26,
+  dishMetalness: 0.2,
+  dishRoughness: 0.8,
+  ridgeColour: 0xffe066,
+  ridgeOpacity: 1,
+  guideColour: 0x35205c,
+  guideOpacity: 0.6,
+
+  wallColour: 0x140a28,
+  wallMetalness: 0.3,
+  wallRoughness: 0.7,
+  postColour: 0x00e5ff,
+  postEmissive: 3,
+  skirtColour: 0x050110,
+
+  // Deliberately dim ambient with hot rims. The tops carry their own light
+  // (beyLightIntensity below), so a bright fill would flatten exactly the
+  // contrast that makes them read as light *sources*.
+  hemiSky: 0x4a2f8f,
+  hemiGround: 0x05010f,
+  hemiIntensity: 0.28,
+  keyIntensity: 0.5,
+  rimAColour: 0xff2e88,
+  rimAIntensity: 3.4,
+  rimBColour: 0x00e5ff,
+  rimBIntensity: 3.4,
+
+  sparkColour: 0xffffff,
+  sparkSize: 0.05,
+  // Was 1 when the trail was a one-pixel THREE.Line. It is a RibbonTrail now —
+  // a real triangle strip roughly 30x the screen area — and at 1 under additive
+  // blending plus bloom the ribbon outshone the top it was trailing. 0.8 keeps
+  // it the brightest thing after the beys themselves without eating them.
+  // 0.32, not the original 1.0 and not the 0.8 this was first restored at.
+  //
+  // Measured in the browser: the ribbon is additive, and bloom here has
+  // threshold 0.7 — so a trail at 0.8 saturates to white, clears the threshold
+  // along its whole length, and blooms into a pair of arcs that span the frame
+  // and read as fog banks rather than as motion. It also destroyed the one
+  // thing the trail is for, which is telling you WHOSE top that is: both
+  // ribbons clipped to white and lost the skin colour entirely.
+  //
+  // At 0.32 the ribbon stays under the bloom threshold along the tail and only
+  // the head — the brightest 20% of the fade ramp — blooms, which is exactly
+  // the read wanted: a hot streak at the top with a coloured wake behind it.
+  trailOpacity: 0.32,
+  beyLightIntensity: 2.1,
+  beyLightFlash: 6,
+  shockwave: true,
+  finisherBlackout: true,
+  postBloom: true,
+  // Threshold matters more than strength: raising it means only genuinely hot
+  // things bloom, so the glow reads as emissive rather than as fog.
+  bloomStrength: 0.72,
+  bloomRadius: 0.62,
+  bloomThreshold: 0.7,
+  // The `toon` flag did not exist when this theme was written. It is false
+  // because Overdrive's entire proposition is *3D with glow* — cel bands and
+  // ink outlines would delete the bloom this theme is built around.
+  toon: false,
+  aura: true,
+  speedLines: true,
+  impactFlash: true,
+
+  bodyClass: 'theme-overdrive',
+};
+
+// Ordered as the picker shows them: least to most stylised.
+export const THEMES: Theme[] = [ARENA, OVERDRIVE, ANIME];
 
 /**
  * Retired theme ids that may still be in players' localStorage or in old
- * ArenaSpec.suggestedTheme values. They were all attempts at the anime look,
- * so they must resolve to ANIME — falling back to ARENA would silently strip
- * the cartoon mode from returning players.
+ * ArenaSpec.suggestedTheme values. They were attempts at the anime look, so
+ * they must resolve to ANIME — falling back to ARENA would silently strip the
+ * cartoon mode from returning players.
+ *
+ * 'overdrive' was in this set and has been REMOVED, deliberately reversing the
+ * earlier remap. The remap was correct only while Overdrive did not exist; now
+ * that it does, a saved 'overdrive' must resolve to Overdrive — the whole
+ * reason the id is in someone's localStorage is that they chose it, and
+ * silently substituting a different theme for their explicit choice is the bug
+ * this set exists to prevent, not an instance of it. `themeById` finds it in
+ * THEMES on its own, so no special case is needed here.
  */
-const LEGACY_ANIME_IDS = new Set(['beam', 'overdrive', 'toon']);
+const LEGACY_ANIME_IDS = new Set(['beam', 'toon']);
 
 export const themeById = (id: string): Theme =>
   LEGACY_ANIME_IDS.has(id) ? ANIME : (THEMES.find((t) => t.id === id) ?? ARENA);
@@ -259,10 +375,18 @@ const KEY = 'beyblade-arena.theme.v1';
 
 export function loadThemeId(): string {
   try {
-    const raw = localStorage.getItem(KEY) ?? ARENA.id;
+    // OVERDRIVE, not ARENA, is what a player with no saved preference gets.
+    // Arena is the *reference* look — deliberately plain, and correct as the
+    // thing every other theme is diffed against — but nobody opens a Beyblade
+    // game hoping for restraint. Overdrive is the same readable 3D arena with
+    // the spectacle turned on, so it is the better first impression while
+    // costing nothing: Arena is one click away in the picker and its values
+    // remain untouched. Anyone who has ever chosen a theme is unaffected,
+    // because a saved id always wins over this default.
+    const raw = localStorage.getItem(KEY) ?? OVERDRIVE.id;
     return LEGACY_ANIME_IDS.has(raw) ? ANIME.id : raw;
   } catch {
-    return ARENA.id;
+    return OVERDRIVE.id;
   }
 }
 

@@ -6,6 +6,7 @@ import { metalToonMaterial, noOutline, setOutline, toonMaterial } from './toon';
 import type { MetalToonOptions } from './toon';
 import { beastEmblem, designByLayer } from './beydex';
 import type { BeyDesign, BladeStyle } from './beydex';
+import { classicByLayer } from './classicdex';
 
 /**
  * The tops get a heavier line than the world around them.
@@ -48,10 +49,73 @@ export function buildBeyMesh(build: BeyBuild, skin: Skin, toon = false): THREE.G
 }
 
 // ---------------------------------------------------------------------------
-// Classic path — the preserved non-toon style. Do not restyle: this is the
-// backup look, kept byte-for-byte equivalent to what it rendered before the
-// toon redesign.
+// Classic path — the clean, technical, non-toon style.
 // ---------------------------------------------------------------------------
+
+/**
+ * Classic proportions, as fractions of the layer radius. The TOON block below
+ * is the same idea for the anime stack.
+ *
+ * WHY THIS EXISTS. 79f5100 replaced Classic's layer — a 0.74r faceted cylinder
+ * plus N thin raked spikes — with the same extruded `bladeSilhouette` the Anime
+ * path uses, at the same full radius. That was the right call for identity (ten
+ * layers stopped rendering as one model in six palettes) and the wrong call for
+ * scale. Measured across the ten designs, the layer's plan-view solid area
+ * became 0.725–0.987·pi·r^2, mean 0.801, against 0.548 for the bare 0.74r
+ * cylinder it replaced; the vertical span went 0.34r -> 0.44r and the max
+ * radius 1.0084r (spike tips) -> 1.0407–1.0561r. Classic renders at full scale
+ * where Anime
+ * shrinks its solid mesh to 0.82x under spin blur, so the two themes stopped
+ * agreeing about how big a top is.
+ *
+ * `layerScale` 0.94 rather than 0.90 is set by the hit ring, not by taste. The
+ * ring is a torus of tube radius 0.05r centred on the collision radius, so its
+ * inner edge sits at 0.95r: a 0.94r layer keeps the blade tips within 0.01r of
+ * that edge and the ring still reads as sitting ON the blades. At 0.90 there is
+ * a 0.05r gap all the way round and the ring visibly floats free of the top.
+ * Scaling the ring instead was rejected outright — it marks the sim's actual
+ * `a.stats.radius + b.stats.radius` contact circle, and a hitbox guide that
+ * lies about the hitbox is worse than one with a gap. Round designs override
+ * this per-design; see `ClassicDesign.layerScale`.
+ *
+ * `discScale` follows because the disc's rim reached 0.88r with weight blocks
+ * out to 0.90r, which at a 0.94r layer leaves 0.04r of taper — the silhouette
+ * loses its "wide layer over a narrower body" read and turns into a barrel.
+ * 0.92 puts the rim at 0.81r and the blocks at 0.83r, restoring 0.11r of taper,
+ * close to the 0.14r the pre-79f5100 stack had.
+ *
+ * Measured on the extruded core (max radius | plan area | vertical span, in
+ * units of r and pi·r^2), all ten designs, before against after — "after"
+ * includes the classicdex cuts, which is why Valtryek and Ragnaruk move most:
+ *
+ *   design    79f5100..now              this block
+ *   aegis     1.0417 | 0.987 | 0.44     0.9000 | 0.711 | 0.38
+ *   fafnir    1.0423 | 0.947 | 0.44     0.9000 | 0.679 | 0.38
+ *   drake     1.0414 | 0.801 | 0.44     0.9400 | 0.641 | 0.38
+ *   leon      1.0440 | 0.801 | 0.44     0.9400 | 0.643 | 0.38
+ *   spryzen   1.0435 | 0.784 | 0.44     0.9400 | 0.614 | 0.38
+ *   valtryek  1.0444 | 0.753 | 0.44     0.9400 | 0.514 | 0.38
+ *   luinor    1.0407 | 0.745 | 0.44     0.9400 | 0.527 | 0.38
+ *   crossx    1.0561 | 0.742 | 0.44     0.9450 | 0.578 | 0.38
+ *   phoenix   1.0428 | 0.729 | 0.44     0.9400 | 0.576 | 0.38
+ *   ragnaruk  1.0455 | 0.725 | 0.44     0.9400 | 0.485 | 0.38
+ *
+ * Areas land in 0.485–0.711, mean 0.597, straddling the 0.548 of the
+ * pre-79f5100 cylinder, while keeping the design-driven silhouette 79f5100 was
+ * written to deliver. Worst-case max radius across the set is 0.9450r (Cross X,
+ * whose `blade` cut peaks a hair past its nominal radius), comfortably inside
+ * the collision circle.
+ */
+// Exported so `beyThumb` draws the picker chip at the proportions the mesh is
+// actually built at — a thumbnail that carries its own copy of these numbers is
+// a second implementation, and it drifts.
+export const CLASSIC = {
+  layerScale: 0.94,
+  layerDepth: 0.34,
+  bevelT: 0.02,
+  bossH: 0.24,
+  discScale: 0.92,
+} as const;
 
 function buildClassicBey(build: BeyBuild, skin: Skin): THREE.Group {
   const group = new THREE.Group();
@@ -62,16 +126,19 @@ function buildClassicBey(build: BeyBuild, skin: Skin): THREE.Group {
 
   const { layer } = build;
   const r = layer.radius;
-  // Classic reads the beydex too.
+  // Classic has its own design set.
   //
   // It used to build every layer from the same faceted cylinder in the skin's
   // colour, so swapping beys in this theme changed the blade *count* and
-  // nothing else — ten designs rendered as one model in six palettes. The
-  // silhouette and palette now come from the design, exactly as in Anime;
-  // what stays classic is the *material* treatment (metalness/roughness
-  // MeshStandardMaterial, no cel bands, no ink outline), which is what gives
-  // this theme its character. The stadium and lighting are untouched.
-  const design = designByLayer(layer.id);
+  // nothing else — ten designs rendered as one model in six palettes. 79f5100
+  // fixed that by pointing Classic at the beydex, which also made Classic a
+  // recolour of Anime. The classicdex keeps the silhouette-per-design win and
+  // takes back the identity: an industrial palette and harder cuts for the
+  // designs authored there, the beydex entry for the rest. What stays classic
+  // is the *material* treatment (metalness/roughness MeshStandardMaterial, no
+  // cel bands, no ink outline). The stadium and lighting are untouched.
+  const design = classicByLayer(layer.id);
+  const layerScale = design.layerScale ?? CLASSIC.layerScale;
 
   // ---- driver: a slim cone that meets the floor at the group origin --------
   const tipHeight = r * 1.05;
@@ -121,8 +188,9 @@ function buildClassicBey(build: BeyBuild, skin: Skin): THREE.Group {
   // Six radial segments rather than 24: the flat faces catch the light
   // differently as it turns, which is what makes the rotation readable.
   const discMat = skinMaterial(skin, design.secondary);
+  const ds = CLASSIC.discScale;
   const discMesh = new THREE.Mesh(
-    new THREE.CylinderGeometry(r * 0.78, r * 0.88, discHeight, 6),
+    new THREE.CylinderGeometry(r * 0.78 * ds, r * 0.88 * ds, discHeight, 6),
     discMat,
   );
   discMesh.position.y = discY;
@@ -130,11 +198,15 @@ function buildClassicBey(build: BeyBuild, skin: Skin): THREE.Group {
   discGroup.add(discMesh);
 
   // Weight blocks around the rim, the disc's equivalent of the layer's blades.
-  const weightGeo = new THREE.BoxGeometry(r * 0.2, discHeight * 1.15, r * 0.16);
+  const weightGeo = new THREE.BoxGeometry(r * 0.2 * ds, discHeight * 1.15, r * 0.16);
   for (let i = 0; i < 3; i++) {
     const angle = (i / 3) * Math.PI * 2 + Math.PI / 6;
     const w = new THREE.Mesh(weightGeo, discMat);
-    w.position.set(Math.cos(angle) * r * 0.8, discY, Math.sin(angle) * r * 0.8);
+    w.position.set(
+      Math.cos(angle) * r * 0.8 * ds,
+      discY,
+      Math.sin(angle) * r * 0.8 * ds,
+    );
     w.rotation.y = -angle;
     w.castShadow = true;
     discGroup.add(w);
@@ -148,18 +220,30 @@ function buildClassicBey(build: BeyBuild, skin: Skin): THREE.Group {
 
   const facets = Math.max(6, layer.blades * 2);
 
-  // The design's own silhouette, extruded — the same 2D profile the Anime
-  // theme cuts, in a metallic material rather than a cel one. This is what
-  // makes a Fafnir read as a rounded spin-steal shield and a Valtryek as a
-  // three-winged attacker in *both* themes.
+  // The design's own silhouette, extruded — cut from the classicdex profile in
+  // a metallic material rather than a cel one. This is what makes a Fafnir read
+  // as a toothed gear ring and a Valtryek as a three-tooth cutter, instead of
+  // ten layers sharing one faceted cylinder.
+  //
+  // bevelOffset is NEGATIVE, and that is a hitbox fix rather than a taste one.
+  // three expands the bevel wall outward from the shape plane for a clockwise
+  // contour (which `bladeSilhouette` produces), so at offset 0 the widest ring
+  // of the mesh sits bevelSize OUTSIDE the outline: measured 1.0407r–1.0561r
+  // across the ten designs, against a sim that collides at exactly
+  // `a.stats.radius + b.stats.radius`. Tops visibly overlapped before touching.
+  // Cancelling the offset pulls the waist back onto the contour — measured
+  // 1.0000r, and 1.0053r for Cross X, whose `blade` cut peaks a hair past r —
+  // so `what you see is what hits` holds again. Dropping bevelSize to 0 fixes
+  // the same thing but loses the moulded edge entirely; this keeps it.
   const coreGeo = new THREE.ExtrudeGeometry(
-    bladeSilhouette(layer.blades, r, design.blade),
-    { depth: r * 0.34, bevelEnabled: true, bevelThickness: r * 0.05,
-      bevelSize: r * 0.04, bevelOffset: 0, bevelSegments: 2, curveSegments: 8 },
+    bladeSilhouette(layer.blades, r * layerScale, design.blade),
+    { depth: r * CLASSIC.layerDepth, bevelEnabled: true,
+      bevelThickness: r * CLASSIC.bevelT, bevelSize: r * 0.04,
+      bevelOffset: -r * 0.04, bevelSegments: 2, curveSegments: 8 },
   );
   const core = new THREE.Mesh(coreGeo, layerMat);
   core.rotation.x = -Math.PI / 2;
-  core.position.y = layerY - r * 0.17;
+  core.position.y = layerY - r * (CLASSIC.layerDepth / 2);
   core.castShadow = true;
   layerGroup.add(core);
 
@@ -173,12 +257,15 @@ function buildClassicBey(build: BeyBuild, skin: Skin): THREE.Group {
 
   // The centre boss: a raised, faceted crown. This is the part that reads as a
   // "face" at a glance and gives the top an up direction.
+  // Shortened with the rest of the stack: the crown was the tallest thing on a
+  // top already 2.29r high under a camera 34° above horizontal, where height
+  // costs more screen than width does. 0.24 takes the assembly to 2.20r.
   const accentMat = skinMaterial(skin, design.accent);
   const boss = new THREE.Mesh(
-    new THREE.ConeGeometry(r * 0.36, r * 0.3, facets),
+    new THREE.ConeGeometry(r * 0.36, r * CLASSIC.bossH, facets),
     accentMat,
   );
-  boss.position.y = layerY + r * 0.3;
+  boss.position.y = layerY + r * CLASSIC.bossH;
   boss.castShadow = true;
   layerGroup.add(boss);
 

@@ -108,7 +108,11 @@ export const LADDER: Rival[] = [
     skinId: 'frost',
     difficulty: 'champion',
     line: 'The complete blader. Every mistake you make, it will already be punishing.',
-    unlocks: { drivers: ['orbit'], skins: ['rose'] },
+    // The final rung was the thinnest reward on the ladder — a driver and a
+    // skin, and the only rival granting no layer. Nosferu is the right thing to
+    // put here: it is the one layer whose mechanic changes how you launch, so
+    // clearing the ladder hands over a new question rather than a spare part.
+    unlocks: { layers: ['nosferu'], drivers: ['orbit'], skins: ['rose'] },
   },
 ];
 

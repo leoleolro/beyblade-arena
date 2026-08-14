@@ -5,7 +5,7 @@ import type { HitEvent } from '../sim/physics';
 import type { BeyState } from '../sim/types';
 import { buildBeyMesh } from './beyMesh';
 import type { BeyParts } from './beyMesh';
-import { RibbonTrail, SparkBurst, Trail } from './effects';
+import { RibbonTrail, SparkBurst } from './effects';
 import type { TrailLike } from './effects';
 import { buildSpinBlur } from './spinBlur';
 import type { SpinBlur } from './spinBlur';
@@ -15,6 +15,7 @@ import type { Skin } from './skins';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { applyStadiumTheme, beyWorldPosition, buildStadium } from './stadium';
 import type { StadiumHandles } from './stadium';
 import { ARENA, THEMES, themeById } from './theme';
@@ -56,6 +57,46 @@ interface BeyVisual {
   shadow: THREE.Mesh | null;
   /** Free-running precession phase, so wobble doesn't look mechanical. */
   wobblePhase: number;
+  /** Seconds since this top died. Drives the defeat animation. */
+  death: number;
+  /** One-shot latch for the flash/ring on the frame a top goes out. */
+  defeatOpened: boolean;
+  /** Unit exit bearing, captured on the frame a knocked-out top leaves. */
+  exit: THREE.Vector3;
+}
+
+/**
+ * The entry drop.
+ *
+ * There was no entry at all: setBeys placed both tops at their sim positions
+ * and the first frame simply had them there, mid-orbit, as if they had always
+ * been spinning. Reported as "the blades enter the arena so slow", which is the
+ * right complaint about the wrong thing — nothing entered, so there was nothing
+ * to be slow.
+ *
+ * 0.35s from 0.62 units up (the rim is at 0.2), well inside the sim's
+ * SETTLE_TIME of 1.25s, so the drop is finished long before the first contact
+ * can matter. ENTRY_FALL splits the window: fall, then a single small rebound.
+ */
+const ENTRY_TIME = 0.35;
+const ENTRY_HEIGHT = 0.62;
+const ENTRY_FALL = 0.78;
+
+/**
+ * Put a top's three sub-groups back where buildBeyMesh left them.
+ *
+ * The burst defeat is the only thing in the renderer that writes to a part
+ * transform, and a round can be cut short mid-scatter. buildBeyMesh hands back
+ * fresh groups every round so this is belt-and-braces — but "the scattered
+ * pieces cannot survive into the next round" is a property worth stating in
+ * code rather than inferring from an allocation.
+ */
+function resetParts(parts: BeyParts): void {
+  for (const p of [parts.layer, parts.disc, parts.driver]) {
+    p.position.set(0, 0, 0);
+    p.rotation.set(0, 0, 0);
+    p.scale.setScalar(1);
+  }
 }
 
 /**
@@ -148,8 +189,34 @@ export class ArenaRenderer {
   private readonly beyRoot = new THREE.Group();
 
   private shake = 0;
+  /**
+   * Clash punch, 0–1: a short radius pull-in and lens kick on a heavy hit.
+   *
+   * Separate from `shake` because they decay at different rates and mean
+   * different things — shake is the operator being rattled and is over in a
+   * beat, punch is the shot tightening on the exchange and wants to breathe.
+   */
+  private punch = 0;
   private cameraAngle = 0;
+  /**
+   * Orbit radius, tracked rather than re-derived from camera.position.
+   *
+   * It used to be read back as hypot(position.x, position.z), which was only
+   * correct while the camera orbited the world origin. It now orbits `focus`,
+   * so the readback would fold the focus offset into the radius and the camera
+   * would creep outward as the fight drifted off centre.
+   */
+  private camRadius = 1.7;
+  /** Eased look-at target: where the fight is, not where the bowl is. */
+  private readonly focus = new THREE.Vector3(0, C.BOWL_DEPTH * 0.35, 0);
+  private readonly focusTarget = new THREE.Vector3();
+  /** Resting vertical field of view; the punch kicks below this and eases back. */
+  private readonly baseFov = 42;
   private elapsed = 0;
+  /** Seconds of entry drop remaining; 0 when idle. */
+  private entry = 0;
+  /** One-shot latch for the touchdown ring, so it fires on exactly one frame. */
+  private entryLanded = true;
 
   private readonly canvas: HTMLCanvasElement;
 
@@ -183,6 +250,8 @@ export class ArenaRenderer {
   private railSparkClock = 0;
   /** Scratch for rider bearings; reused so the rail costs no allocation. */
   private readonly railAngles: number[] = [];
+  /** Scratch for the rail spark stream direction. */
+  private readonly railStream = new THREE.Vector3();
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -303,6 +372,21 @@ export class ArenaRenderer {
     }
   }
 
+  /**
+   * Build the bloom render path, once, on first use by a theme that wants it.
+   *
+   * This had not executed since the theme consolidation deleted the only
+   * postBloom theme, and it did not survive the three.js upgrades that happened
+   * meanwhile. EffectComposer's buffers are HalfFloatType and therefore LINEAR,
+   * and UnrealBloomPass's final blend is a plain ShaderMaterial that does no
+   * colour-space conversion — so the last pass was writing linear values
+   * straight into an sRGB framebuffer. That is not a subtle difference: the
+   * whole image comes out washed out and milky, which would have read as "the
+   * bloom is broken" rather than as "the output pass is missing".
+   *
+   * OutputPass does the tone-mapping and sRGB conversion the renderer would
+   * normally do for itself, and must be LAST in the chain.
+   */
   private ensureComposer(): void {
     if (this.composer) return;
     const w = this.canvas.clientWidth || window.innerWidth;
@@ -311,6 +395,7 @@ export class ArenaRenderer {
     this.composer.addPass(new RenderPass(this.scene, this.camera));
     this.bloom = new UnrealBloomPass(new THREE.Vector2(w, h), 0.9, 0.55, 0.62);
     this.composer.addPass(this.bloom);
+    this.composer.addPass(new OutputPass());
     this.composer.setSize(w, h);
   }
 
@@ -343,6 +428,67 @@ export class ArenaRenderer {
   finish(): void {
     if (this.theme.finisherBlackout) this.blackout = 0.55;
     this.shake = Math.max(this.shake, 0.07);
+    this.punch = Math.max(this.punch, 0.75);
+  }
+
+  /**
+   * Called when a round starts — the mirror of finish().
+   *
+   * Two jobs. The tops DROP IN from above the rim instead of materialising
+   * mid-orbit, landing together in a ring of sparks; and the camera starts wide
+   * and swung round to the player's entry side, so the exponential radius ease
+   * updateCamera already runs reads as a hard push-in on the launch.
+   *
+   * Render-only by construction: the drop is a y offset added on top of the sim
+   * position each frame (see entryOffset) and is never written back into
+   * b.pos, so the physics is untouched and a headless run is unaffected.
+   *
+   * @param entryAngle The player's launch bearing, in sim-plane radians.
+   */
+  start(entryAngle = 0): void {
+    this.entry = ENTRY_TIME;
+    this.entryLanded = false;
+    this.shake = 0;
+    this.punch = 0;
+    // The focus is damped at 3.5/s, so a round that ended in a knockout leaves
+    // it parked over the loser's exit point out near the rim. Without this the
+    // next round opens aimed off-centre and drifts back over roughly the whole
+    // 0.35s drop — i.e. the entry, the one shot that has to be composed.
+    this.focus.set(0, C.BOWL_DEPTH * 0.35, 0);
+    // Otherwise a cut spent on the last hit of the previous round can eat the
+    // first clash of this one.
+    this.frameCooldown = 0;
+
+    // Sim (x, y) maps to world (x, z) and the orbit is parameterised as
+    // (sin, cos), so pi/2 - entryAngle is the bearing that puts the camera
+    // over the player's drop point.
+    this.cameraAngle = Math.PI / 2 - entryAngle;
+
+    // 35% wider than the resting frame. updateCamera closes the gap at 2.2/s,
+    // so the push-in runs for most of the 1.25s settle window and finishes
+    // about when the tops are first allowed to hurt each other.
+    const aspect = this.camera.aspect || 1;
+    const narrow = aspect < 1.6 ? 1.6 / Math.max(aspect, 0.5) : 1;
+    this.camRadius = 1.62 * narrow * 1.35;
+  }
+
+  /**
+   * Height to add to a top's visual position this frame, in world units.
+   *
+   * Cubic ease-out over the first 78% of the window — fast out of the sky,
+   * decelerating into the dish — and then one small rebound, because a drop
+   * that stops dead at the floor reads as a teleport that happened to have a
+   * trajectory. Measured: 0.62 to 0 over 0.27s, then +0.045 to 0 over 0.08s.
+   */
+  private entryOffset(): number {
+    if (this.entry <= 0) return 0;
+    const t = 1 - this.entry / ENTRY_TIME;
+    if (t < ENTRY_FALL) {
+      const k = t / ENTRY_FALL;
+      return ENTRY_HEIGHT * (1 - k) ** 3;
+    }
+    const k = (t - ENTRY_FALL) / (1 - ENTRY_FALL);
+    return 0.045 * Math.sin(k * Math.PI) * (1 - k);
   }
 
   private addLights(): void {
@@ -390,6 +536,11 @@ export class ArenaRenderer {
   setBeys(beys: BeyState[], skins: Record<string, string> = {}): void {
     this.lastSkins = skins;
     this.lastBeys = beys;
+    // A mid-round theme switch calls straight back in here (see setTheme), and
+    // without this the tops would jump back into the sky and re-drop in the
+    // middle of a fight. start() is the only thing that arms the entry.
+    this.entry = 0;
+    this.entryLanded = true;
     for (const v of this.visuals.values()) {
       this.beyRoot.remove(v.group);
       this.beyRoot.remove(v.trail.object);
@@ -404,9 +555,35 @@ export class ArenaRenderer {
     for (const b of beys) {
       const skin: Skin = skinById(skins[b.id] ?? 'frost');
       const group = buildBeyMesh(b.build, skin, this.theme.toon);
-      const trail: TrailLike = this.theme.toon
-        ? new RibbonTrail(skin.primary, b.stats.radius)
-        : new Trail(skin.primary);
+
+      // The ribbon is not a toon effect — it is simply a trail you can SEE.
+      // The fallback `Trail` is a THREE.Line, which no desktop GL driver draws
+      // wider than one pixel (documented at effects.ts), so on a 4K display the
+      // "trail" was a hairline nobody ever noticed. RibbonTrail is real
+      // geometry and reads at any resolution; its noOutline call is inert
+      // outside the toon path, so there is nothing toon-specific left in it.
+      //
+      // EVERY theme gets the ribbon, ARENA included, and that is a deliberate
+      // narrowing of ARENA's "unchanged" contract rather than a violation of
+      // it. Two reasons:
+      //
+      //  - The old `Trail` is a 1px THREE.Line, and effects.ts records that
+      //    linewidth is ignored on essentially every platform. ARENA's hairline
+      //    trail is not a design choice anyone made; it is what the platform
+      //    does to a choice nobody could implement. Preserving it preserves a
+      //    limitation, not a look.
+      //  - Keeping a per-theme PRIMITIVE was an outright bug. setTheme only
+      //    rebuilds the tops when `toon` changes, and ARENA.toon === OVERDRIVE
+      //    .toon === false, so switching between those two left whichever
+      //    primitive the last launch built — a wide additive ribbon stranded in
+      //    ARENA, or the invisible hairline stranded in the theme whose entire
+      //    point is spectacle — until the next round rebuilt it.
+      //
+      // What the contract does still bind is ARENA's PARAMETERS: its palette,
+      // its lights, and its effect flags are untouched, and trailOpacity stays
+      // at the 0.45 it has always had, so the ribbon reads as a soft wake here
+      // and as a hard streak in Overdrive at 0.8.
+      const trail: TrailLike = new RibbonTrail(skin.primary, b.stats.radius);
       trail.setOpacity(this.theme.trailOpacity);
 
       // Toon only: motion is drawn, not simulated — at high spin the blur is
@@ -415,6 +592,7 @@ export class ArenaRenderer {
       // silhouette, sharing its geometry.
       const design = designByLayer(b.build.layer.id);
       const parts = group.userData.parts as BeyParts;
+      resetParts(parts);
       const blur = this.theme.toon
         ? buildSpinBlur(design, b.stats.radius, parts.layer, b.build.layer.blades)
         : null;
@@ -446,6 +624,9 @@ export class ArenaRenderer {
         aura,
         shadow,
         wobblePhase: Math.random() * Math.PI * 2,
+        death: 0,
+        defeatOpened: false,
+        exit: new THREE.Vector3(1, 0, 0),
       });
     }
   }
@@ -455,24 +636,31 @@ export class ArenaRenderer {
     this.elapsed += dt;
     this.frameCooldown = Math.max(0, this.frameCooldown - dt);
 
+    this.entry = Math.max(0, this.entry - dt);
+    const drop = this.entryOffset();
+    const entering = this.entry > 0;
+    // Ramps 0 to 1 across the entry window, so the drawn motion spins UP as the
+    // top lands rather than arriving already at full smear.
+    const entryK = entering ? clampUnit(1 - this.entry / ENTRY_TIME) : 1;
+
     for (const b of beys) {
       const v = this.visuals.get(b.id);
       if (!v) continue;
 
       if (!b.alive) {
-        // Knocked-out tops drop away and stop trailing.
-        v.group.position.y -= dt * 1.6;
-        v.group.rotation.z += dt * 4;
+        v.death += dt;
         v.trail.setVisible(false);
         if (v.blur) v.blur.mesh.visible = false;
-        if (v.aura) v.aura.sprite.visible = false;
         if (v.shadow) v.shadow.visible = false;
-        if (v.group.position.y < -1.5) v.group.visible = false;
+        this.playDefeat(v, b, dt);
         continue;
       }
 
       const p = beyWorldPosition(b.pos.x, b.pos.y);
       v.group.position.copy(p);
+      // The entry drop. Purely additive on the render position — the sim has
+      // the top on the dish the whole time.
+      if (drop > 0) v.group.position.y += drop;
 
       if (v.shadow) {
         // Sits on the dish under the top, flat, tracking position only. The
@@ -498,13 +686,22 @@ export class ArenaRenderer {
       // returns at full size and its wobble carries the frame. Shrink rather
       // than hide: the afterimages stay at full radius, so the shrink is what
       // opens the gap between the solid top and its own smear.
-      const blurK = v.blur ? v.blur.update(sn, dt) : 0;
+      const blurK = v.blur ? v.blur.update(sn * entryK, dt) : 0;
       const detail = 1 - blurK * 0.18;
       v.parts.layer.scale.setScalar(detail);
       v.parts.disc.scale.setScalar(detail);
 
-      v.trail.setVisible(true);
-      v.trail.push(p.clone().setY(p.y + 0.05));
+      if (entering) {
+        // Hold the trail off and keep re-seeding it while the top is in the
+        // air. Pushed positions include the drop offset, so a live trail would
+        // draw a streak hanging out of the sky and then leave it there — the
+        // ribbon's fade ramp is fixed-length and cannot outrun it.
+        v.trail.setVisible(false);
+        v.trail.reset();
+      } else {
+        v.trail.setVisible(true);
+        v.trail.push(p.clone().setY(p.y + 0.05));
+      }
 
       // The hit ring flares on contact and dims as spin runs out.
       const ring = v.group.userData.ring as THREE.Mesh | undefined;
@@ -532,13 +729,86 @@ export class ArenaRenderer {
       }
     }
 
+    // Touchdown. Both tops land on the same frame — that simultaneity is the
+    // point, it is the "big collision at the start" the entry exists for.
+    if (!this.entryLanded && this.entry <= ENTRY_TIME * (1 - ENTRY_FALL)) {
+      this.entryLanded = true;
+      for (const b of beys) {
+        if (!b.alive) continue;
+        const at = beyWorldPosition(b.pos.x, b.pos.y);
+        at.y += 0.02;
+        // Gated on the theme's own shockwave flag rather than fired blind:
+        // that flag is exactly the statement "this theme draws pressure rings",
+        // and ARENA says no.
+        //
+        // 0.5, not the 1.5 this shipped at. This ring fires TWICE — once per
+        // top — on the same frame, at the start of literally every round, and
+        // at 1.5 the pair swept out to one and a half stadium radii and read
+        // as two grey bands wiping across the whole frame. It was the single
+        // most visible thing in the restored theme and it was not an effect
+        // anyone would recognise as a touchdown. Landing is a small, sharp
+        // event; the ring should sit under the top, not cross the arena.
+        if (this.theme.shockwave) this.shockwaves.spawn(at, 0xffffff, 0.5);
+        this.sparks.spawn(at, 3.0, 40);
+      }
+      this.shake = Math.max(this.shake, 0.05);
+      this.punch = Math.max(this.punch, 0.5);
+    }
+
     for (const h of hits) {
       const at = beyWorldPosition(h.at.x, h.at.y);
       at.y += 0.06;
-      this.sparks.spawn(at, h.strength, h.opposite ? 40 : 24);
+      // The spark count was 24 or 40, chosen purely by spin parity — so a
+      // finisher and a glancing tap threw an identical shower and the whole
+      // damage range the sim produces was invisible. Strength drives it now:
+      // 12 + 14*strength, so a 0.4 nudge gets ~18, a hitstop-grade hit (1.6)
+      // gets ~34, an impact-frame hit (2.6) ~48, and a 5+ opposite-spin crit
+      // hits the 72 cap. The opposite-spin bonus survives as a multiplier
+      // because blades biting the wrong way genuinely do throw more.
+      const count = Math.min(
+        72,
+        Math.round((12 + h.strength * 14) * (h.opposite ? 1.25 : 1)),
+      );
+      this.sparks.spawn(at, h.strength, count);
       this.shake = Math.min(0.09, this.shake + h.strength * 0.016);
+      this.punch = Math.min(1, this.punch + h.strength * 0.14);
       if (this.theme.shockwave && h.strength >= C.HITSTOP_THRESHOLD) {
-        this.shockwaves.spawn(at, h.crit ? 0xfff0a0 : 0xffffff, h.crit ? 1.6 : 1.1);
+        // Ring size scales with the hit too. The ring always expands over a
+        // fixed 0.34s (shockwave.ts), so a bigger span is also a FASTER wave —
+        // size and speed come off the one number, which is what makes a heavy
+        // ring feel like more pressure instead of just a wider circle.
+        //
+        // THE CAP IS THE STADIUM, not a taste value. shockwave.ts scales the
+        // unit ring to `0.05 + eased * span` against STADIUM_RADIUS 1.0 and a
+        // skirt that ends at 1.5, so a span past ~1.55 spends most of its life
+        // as a grey band expanding through empty air outside the bowl — and
+        // with the camera orbiting at 1.62–2.19 it sweeps out past and under
+        // the lens. Seen in the browser at the first attempt's 2.95: two huge
+        // arcs across the whole frame that read as fog, not as impact.
+        // THE SCALE HERE WAS FOUND BY BISECTION IN THE BROWSER, not by taste,
+        // because three plausible suspects looked identical on screen. The
+        // first attempt spanned 2.95 and drew two grey bands across the whole
+        // frame; suspecting the new ribbon trail, I zeroed trailOpacity and
+        // the bands were still there; disabling `shockwave` on the theme
+        // removed them. So the ring was always the culprit, and the reason is
+        // arithmetic rather than tuning: a ring centred on the clash and
+        // expanding to radius 1.0 has, by definition, swept the entire
+        // stadium, and something covering the whole arena reads as weather,
+        // not as an impact.
+        //
+        // A concussion ring has to stay LOCAL to the hit. Measured now: 0.29
+        // at the hitstop bar, 0.32 at the impact-frame bar, 0.42 at the cap —
+        // under half the 1.0 stadium radius, so it always reads as energy
+        // coming off the two tops rather than as a wave crossing the dish.
+        const span = Math.min(0.42, 0.18 + h.strength * 0.045) + (h.crit ? 0.05 : 0);
+        // A perfect block is the DEFENDER's moment, so it gets the defender's
+        // colour and a second inner ring travelling the other way in size. The
+        // sim has computed perfectBlock since the move triangle landed and
+        // nothing has ever drawn it: the one exchange that rewards reading the
+        // opponent looked exactly like a lucky bump.
+        const colour = h.perfectBlock ? 0x7dd3fc : h.crit ? 0xfff0a0 : 0xffffff;
+        this.shockwaves.spawn(at, colour, span);
+        if (h.perfectBlock) this.shockwaves.spawn(at, colour, span * 0.55);
       }
       // The manga cut, centred on where the clash actually happened. Same
       // threshold as hitstop: the sim freezes for a beat and this is the frame
@@ -546,9 +816,14 @@ export class ArenaRenderer {
       // invisible at these speeds.
       // Crits always earn one; otherwise the hit has to clear a bar well above
       // hitstop AND the refractory window has to have expired.
-      const frameWorthy =
-        h.crit || h.strength >= C.IMPACT_FRAME_THRESHOLD;
-      if (this.theme.toon && frameWorthy && this.frameCooldown <= 0) {
+      // A perfect block earns one unconditionally, refractory window included.
+      // It is the rarest thing in the move triangle — it needs contact to land
+      // inside the opening beat of a block that was thrown on the read — so it
+      // cannot strobe, and being cut out by a refractory window that an
+      // ordinary trade opened a moment earlier is precisely backwards.
+      const frameWorthy = h.crit || h.strength >= C.IMPACT_FRAME_THRESHOLD;
+      const framed = h.perfectBlock || (frameWorthy && this.frameCooldown <= 0);
+      if (this.theme.toon && framed) {
         this.frameCooldown = C.IMPACT_FRAME_COOLDOWN;
         this.projected.copy(at).project(this.camera);
         // Design primaries feed the clash-tone frame style; the sim only
@@ -580,12 +855,28 @@ export class ArenaRenderer {
     if (this.rail && this.rail.group.visible) {
       const riders = beys.filter((b) => b.alive && b.railTime > 0);
       this.railSparkClock += dt;
-      if (riders.length && this.railSparkClock > 0.035) {
+      // 0.012s x 14, up from 0.035s x 5. The hook was firing all along — 94% of
+      // rounds engage the rail inside 0.25s — but 143 particles/second of
+      // isotropic puff at the top's centre is a wisp of smoke, not a grind.
+      // ~1170/s off the contact edge in a directional cone is a weld.
+      if (riders.length && this.railSparkClock > 0.012) {
         this.railSparkClock = 0;
         for (const b of riders) {
-          const at = beyWorldPosition(b.pos.x, b.pos.y);
-          at.y += 0.03;
-          this.sparks.spawn(at, 1.4, 5);
+          // Spawn at the CONTACT EDGE. Taken as the top's own outer edge rather
+          // than from the rail's radius: they coincide while a top is locked
+          // in, and this stays correct for a top still drifting inside the
+          // engage band, with no need to plumb the rail spec through.
+          const r = Math.hypot(b.pos.x, b.pos.y) || 1;
+          const at = beyWorldPosition(
+            b.pos.x + (b.pos.x / r) * b.stats.radius,
+            b.pos.y + (b.pos.y / r) * b.stats.radius,
+          );
+          at.y += 0.02;
+          // Trailing BACKWARD along -velocity in a narrow cone. Sim (x, y) is
+          // world (x, z). Grinding metal throws a stream behind the contact;
+          // the isotropic burst this used to spawn read as the top steaming.
+          this.railStream.set(-b.vel.x, 0, -b.vel.y);
+          this.sparks.spawn(at, 1.8, 14, this.railStream, 0.28);
         }
       }
       const flare = riders.length > 0 ? 2.6 : 0;
@@ -632,6 +923,13 @@ export class ArenaRenderer {
     this.shockwaves.update(dt);
     this.updateCamera(beys, dt);
 
+    // Exactly one render path per frame, and toon wins the tie by construction.
+    // OutlineEffect and EffectComposer must never both run: the outline pass
+    // renders the scene TWICE straight to the canvas, so following it with a
+    // composer render would draw a third, un-outlined image over the top, and
+    // preceding it would throw the composer's work away. The if/else chain is
+    // the guarantee — no theme is expected to set both flags, but a theme that
+    // did would still render exactly once.
     if (this.theme.toon) {
       if (!this.outline) {
         // Thick and near-black. Thin outlines read as anti-aliasing artefacts;
@@ -652,14 +950,54 @@ export class ArenaRenderer {
   }
 
   /**
-   * Slow orbit around the stadium, easing toward the action and shaking on
-   * heavy contact.
+   * The camera.
+   *
+   * This is the only write point for camera position in the whole renderer and
+   * nothing in the scene is baked to it, which makes it the cheapest place in
+   * the codebase to buy presence. It used to be a tripod: a slow orbit of the
+   * world origin, staring at a fixed point in the middle of an empty bowl,
+   * plus uncorrelated per-axis position jitter on contact. Four changes:
+   *
+   *   - it FRAMES THE FIGHT, easing the look-at toward the midpoint of the live
+   *     tops instead of at the furniture;
+   *   - a heavy clash punches the radius in and kicks the lens;
+   *   - the shake is a decaying ROLL about the view axis, not a positional
+   *     jitter — see below;
+   *   - the eye height is derived from the pull-back distance rather than
+   *     constant, to hold a hard floor on elevation.
+   *
+   * Everything is exponentially eased at a per-second rate, so it is
+   * frame-rate independent and nothing snaps.
    */
   private updateCamera(beys: BeyState[], dt: number): void {
     this.cameraAngle += dt * 0.09;
 
-    // Frame the surviving tops: pull back when they're far apart.
     const alive = beys.filter((b) => b.alive);
+
+    // ---------------------------------------------------------- framing ----
+    // Damped to 0.55 of the way out to the midpoint rather than tracking it
+    // 1:1, for two reasons. Two tops orbiting to opposite sides put the
+    // midpoint back at the centre anyway, so the last 45% buys almost nothing;
+    // and the impact-frame projection in update() reads a camera that is one
+    // frame stale, so a fast pan lands the manga cut visibly off the clash.
+    // 0.55 with a 3.5/s ease holds the worst-case pan near 0.3 degrees/frame at
+    // 60fps, comfortably inside what the 22–78% clamp in impactFrame.ts
+    // absorbs.
+    let mx = 0;
+    let my = 0;
+    for (const b of alive) {
+      mx += b.pos.x;
+      my += b.pos.y;
+    }
+    if (alive.length) {
+      mx /= alive.length;
+      my /= alive.length;
+    }
+    const mid = beyWorldPosition(mx, my);
+    this.focusTarget.set(mid.x * 0.55, mid.y + 0.05, mid.z * 0.55);
+    this.focus.lerp(this.focusTarget, 1 - Math.exp(-dt * 3.5));
+
+    // Pull back when the tops are far apart.
     let spread = 0;
     for (let i = 0; i < alive.length; i++) {
       for (let k = i + 1; k < alive.length; k++) {
@@ -674,22 +1012,202 @@ export class ArenaRenderer {
     // tops slide off the sides of the screen exactly when they separate.
     const aspect = this.camera.aspect || 1;
     const narrow = aspect < 1.6 ? 1.6 / Math.max(aspect, 0.5) : 1;
-    const targetDist = (1.62 + spread * 0.34) * narrow;
-    const radius = THREE.MathUtils.lerp(
-      Math.hypot(this.camera.position.x, this.camera.position.z),
-      targetDist,
-      1 - Math.exp(-dt * 2.2),
-    );
 
-    this.shake = Math.max(0, this.shake - dt * 0.22);
-    const jitter = this.shake;
+    // ------------------------------------------------------------ punch ----
+    // Decays over ~0.4s from a full hit. Accumulated in the hits loop, and by
+    // finish() and the entry touchdown.
+    this.punch = Math.max(0, this.punch - dt * 2.4);
+    const punch = clampUnit(this.punch);
+
+    const targetDist = (1.62 + spread * 0.34) * narrow * (1 - punch * 0.12);
+    this.camRadius += (targetDist - this.camRadius) * (1 - Math.exp(-dt * 2.2));
+
+    // Lens kick: 42 down to ~38.4 at full punch, eased at 9/s. Deliberately
+    // small. A big fov swing on every clash is nauseating, and it also
+    // re-projects the impact frame — at this rate the fov moves under 0.4
+    // degrees in a 16ms frame, which the stale-projection clamp swallows.
+    const targetFov = this.baseFov - punch * 3.6;
+    const fov =
+      this.camera.fov + (targetFov - this.camera.fov) * (1 - Math.exp(-dt * 9));
+    if (Math.abs(fov - this.camera.fov) > 1e-4) {
+      this.camera.fov = fov;
+      this.camera.updateProjectionMatrix();
+    }
+
+    // -------------------------------------------------------- elevation ----
+    // HARD FLOOR, and the reason the height is no longer the constant 1.16.
+    // spinBlur's viewFade (spinBlur.ts:363) is at full strength only above
+    // sin(elevation) >= 0.44, about 26 degrees, and falls away to 0.32 by 6
+    // degrees — so a camera that sinks toward the rim silently guts the anime
+    // motion read to a third and gives no sign it has done so. tan(26 deg) is
+    // 0.488; 0.5 taken against (radius + 0.45) rather than radius alone keeps
+    // even the far top — up to about a unit beyond the focus — above ~24
+    // degrees when the shot is at its widest.
+    const bob = Math.sin(this.elapsed * 0.35) * 0.08;
+    const height = Math.max(
+      1.16 + bob,
+      this.focus.y + (this.camRadius + 0.45) * 0.5,
+    );
 
     this.camera.position.set(
-      Math.sin(this.cameraAngle) * radius + (Math.random() - 0.5) * jitter,
-      1.16 + Math.sin(this.elapsed * 0.35) * 0.08 + (Math.random() - 0.5) * jitter,
-      Math.cos(this.cameraAngle) * radius + (Math.random() - 0.5) * jitter,
+      this.focus.x + Math.sin(this.cameraAngle) * this.camRadius,
+      height,
+      this.focus.z + Math.cos(this.cameraAngle) * this.camRadius,
     );
-    this.camera.lookAt(0, C.BOWL_DEPTH * 0.35, 0);
+    this.camera.lookAt(this.focus);
+
+    // ------------------------------------------------------------ shake ----
+    // Rotational, about the view axis, applied after lookAt so it is in view
+    // space. The old version offset the camera POSITION on all three axes by
+    // independent random values every frame, which is indistinguishable from a
+    // dropped frame — the whole image steps sideways and back with no
+    // continuity between frames, and it reads as a glitch rather than as
+    // force. Rolling the camera keeps the subject pinned where the eye already
+    // is and moves the horizon instead, which is what a physical operator
+    // absorbing a shock actually does. Two incommensurate frequencies so
+    // consecutive hits cannot beat into a regular oscillation.
+    // At the 0.09 shake ceiling this is ~4.6 degrees of roll and ~1.8 of
+    // pitch, decaying to nothing in 0.4s.
+    this.shake = Math.max(0, this.shake - dt * 0.22);
+    if (this.shake > 1e-4) {
+      this.camera.rotateZ(Math.sin(this.elapsed * 47) * this.shake * 0.9);
+      this.camera.rotateX(Math.sin(this.elapsed * 31 + 1.7) * this.shake * 0.35);
+    }
+  }
+
+  /**
+   * The three ways a round ends, drawn as three different things.
+   *
+   * The sim has always said which one happened — `BeyState.defeat`, set in
+   * battle.ts — and the renderer has always ignored it. Burst, ring-out and
+   * spin-finish all sank through the floor identically, so the signature moment
+   * of the entire franchise (the top coming APART) had no picture at all and
+   * looked the same as running out of spin.
+   *
+   * THE BUDGET IS 0.40 SECONDS, not the 1.15 of FINISH_HOLD_TIME. Game.tick
+   * feeds the renderer `dt * FINISH_RENDER_SCALE` for the whole hold (that
+   * slow-motion is what sells the finish), so 1.15s of wall clock delivers
+   * 1.15 * 0.35 = 0.40s of render time here before the result panel covers the
+   * stadium. `t` below is render time and is therefore measured against that,
+   * not against the wall clock. Getting this wrong is invisible in code review
+   * and obvious on screen: the animation is simply cut off mid-way.
+   *
+   * Measured against the 0.40s budget: the burst scatter completes at 0.34,
+   * the knockout arc leaves the frame at 0.40, the topple settles at 0.36.
+   */
+  private playDefeat(v: BeyVisual, b: BeyState, dt: number): void {
+    const t = v.death;
+
+    if (b.defeat === 'burst') {
+      // The layer, disc and driver are ALREADY separate sub-groups (v.parts,
+      // built by beyMesh), so the top can literally come apart — no extra
+      // geometry, and the pieces that fly are the pieces the player chose.
+      if (!v.defeatOpened) {
+        v.defeatOpened = true;
+        const at = v.group.position.clone();
+        at.y += 0.06;
+        // White, and larger than any clash ring can be, so a burst can never
+        // be mistaken for one more heavy hit. That is an invariant, not a
+        // wish: the clash span above caps at 1.55 + 0.12 on a crit = 1.67, so
+        // this must stay strictly above the clash cap of 0.42 + 0.05 = 0.47 —
+        // and it still has to die near the skirt rather than sail off into
+        // empty air, which is why it is a hair over rather than double. TWO rings a beat apart carry the extra
+        // weight instead of one huge one.
+        if (this.theme.shockwave) {
+          this.shockwaves.spawn(at, 0xffffff, 0.66);
+          this.shockwaves.spawn(at, 0xffffff, 0.4);
+        }
+        this.sparks.spawn(at, 4.5, 64);
+        // Only in themes that already light the arena from the tops. ARENA
+        // holds beyLightIntensity at 0 and must not grow a light source it has
+        // never had.
+        if (this.theme.beyLightIntensity > 0) {
+          v.light.color.setHex(0xffffff);
+          v.light.intensity = Math.max(v.light.intensity, 9);
+        }
+        this.shake = Math.max(this.shake, 0.085);
+      }
+      // Ease-out: the pieces leave hard and then coast, which is what makes it
+      // read as something breaking rather than something being thrown.
+      const k = clampUnit(t / 0.34);
+      const eased = 1 - (1 - k) * (1 - k);
+      const parts = [v.parts.layer, v.parts.disc, v.parts.driver];
+      for (let i = 0; i < parts.length; i++) {
+        // Fanned off the top's own wobble phase, so the three pieces separate
+        // instead of overlapping and the fan differs per top for free.
+        const a = v.wobblePhase + i * 2.4;
+        const reach = 0.3 + i * 0.06;
+        // Gravity is deliberately weak — 0.16 against a launch of 0.30..0.18.
+        //
+        // The first attempt used 0.55, which is roughly physical and completely
+        // wrong here. The group's origin is the DRIVER TIP (beyMesh.ts:32), so
+        // the three parts sit at local y of only ~0.19 / 0.15 / 0.07; a 0.55
+        // fall term puts the driver under the dish 25% into the animation and
+        // the disc at 43%, and the floor lathe is opaque and depth-writing, so
+        // most of the burst played out invisibly beneath it — the exact defect
+        // this animation was written to replace. At 0.16 every piece ends the
+        // 0.34s window ABOVE where it started (+0.14 / +0.08 / +0.02), which is
+        // also the right read: a burst throws the layer up and out, it does not
+        // drop it.
+        parts[i].position.set(
+          Math.cos(a) * reach * eased,
+          (0.3 - i * 0.06) * eased - 0.16 * eased * eased,
+          Math.sin(a) * reach * eased,
+        );
+        parts[i].rotation.x += dt * (7 + i * 3);
+        parts[i].rotation.z += dt * (5 - i * 2);
+        parts[i].scale.setScalar(1);
+      }
+      // The flash fades faster than the parts fly, so the pieces are readable
+      // against the dark rather than silhouetted in their own glare.
+      v.light.intensity *= Math.exp(-dt * 6);
+      if (v.aura) {
+        v.aura.sprite.visible = this.theme.aura && k < 1;
+        if (v.aura.sprite.visible) v.aura.update(0.2, 1 - k, b.stats.radius, 1.4);
+      }
+      if (k >= 1) v.group.visible = false;
+      return;
+    }
+
+    if (b.defeat === 'knockout') {
+      // Ringed out: it went through a pocket, so it leaves the way it was
+      // travelling — a ballistic arc over the rim, not a sink through the
+      // floor. The sim's final position is already past EXIT_RADIUS, so the
+      // outward radial IS the exit bearing and needs nothing else to derive.
+      if (!v.defeatOpened) {
+        v.defeatOpened = true;
+        v.exit.copy(v.group.position).setY(0);
+        if (v.exit.lengthSq() < 1e-8) v.exit.set(1, 0, 0);
+        v.exit.normalize();
+      }
+      v.group.position.x += v.exit.x * 2.6 * dt;
+      v.group.position.z += v.exit.z * 2.6 * dt;
+      // Up at 2.2/s against 26/s^2 of gravity: peaks 0.09 above the rim at
+      // 0.085s, crosses back down at 0.17s, and passes the -1.2 cut-off at
+      // 0.40s — exactly the render-time budget. Steep on purpose: it has to be
+      // a whole arc inside 0.4s, and a lazy lob would still be hanging in
+      // frame when the result panel arrives.
+      v.group.position.y += (2.2 - t * 26) * dt;
+      v.group.rotation.z += dt * 14;
+      v.group.rotation.x += dt * 6;
+      if (v.aura) v.aura.sprite.visible = false;
+      if (v.group.position.y < -1.2) v.group.visible = false;
+      return;
+    }
+
+    // spin-finish, and any defeat the sim left unset: out of spin, not out of
+    // the arena. It stays on the dish, the precession races as the last of the
+    // spin goes, then the lean opens all the way over and it lies down. The
+    // wobble rate is driven to zero by the same curve that lays it flat, so it
+    // topples and STOPS rather than lolling on its side forever.
+    const k = clampUnit(t / 0.36);
+    const eased = k * k;
+    const lean = b.tilt + (Math.PI / 2 - b.tilt) * eased;
+    v.wobblePhase += dt * 14 * (1 - eased);
+    v.group.rotation.x = Math.sin(v.wobblePhase) * lean;
+    v.group.rotation.z = Math.cos(v.wobblePhase) * lean;
+    v.group.rotation.y += dt * 5 * (1 - eased);
+    if (v.aura) v.aura.sprite.visible = false;
   }
 
   /**
