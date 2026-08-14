@@ -784,17 +784,29 @@ export function beastEmblem(design: BeyDesign, size = 256): HTMLCanvasElement {
       // the chord so the membrane looks stretched between finger bones. Drawn
       // wings-first so the torso pins their roots.
       //
-      // The wingtip sits at 86 authored px: times the 1.15 dark-chip scale that
-      // is 99, just inside the 104px inner gold ring. Drawn at 96 (the width
-      // the shape wants) the tips cross the bezel and the mark reads as
-      // clipped, so this is the widest a spread wing can be on this chip.
+      // WINGSPAN IS BOUNDED BY THE BEZEL, and the bound is RADIAL.
+      //
+      // The first version put the tip at (86, -44) and justified it as "86 px,
+      // inside the 104 px inner gold ring" — which measured the x component
+      // and forgot the y. The tip's actual distance from the chip centre is
+      // hypot(86, 44) = 96.6; times the 1.15 dark-chip scale that is 111.1,
+      // plus half the 5·s stroke = 114.0. The chip's gold bands sit at
+      // 101.8–107.0 and 107.7–115.4, and nothing here clips, so both wingtips
+      // painted straight across the inner ring and landed centred on the deep
+      // one — a gold mark over a gold bezel with a crimson cel line through
+      // it. Every other dark-chip motif clears it (lion 89.7, phoenix 97.9,
+      // drakehead 101.9).
+      //
+      // Scaled 0.85 throughout so the shape keeps its proportions: the tip is
+      // now at hypot(73, 37) = 81.8 → 94.1 + 2.9 stroke = 97.0, clear of the
+      // 101.8 inner band with room for the stroke to breathe.
       for (const dir of [-1, 1] as const) {
         ctx.beginPath();
-        ctx.moveTo(dir * 8 * s, -16 * s);
-        ctx.quadraticCurveTo(dir * 44 * s, -64 * s, dir * 86 * s, -44 * s); // leading edge
-        ctx.quadraticCurveTo(dir * 66 * s, -32 * s, dir * 62 * s, -4 * s); // outer scallop
-        ctx.quadraticCurveTo(dir * 46 * s, -20 * s, dir * 38 * s, 6 * s);
-        ctx.quadraticCurveTo(dir * 25 * s, -14 * s, dir * 13 * s, 2 * s);
+        ctx.moveTo(dir * 7 * s, -14 * s);
+        ctx.quadraticCurveTo(dir * 37 * s, -54 * s, dir * 73 * s, -37 * s); // leading edge
+        ctx.quadraticCurveTo(dir * 56 * s, -27 * s, dir * 53 * s, -3 * s); // outer scallop
+        ctx.quadraticCurveTo(dir * 39 * s, -17 * s, dir * 32 * s, 5 * s);
+        ctx.quadraticCurveTo(dir * 21 * s, -12 * s, dir * 11 * s, 2 * s);
         ctx.closePath();
         ctx.fill();
         ctx.stroke();

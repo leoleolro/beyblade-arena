@@ -158,19 +158,43 @@ reading before you commit.
 The rubber-blade mechanic from the series: a layer with `spinSteal` bites into an
 opponent turning the *other* way and converts part of that contact back into its
 own rotation. The top looks like it's dying, then climbs back with every further
-clash — Fafnir absorbs 62%, Luinor 12%, everything else nothing.
+clash — Fafnir absorbs 62%, Luinor 12%, Nosferu 88%, everything else nothing.
 
-It **only works in opposite-spin matchups**. Against a same-spin opponent the
-blades travel together at the contact point and there is nothing to bite into.
-That restriction is what stops it being a free stat, and it gives the
-spin-direction choice real weight: an absorber *wants* the pairing that would
-destroy anything else. Measured, the absorber survives **14.7s in opposite-spin
-against 7.4s in same-spin**.
+It **only works in opposite-spin matchups**, with exactly one named exception.
+Against a same-spin opponent the blades travel together at the contact point and
+there is nothing to bite into. That restriction is what stops it being a free
+stat, and it gives the spin-direction choice real weight: an absorber *wants*
+the pairing that would destroy anything else. Measured, the absorber survives
+**14.7s in opposite-spin against 7.4s in same-spin**.
+
+### The exception, and why it is per-layer
+
+Raising `spinSteal` alone turned out to be nearly inert. Mitigation saturates —
+the absorber's own loss is reduced by `1 - steal * 0.55`, so 0.55 is the ceiling
+however high the stat goes — and the gain scales off the absorber's deliberately
+low attack. Measured on one stat line: steal 0.62 → 0.88 → 1.00 moved the win
+rate 31.3% → 35.6% → 37.5%. There is no vampire at the end of that dial.
+
+So the *mechanic* changed instead, via a second per-layer stat: `sameSteal`,
+which lets a layer absorb on same-spin contact at a reduced rate. **Sanguine
+Nosferu is the only layer that declares it** (0.30), so every other layer is
+bit-identical to before and the opposite-spin-only rule still holds
+catalog-wide. A global factor was tried first and rejected: it fails
+`steal.test.ts`'s same-spin assertion by construction, and at 0.50 it drags
+fafnir/wall/bastion to 77.1% — past the 72% ceiling.
+
+Nosferu's counterplay is **burst**. Steal does nothing against burst damage, so
+a top whose spin keeps climbing has to be popped rather than outlasted — and at
+`burstResist` 0.88 it is the easiest thing in the game to pop. Swept across all
+six presets at 80 seeds a pairing: best build 56.7% (against an existing legal
+maximum of 59.2%), worst build 33.3% (against a floor of 33.5%).
 
 Stolen spin is capped at launch spin. Uncapped, a long absorbing exchange
 ratchets upward and the round never ends. `src/sim/steal.test.ts` pins all four
 invariants: it works, it's inert in same-spin, it never exceeds launch spin, and
-a non-absorbing layer absorbs nothing.
+a non-absorbing layer absorbs nothing — plus two more for the exception: that
+Nosferu steals strictly less on same-spin than opposite, and that no other layer
+has a non-zero `sameSteal`, so the exception cannot silently spread.
 
 Adding it fixed the game's chronically weakest build — Endless Coil went from
 32% to 47% — and needed one compensating buff to Ragnaruk, whose fast
@@ -394,15 +418,30 @@ Two looks, switchable in the garage and persisted:
   ribbon trails, manga impact frames, auras, speed lines and shockwaves — one
   theme that owns the whole treatment.
 
-There used to be four: three separate part-way attempts at the anime look
-(Beam Clash, Overdrive, Toon) accumulated alongside Arena, none of which
-actually landed it — three "anime" chips in the picker and no anime. They are
-consolidated into the single **Anime** theme; saved ids from the retired themes
-migrate to it via `loadThemeId`/`themeById`, so returning players keep their
-cartoon mode instead of silently falling back to Arena. The lesson worth
-keeping: themes are *commitments*, not accretions — when a new attempt at a
-look supersedes an old one, the old one should be absorbed, not left as a
-third option that dilutes the picker.
+There are three: **Arena** (clean, technical, readable), **Overdrive** (3D with
+glow, bloom and impact) and **Anime** (full cartoon). Overdrive is the default.
+
+This used to be two, and the consolidation that produced them was half right and
+half a mistake worth recording. Four themes had accumulated — Arena plus three
+part-way attempts at the anime look (Beam Clash, Overdrive, Toon), none of which
+landed it, giving three "anime" chips in the picker and no anime. Folding Beam
+Clash and Toon into a single committed **Anime** theme was correct.
+
+Folding **Overdrive** in was not, and it was reported as "the effects are gone,
+no more glowing lights and gundam battle effect". Overdrive was never a
+part-way attempt at the cartoon look: it was a *different* look — realistic 3D
+materials with per-top glow, bloom, auras, speed lines and a full-screen impact
+flash. Cel shading deletes glow by construction (`postBloom` is false in Anime
+because cel art does not bleed), so the cartoon theme was never a superset of
+the glow theme, and absorbing one into the other destroyed a look nothing else
+provided. It has been restored from its original literal, removed from
+`LEGACY_ANIME_IDS`, and made the default.
+
+The real lesson is narrower than the one first written here. Themes are
+commitments rather than accretions — but "supersedes" has to be checked against
+what a theme actually *does*, not against what its name suggests. Three chips
+saying "anime" was the symptom; two of them being the same look was the reason
+to merge, and the third being a different look was the reason not to.
 
 ### The anime pipeline
 
@@ -719,7 +758,7 @@ genuinely different constructions, chosen per design:
 | profile | character | used by |
 |---|---|---|
 | `blade` | straight run to a hard point, deep undercut — cut metal | Valtryek, Spryzen, Cross X |
-| `wave` | continuous scallop, no corner anywhere — moulded plastic | Fafnir, Aegis, Steel Leon |
+| `wave` | continuous scallop, no corner anywhere — moulded plastic | Fafnir, Aegis, Steel Leon, Sanguine Nosferu |
 | `hook` | edge bulges past contact radius then curls back into a barb | Luinor, Cobalt Drake |
 | `flame` | long slow rise, short sharp fall — blown backwards | Ragnaruk, Crimson Phoenix |
 

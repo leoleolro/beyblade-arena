@@ -3,6 +3,7 @@ import { CRATES, RARITY_COLOUR, RARITY_LABEL, REROLL_COST } from '../economy';
 import type { CrateSpec, Rarity } from '../economy';
 import { playCrateReveal } from './crateReveal';
 import { drawBeyThumb } from './beyThumb';
+import { themeById } from './theme';
 import { LAYERS } from '../sim/parts';
 
 /**
@@ -78,7 +79,7 @@ export function shopSection(game: Game, onChange: () => void): HTMLElement {
       // after a purchase would otherwise let a second click through.
       const result = game.openCrate(crate.id);
       if (!result) return;
-      playCrateReveal(result, onChange);
+      playCrateReveal(result, onChange, themeById(game.themeId).toon ? 'anime' : 'classic');
     });
 
     row.appendChild(card);
@@ -156,7 +157,9 @@ function offerBlock(game: Game, onChange: () => void): HTMLElement {
     if (r.kind === 'layers' && LAYERS.some((l) => l.id === r.id)) {
       const canvas = document.createElement('canvas');
       canvas.className = 'offer-art';
-      drawBeyThumb(canvas, r.id, 56);
+      // Same set the garage picker draws, or the shop sells a bey that looks
+      // nothing like the one the player receives.
+      drawBeyThumb(canvas, r.id, 56, themeById(game.themeId).toon ? 'anime' : 'classic');
       card.appendChild(canvas);
     } else {
       const glyph = document.createElement('span');

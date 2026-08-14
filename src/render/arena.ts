@@ -170,6 +170,10 @@ export class ArenaRenderer {
   private readonly impactFrame = new ImpactFrame();
   /** Scratch for projecting hit points to the screen; no per-hit allocation. */
   private readonly projected = new THREE.Vector3();
+  /** Scratch for the drain stream's direction; no per-frame allocation. */
+  private readonly drainDir = new THREE.Vector3();
+  /** Throttle on the drain stream, so absorption glows instead of strobing. */
+  private drainCooldown = 0;
   /**
    * Seconds until another impact frame may fire.
    *
@@ -543,6 +547,19 @@ export class ArenaRenderer {
     this.entryLanded = true;
     for (const v of this.visuals.values()) {
       this.beyRoot.remove(v.group);
+      // The mesh tree is disposed too, not just detached.
+      //
+      // It used to be only removed, and that leaked the whole top — geometry,
+      // materials, the aura's generated texture, the spin-blur mesh — once per
+      // round for both tops, unbounded across a ladder run. The trail and the
+      // shadow beside it were always disposed, so this was an omission rather
+      // than a policy. buildBeyMesh allocates a fresh tree every round, so
+      // there is nothing to keep.
+      // The aura sprite is a CHILD of the group (see setBeys below), so this
+      // covers its material. Its texture is deliberately shared across every
+      // aura ever built and must outlive any one of them, which is why
+      // disposeTree only disposes materials and geometry, never maps.
+      disposeTree(v.group);
       this.beyRoot.remove(v.trail.object);
       disposeTree(v.trail.object);
       if (v.shadow) {
@@ -635,6 +652,7 @@ export class ArenaRenderer {
   update(beys: BeyState[], hits: HitEvent[], dt: number): void {
     this.elapsed += dt;
     this.frameCooldown = Math.max(0, this.frameCooldown - dt);
+    this.drainCooldown = Math.max(0, this.drainCooldown - dt);
 
     this.entry = Math.max(0, this.entry - dt);
     const drop = this.entryOffset();
@@ -701,6 +719,47 @@ export class ArenaRenderer {
       } else {
         v.trail.setVisible(true);
         v.trail.push(p.clone().setY(p.y + 0.05));
+      }
+
+      // THE DRAIN.
+      //
+      // `stealPulse` is set to 1 by the sim on the frame a top absorbs spin and
+      // decays at 3.5/s, exactly like `hitFlash`. It shipped written-but-unread,
+      // which meant the game's most distinctive mechanic — a top that is losing
+      // and climbing back — had no signal at all beyond a number in the
+      // post-round table.
+      //
+      // Drawn as a stream running from the VICTIM to the ABSORBER, because the
+      // direction is the whole point: spin is leaving one top and arriving at
+      // the other, and a glow on the winner alone would read as "it got a
+      // buff". Tinted with the absorber's own skin so you can see who is
+      // feeding. Reuses the directional spark path added for the rail grind, so
+      // it costs no new pooled resource.
+      const pulse = b.stealPulse ?? 0;
+      if (pulse > 0.06 && this.drainCooldown <= 0) {
+        const donor = beys.find((o) => o.id !== b.id && o.alive);
+        if (donor) {
+          const from = beyWorldPosition(donor.pos.x, donor.pos.y);
+          from.y += 0.05;
+          this.drainDir.copy(p).sub(from);
+          const dist = this.drainDir.length();
+          if (dist > 1e-4) {
+            this.drainDir.multiplyScalar(1 / dist);
+            // A tight cone and a count that follows the pulse: a big absorb
+            // reads as a torrent, a trickle as a few motes.
+            this.sparks.spawn(
+              from,
+              1.1 + pulse * 1.4,
+              Math.round(6 + pulse * 14),
+              this.drainDir,
+              0.18,
+            );
+          }
+        }
+        // Absorbing tops take contact several times a second, and an
+        // unthrottled stream strobes exactly the way the impact frames did
+        // before their cooldown landed.
+        this.drainCooldown = 0.08;
       }
 
       // The hit ring flares on contact and dims as spin runs out.

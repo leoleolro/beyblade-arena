@@ -1,6 +1,7 @@
 import { RARITY_COLOUR, RARITY_LABEL } from '../economy';
 import type { CrateResult, RewardRef } from '../economy';
 import { drawBeyThumb } from './beyThumb';
+import type { ThumbTheme } from './beyThumb';
 import { LAYERS } from '../sim/parts';
 
 /**
@@ -40,14 +41,14 @@ const isLayer = (r: RewardRef): boolean =>
  * else gets a rarity-tinted plate with its name, because a disc or a driver
  * has no silhouette worth 96px and a fake one would be worse than none.
  */
-function tile(r: RewardRef): HTMLElement {
+function tile(r: RewardRef, thumbTheme: ThumbTheme): HTMLElement {
   const el = document.createElement('div');
   el.className = `reel-tile r-${r.rarity}`;
   el.style.setProperty('--rar', hex(RARITY_COLOUR[r.rarity]));
 
   if (isLayer(r)) {
     const canvas = document.createElement('canvas');
-    drawBeyThumb(canvas, r.id, 64);
+    drawBeyThumb(canvas, r.id, 64, thumbTheme);
     el.appendChild(canvas);
   } else {
     const glyph = document.createElement('div');
@@ -78,7 +79,13 @@ function ease(t: number): number {
   return 1 - k * k * k + Math.sin(t * Math.PI * 2.0) * 0.045 * k * k;
 }
 
-export function playCrateReveal(result: CrateResult, onDone: () => void): void {
+export function playCrateReveal(
+  result: CrateResult,
+  onDone: () => void,
+  // Threaded in rather than read from a global: the reel has to show the same
+  // silhouettes the garage does, and this module has no Game to ask.
+  thumbTheme: ThumbTheme = 'anime',
+): void {
   if (typeof document === 'undefined') {
     onDone();
     return;
@@ -107,7 +114,7 @@ export function playCrateReveal(result: CrateResult, onDone: () => void): void {
   const WIN_INDEX = Math.min(result.reel.length - 4, 38);
   const tiles: RewardRef[] = result.reel.slice();
   tiles[WIN_INDEX] = result.reward;
-  for (const r of tiles) strip.appendChild(tile(r));
+  for (const r of tiles) strip.appendChild(tile(r, thumbTheme));
   const winTile = strip.children[WIN_INDEX] as HTMLElement;
 
   const caption = document.createElement('div');

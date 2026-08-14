@@ -982,7 +982,12 @@ export class Ui {
           colour: l.colour,
           note:
             `${l.archetype} · atk ${l.attack} · def ${l.defense}` +
-            (l.spinSteal > 0 ? ` · absorbs ${Math.round(l.spinSteal * 100)}%` : ''),
+            (l.spinSteal > 0 ? ` · absorbs ${Math.round(l.spinSteal * 100)}%` : '') +
+            // The one property that makes a vampire a different bey rather
+            // than a bigger Fafnir: matching its spin does not switch it off.
+            // Without this it read identically to every other absorber at the
+            // exact moment the player picks a spin direction to fight it.
+            ((l.sameSteal ?? 0) > 0 ? ' · drains either spin' : ''),
         })),
         'layer',
       ],
