@@ -2,6 +2,7 @@ import type { Game } from './game';
 import { DISCS, DRIVERS, LAYERS, deriveStats, makeBuild } from './sim/parts';
 import { BEY_PRESETS } from './render/beydex';
 import { beyThumb } from './render/beyThumb';
+import { shopSection } from './render/shopSection';
 import * as C from './sim/constants';
 import { SKINS, skinById } from './render/skins';
 import type { Channel } from './audio';
@@ -963,6 +964,9 @@ export class Ui {
     // under cosmetics.
     collection.appendChild(this.arenaSection());
     collection.appendChild(this.spinSection());
+    // Crates sit in Collection because acquiring is what this tab is for; the
+    // Workshop is about tuning what you already own.
+    collection.appendChild(shopSection(g, () => this.render()));
 
     const slots: [string, { id: string; name: string; colour?: number; note: string }[], string][] = [
       [

@@ -55,7 +55,7 @@ export interface CrateSpec {
 }
 
 export const RARITY_COLOUR: Record<Rarity, number> = {
-  common: 0x8fa3bf,
+  common: 0x6b7d99,
   rare: 0x3f8fe8,
   epic: 0xa855f7,
   legendary: 0xf0a020,

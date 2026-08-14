@@ -1342,3 +1342,254 @@ body.theme-anime .coach.on {
   background: rgba(56, 189, 248, 0.14);
   color: var(--text);
 }
+
+/* ------------------------------------------------------------ crate shop */
+
+.shop-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.shop-head h4 { margin: 0; }
+
+.coin-pill {
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(250, 204, 21, 0.45);
+  background: rgba(250, 204, 21, 0.12);
+  color: #fde047;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.chip.crate-card {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  min-width: 190px;
+  text-align: left;
+}
+
+.crate-title { font-size: 13px; }
+
+/* Generated from the crate's own weights — see oddsBar(). */
+.crate-odds {
+  display: flex;
+  height: 6px;
+  border-radius: 3px;
+  overflow: hidden;
+  gap: 1px;
+}
+
+.crate-odds i { display: block; }
+
+.crate-price {
+  font-size: 11px;
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------- crate reveal */
+
+.crate-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(4, 7, 14, 0.86);
+  backdrop-filter: blur(6px);
+  pointer-events: auto;
+}
+
+.crate-box {
+  --rar: var(--line);
+  width: min(760px, 92vw);
+  padding: 22px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  text-align: center;
+  transition: border-color 200ms ease, box-shadow 200ms ease;
+}
+
+.crate-box.settled {
+  border-color: var(--rar);
+  box-shadow: 0 0 40px -6px var(--rar);
+}
+
+/* The reel window. overflow hidden is what turns a long strip into a slot. */
+.crate-window {
+  position: relative;
+  overflow: hidden;
+  height: 112px;
+  border-radius: 10px;
+  /* Opaque, not a translucent tint: the edge fade below has to blend to an
+     exact colour, and a stack of alpha layers has no single answer. */
+  background: #080c15;
+}
+
+.crate-strip {
+  display: flex;
+  gap: 8px;
+  padding: 8px 0;
+  /* Transform only — animating `left` would relayout 48 tiles every frame. */
+  will-change: transform;
+}
+
+.reel-tile {
+  --rar: var(--line);
+  flex: 0 0 96px;
+  height: 96px;
+  border-radius: 8px;
+  border: 2px solid var(--rar);
+  background: rgba(255, 255, 255, 0.04);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  overflow: hidden;
+}
+
+.reel-tile small {
+  font-size: 9px;
+  color: var(--dim);
+  max-width: 88px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reel-glyph {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 18px;
+  color: var(--rar);
+  border: 2px solid var(--rar);
+}
+
+/* The marker is the promise: whatever sits under it is what you won. */
+.crate-marker {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-1px);
+  background: #fde047;
+  box-shadow: 0 0 12px rgba(253, 224, 71, 0.8);
+  pointer-events: none;
+}
+
+.crate-caption {
+  min-height: 62px;
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.crate-caption b { font-size: 19px; }
+
+.crate-rarity {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--rar);
+}
+
+.crate-new { font-size: 12px; color: var(--good); }
+.crate-dupe { font-size: 12px; color: #fde047; }
+
+.crate-skip {
+  margin-top: 6px;
+  padding: 7px 20px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  cursor: pointer;
+}
+
+/* The reel fades at both edges so it reads as a strip passing through a
+   window, rather than a row of cards chopped off by a box. */
+.crate-window::before,
+.crate-window::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 64px;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.crate-window::before {
+  left: 0;
+  background: linear-gradient(90deg, #080c15, rgba(8, 12, 21, 0));
+}
+
+.crate-window::after {
+  right: 0;
+  background: linear-gradient(270deg, #080c15, rgba(8, 12, 21, 0));
+}
+
+/* The one you won, lifted out of the row once the reel stops. */
+.reel-tile.won {
+  transform: scale(1.06);
+  background: color-mix(in srgb, var(--rar) 18%, transparent);
+  box-shadow: 0 0 22px -2px var(--rar);
+  transition: transform 220ms cubic-bezier(0.2, 1.4, 0.4, 1), box-shadow 220ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reel-tile.won { transition: none; }
+}
+
+/* Rarity has to be felt, not read. The glow scales hard with it so a legendary
+   pull is unmistakable from across the room and a common one is a shrug —
+   otherwise every outcome looks like a jackpot and none of them mean anything. */
+.crate-box.settled.r-common {
+  box-shadow: 0 0 18px -8px var(--rar);
+}
+
+.crate-box.settled.r-rare {
+  box-shadow: 0 0 34px -6px var(--rar);
+}
+
+.crate-box.settled.r-epic {
+  box-shadow: 0 0 52px -4px var(--rar);
+}
+
+.crate-box.settled.r-legendary {
+  box-shadow: 0 0 74px -2px var(--rar);
+  animation: legendary-pulse 1.7s ease-in-out infinite;
+}
+
+@keyframes legendary-pulse {
+  0%, 100% { box-shadow: 0 0 74px -2px var(--rar); }
+  50% { box-shadow: 0 0 110px 4px var(--rar); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .crate-box.settled.r-legendary { animation: none; }
+}
+
+/* Caption placeholder while the reel runs, so the box isn't half empty. */
+.crate-waiting {
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--dim);
+  align-self: center;
+  margin-top: 16px;
+}
