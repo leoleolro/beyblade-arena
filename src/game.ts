@@ -13,8 +13,8 @@ import type { Fighter } from './sim/battle';
 import * as C from './sim/constants';
 import { DEFAULT_BUILD } from './sim/parts';
 import type { BeyBuild, LaunchParams, MoveKind } from './sim/types';
-import { crateById, rollCrate } from './economy';
-import type { CrateResult } from './economy';
+import { DIRECT_PRICE, REROLL_COST, REWARDS, crateById, rollCrate, rollOffer } from './economy';
+import type { CrateResult, OfferSlot, RewardRef } from './economy';
 
 /** Screens the player moves through. */
 export type Screen =
@@ -261,6 +261,64 @@ export class Game {
     if (result.duplicate) this.progress.credit(result.refund);
     else this.progress.grant(result.reward.kind, result.reward.id);
     return result;
+  }
+
+  /**
+   * The current shop offer, rolled lazily.
+   *
+   * Lazy because rolling needs to know what is already owned, and that is not
+   * known when a fresh save is constructed. Stale entries are dropped on read
+   * rather than at grant time: a part can become owned through the ladder or a
+   * crate while the offer is sitting there, and the shop should never sell
+   * something the player already has.
+   */
+  get offer(): OfferSlot[] {
+    const owned = (kind: keyof Unlocks, id: string): boolean =>
+      this.progress.has(kind, id);
+    const stored = this.progress.data.offer
+      .map((ref) => REWARDS.find((r) => r.kind === ref.kind && r.id === ref.id))
+      .filter((r): r is RewardRef => r !== undefined && !owned(r.kind, r.id))
+      .map((reward) => ({ reward, price: DIRECT_PRICE[reward.rarity] }));
+
+    if (stored.length === this.progress.data.offer.length && stored.length > 0) {
+      return stored;
+    }
+
+    // Anything dropped, or nothing rolled yet: roll a full set. Topping up the
+    // remaining slots instead would let a player buy one part and get a fresh
+    // look at the rest for free, over and over.
+    const fresh = rollOffer(owned, this.crateRng);
+    // Guarded, because a fully-collected player rolls an empty offer on every
+    // read and this getter runs on every garage render — an unguarded write
+    // would be a localStorage save per frame of the settings screen.
+    if (fresh.length > 0 || this.progress.data.offer.length > 0) {
+      this.progress.setOffer(fresh.map((s) => ({ kind: s.reward.kind, id: s.reward.id })));
+    }
+    return fresh;
+  }
+
+  /** Buy a specific part outright. Returns false when it can't be afforded. */
+  buyOffer(kind: keyof Unlocks, id: string): boolean {
+    const slot = this.offer.find((s) => s.reward.kind === kind && s.reward.id === id);
+    if (!slot) return false;
+    if (!this.progress.spend(slot.price)) return false;
+    this.progress.grant(kind, id);
+    // Granting makes the slot stale, and the `offer` getter drops stale slots —
+    // so the bought part vanishes from the shelf on the next read, which is
+    // exactly right, and the remaining slots survive because they are still
+    // valid. Clearing the whole offer here would reroll it for free.
+    this.progress.setOffer(
+      this.progress.data.offer.filter((r) => !(r.kind === kind && r.id === id)),
+    );
+    return true;
+  }
+
+  /** Pay to replace the whole offer. */
+  rerollOffer(): boolean {
+    if (!this.progress.spend(REROLL_COST)) return false;
+    const fresh = rollOffer((k, i) => this.progress.has(k, i), this.crateRng);
+    this.progress.setOffer(fresh.map((s) => ({ kind: s.reward.kind, id: s.reward.id })));
+    return true;
   }
 
   goTo(screen: 'home' | 'howto' | 'garage'): void {

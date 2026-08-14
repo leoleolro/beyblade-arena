@@ -846,6 +846,79 @@ would exhaust the browser's ~16 context limit on their own, and the plan view is
 the honest angle anyway — it is where the blade profile reads, and roughly what
 the battle camera shows.
 
+## Coins, crates and the shelf
+
+Two ways to acquire a part, on purpose, because either one alone is a worse
+game. `src/economy.ts` holds both.
+
+**The crate** is chance. Three tiers, each with published odds, and the odds bar
+under every crate in the garage is *generated from the crate's own weights* —
+there is no second copy of those numbers to drift out of sync with the roll.
+`rollCrate` picks the rarity first and the item second, which is what makes the
+advertised weights true: rolling an item directly and reading its rarity
+afterwards would let the catalog's shape silently override the crate's, so
+adding three common layers would quietly make every crate worse.
+
+**The shelf** is choice. Four named parts at fixed prices, restocked free after
+every match, with a flat 45-coin reroll for impatience. It exists so that
+wanting a specific part never requires gambling for it. Chasing one particular
+legendary through Relic Crates costs roughly 4,700 coins in expectation and
+hands you a random one at the end; the shelf sells the exact part for 1,500 and
+cannot disappoint you. `economy.test.ts` pins that relation for every rarity —
+if the certain path ever became the worse deal, the crate would stop being
+optional, and that test fails the build.
+
+Three properties are structural rather than promises, and each has a test:
+
+1. **The only source of coins is playing.** There is no purchase path anywhere
+   in the codebase. A crate cannot be bought, only earned.
+2. **Crates hold nothing the ladder does not also give.** Every reward also
+   drops from beating rivals. A crate buys the part *sooner*, never exclusively,
+   and never power the balance suite has not measured.
+3. **Rarity is derived, not assigned.** `layerRarity` and `spreadRarity` compute
+   it from what a part actually does, so a nerfed part becomes commoner
+   automatically and rarity can never disagree with power. Skins cap at rare —
+   the rarest thing in the game should not be something that cannot affect a
+   match.
+
+Duplicates refund instead of being swallowed. The invariant that matters is
+*expected* refund, not the maximum one: bounding the maximum sounds right and is
+wrong, because the cheapest crate costs 60, so it would force a legendary
+duplicate below that and make the best consolation prize in the game worth less
+than a common part. Measured expectation is 21–43% of cost — enough to sting,
+never a coin printer for a fully-collected player.
+
+The reroll cost is flat and there is a test asserting it. Escalating reroll
+prices are the standard trick in this genre and they are the manipulative part:
+they charge you more for continuing to look, which is pressure dressed as a
+choice.
+
+### The reveal
+
+The reel is the feature. A pull that prints "you got X" is worth nothing — the
+value is in the seconds before you know. `crateReveal.ts` scrolls 48 tiles,
+decelerates with a cubic ease carrying a damped sine on the tail so it overshoots
+slightly and comes back, and settles with the winner under a fixed marker.
+
+Two details that look like styling and are not:
+
+- The winner is **placed into the strip** and the strip translated so it lands
+  under the marker — not the marker moved to wherever the reel stopped. Those
+  render identically and only one of them can silently show the wrong item.
+- The result is **rolled and banked before the animation starts**. Closing the
+  tab mid-reveal cannot cost the item, and the near-miss is honest theatre
+  rather than a recalculation.
+
+The settle glow scales hard with rarity and a legendary pulses, because if every
+outcome lights up the room then none of them mean anything. Common was darkened
+from `#8fa3bf` for the same reason — it was bright enough that the dullest
+possible result looked like a jackpot.
+
+Found while testing: `requestAnimationFrame` does not run in a hidden tab, so
+switching away mid-reveal froze the reel with no caption and left it frozen on
+return. Nothing was lost — the item is already banked — but a stalled reel is
+indistinguishable from a crash, so a `setTimeout` backstop resolves it.
+
 ## Known gaps
 
 - **The champion AI loses to the rookie in stamina and defence mirrors** (35%
@@ -853,23 +926,17 @@ the battle camera shows.
   mixing. `chooseSpinDir` and `chooseLaunch` branch on archetype but `pickMove`
   does not, which is the obvious suspect — but one attempt at fixing it was
   chasing the seat-bias confound above and had to be reverted, so this needs
-  measuring properly rather than another guess. Note the confound is now gone,
-  so a re-measurement would finally be trustworthy.
-- Skins vary colour and material but not silhouette.
-- The tutorial is explanatory, not interactive.
-- The garage labels sit at fixed thirds rather than tracking projected screen
-  positions, so they drift when the model is rotated steeply.
-- The ladder ends. No endless mode or ranked ladder after Zeph.
-- Bundle is ~700 kB (182 kB gzipped), almost entirely Three.js.
-
+  measuring properly rather than another guess. The confound is gone now, so a
+  re-measurement would finally be trustworthy.
 - Skins vary colour and material but not **silhouette**. Blade count already
   differs per layer; distinct shapes per skin would push identification further.
-- The AI reads moves but does not bluff, so a patient player can bait it.
 - The tutorial is explanatory, not interactive. A scripted round that forces
   each situation in turn would teach the triangle faster than reading it.
 - The garage labels sit at fixed thirds rather than tracking the projected
-  screen position of each part, so they drift slightly from the parts when the
-  model is rotated steeply.
-- The ladder ends. After Zeph there's no endless mode, no ranked ladder and no
+  screen position of each part, so they drift when the model is rotated steeply.
+- The ladder ends. After Zeph there is no endless mode, no ranked ladder and no
   daily challenge — and the deterministic seeded sim makes a seeded daily run
-  nearly free, so that's the obvious next step.
+  nearly free, so that is the obvious next step.
+- The shelf restocks per match but does not rotate on a clock, so there is no
+  reason to come back tomorrow specifically.
+- Bundle is ~700 kB (182 kB gzipped), almost entirely Three.js.

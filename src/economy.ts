@@ -226,6 +226,85 @@ export function rollCrate(
   return { reward, duplicate, refund: duplicate ? REFUND[reward.rarity] : 0, reel };
 }
 
+/* -------------------------------------------------------------- the offer */
+
+export interface OfferSlot {
+  reward: RewardRef;
+  price: number;
+}
+
+/**
+ * What a specific, named part costs outright.
+ *
+ * These are the release valve on the crate, and the reason both mechanisms can
+ * coexist without one making the other pointless:
+ *
+ *  - The **crate** is cheaper per item. 420 coins always returns something.
+ *  - The **offer** is the only way to buy the part you actually want. Chasing a
+ *    particular legendary through Relic Crates costs about 2,300 coins in
+ *    expectation (420 / 0.18) and hands you a random one at the end of it; the
+ *    offer sells the exact part for 1,500 and cannot disappoint you.
+ *
+ * So the gamble is for players with few coins who want *anything*, and the
+ * offer is for players who know what they are missing. Deliberately priced so
+ * that the player who refuses to gamble is not the player who falls behind —
+ * if the certain path were the worse deal, the crate would stop being optional.
+ */
+export const DIRECT_PRICE: Record<Rarity, number> = {
+  common: 90,
+  rare: 240,
+  epic: 620,
+  legendary: 1500,
+};
+
+export const OFFER_SIZE = 4;
+
+/**
+ * Flat, and it stays flat.
+ *
+ * Escalating reroll costs are the standard trick and they are the manipulative
+ * part of this genre: they punish the player for continuing to look, which is
+ * pressure rather than a choice. A constant price means rerolling is a plain
+ * trade the player can evaluate once and then stop thinking about.
+ */
+export const REROLL_COST = 45;
+
+/** Appearance weights for the offer. Cheap things show up often. */
+const OFFER_WEIGHT: Record<Rarity, number> = {
+  common: 44,
+  rare: 33,
+  epic: 18,
+  legendary: 5,
+};
+
+/**
+ * Roll a fresh set of offers.
+ *
+ * Unlike the crate, this filters out what the player already owns. The crate
+ * cannot do that — excluding owned items would silently make its advertised
+ * weights false — but nothing is advertised here, and a shop slot showing a
+ * part you already have is simply dead space on the screen.
+ */
+export function rollOffer(
+  owned: (kind: keyof Unlocks, id: string) => boolean,
+  rng: () => number,
+  size: number = OFFER_SIZE,
+): OfferSlot[] {
+  const pool = REWARDS.filter((r) => !owned(r.kind, r.id));
+  const out: OfferSlot[] = [];
+  const taken = new Set<string>();
+
+  while (out.length < size && taken.size < pool.length) {
+    const left = pool.filter((r) => !taken.has(`${r.kind}:${r.id}`));
+    if (left.length === 0) break;
+    const pick = weightedPick(left, (r) => OFFER_WEIGHT[r.rarity], rng);
+    taken.add(`${pick.kind}:${pick.id}`);
+    out.push({ reward: pick, price: DIRECT_PRICE[pick.rarity] });
+  }
+
+  return out;
+}
+
 /**
  * Coins for finishing a match.
  *

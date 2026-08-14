@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { CRATES, REWARDS, RARITY_LABEL, matchReward, rollCrate } from './economy';
+import {
+  CRATES,
+  DIRECT_PRICE,
+  REROLL_COST,
+  REWARDS,
+  RARITY_LABEL,
+  matchReward,
+  rollCrate,
+  rollOffer,
+} from './economy';
 import type { Rarity } from './economy';
 import { makeRng } from './sim/math';
 import { DISCS, DRIVERS, LAYERS } from './sim/parts';
@@ -121,6 +130,55 @@ describe('economy', () => {
     for (const r of REWARDS) {
       if (r.kind === 'skins') expect(r.rarity).not.toBe('legendary');
     }
+  });
+
+  it('never puts something you already own on the shelf', () => {
+    // A slot showing a part you have is dead space, and four of them is a shop
+    // that appears broken.
+    const rng = makeRng(11);
+    const mine = new Set(['valtryek', 'gravity', 'atomic', 'frost']);
+    for (let i = 0; i < 200; i++) {
+      for (const slot of rollOffer((_k, id) => mine.has(id), rng)) {
+        expect(mine.has(slot.reward.id)).toBe(false);
+      }
+    }
+  });
+
+  it('never repeats a part within one offer', () => {
+    const rng = makeRng(3);
+    for (let i = 0; i < 300; i++) {
+      const slots = rollOffer(() => false, rng);
+      const keys = slots.map((s) => `${s.reward.kind}:${s.reward.id}`);
+      expect(new Set(keys).size).toBe(keys.length);
+    }
+  });
+
+  it('lets a patient player buy a specific part for less than chasing it', () => {
+    // The whole justification for the shelf existing next to the crate. If
+    // gambling were the cheaper route to a *named* part, the crate would stop
+    // being optional and the shelf would be decoration.
+    const relic = CRATES[2];
+    const total = RARITIES.reduce((a, r) => a + relic.weights[r], 0);
+    for (const rarity of RARITIES) {
+      const p = relic.weights[rarity] / total;
+      if (p <= 0) continue;
+      // Expected coins to see ANY item of this rarity from the best crate for
+      // it — and it would still be a random one of the several at that tier.
+      const chase = relic.cost / p;
+      const pool = REWARDS.filter((r) => r.rarity === rarity).length;
+      const named = chase * pool; // expected cost to hit one *specific* part
+      console.log(
+        `  ${RARITY_LABEL[rarity].padEnd(9)} shelf ${DIRECT_PRICE[rarity]}  vs chasing a named one ≈ ${Math.round(named)}`,
+      );
+      expect(DIRECT_PRICE[rarity]).toBeLessThan(named);
+    }
+  });
+
+  it('does not escalate the reroll price', () => {
+    // Documented as a deliberate refusal in economy.ts; pinned here because it
+    // is the kind of thing that gets "optimised" back in later.
+    expect(REROLL_COST).toBe(45);
+    expect(typeof REROLL_COST).toBe('number');
   });
 
   it('pays a loss enough to keep a losing streak playable', () => {

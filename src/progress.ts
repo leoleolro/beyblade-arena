@@ -28,6 +28,12 @@ export interface ProgressData {
   streak: number;
   /** Spendable currency. Earned only — there is no purchase path. */
   coins: number;
+  /**
+   * The current shop offer, stored as bare references rather than resolved
+   * slots. Prices and rarities are re-derived on read, so a save written before
+   * a part was retuned shows the new price instead of an outdated one.
+   */
+  offer: { kind: keyof Unlocks; id: string }[];
 }
 
 const fresh = (): ProgressData => ({
@@ -43,6 +49,9 @@ const fresh = (): ProgressData => ({
   // Enough for one Scrap Crate on a fresh save, so the mechanic is discovered
   // by using it rather than by reading about it.
   coins: 60,
+  // Empty, not pre-rolled: the roll needs to know what the player owns, and
+  // Game fills it on first read.
+  offer: [],
 });
 
 export class Progress {
@@ -111,6 +120,11 @@ export class Progress {
     this.save();
   }
 
+  setOffer(slots: { kind: keyof Unlocks; id: string }[]): void {
+    this.data.offer = slots;
+    this.save();
+  }
+
   /** Grant an unlock. Returns false when it was already owned. */
   grant(kind: keyof Unlocks, id: string): boolean {
     const list = this.data[kind] as string[];
@@ -131,6 +145,10 @@ export class Progress {
    */
   recordMatch(won: boolean): Unlocks {
     const gained: Unlocks = {};
+    // The offer refreshes free on every finished match, win or lose. That is
+    // the TFT rhythm: the shop is something you look at between rounds, not a
+    // thing you pay to look at. Rerolling is for impatience, not for access.
+    this.data.offer = [];
     // Paid before the streak is mutated below, so a win is rewarded for the
     // streak it *extended* rather than the one it started.
     this.data.coins += matchReward(won, this.data.streak);

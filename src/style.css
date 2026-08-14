@@ -1593,3 +1593,76 @@ body.theme-anime .coach.on {
   align-self: center;
   margin-top: 16px;
 }
+
+/* ------------------------------------------------------- the rotating shelf */
+
+.offer {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.reroll-btn {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.reroll-btn small { color: var(--dim); font-size: 10px; }
+.reroll-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.chip.offer-card {
+  --rar: var(--line);
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  min-width: 190px;
+  text-align: left;
+  /* The rarity reads on the left edge only. A full border in the rarity colour
+     turned the row into four competing signs — the price is what the player is
+     actually comparing. */
+  border-left: 3px solid var(--rar);
+}
+
+.offer-art,
+.offer-glyph {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+}
+
+.offer-glyph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 2px solid var(--rar);
+  color: var(--rar);
+  font-weight: 800;
+  font-size: 14px;
+}
+
+.offer-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.offer-text b { font-size: 13px; }
+
+.offer-rarity {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--rar);
+}
