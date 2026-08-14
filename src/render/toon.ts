@@ -15,24 +15,50 @@ import * as THREE from 'three';
  * the inverted-hull outline for the whole scene in one wrap of the renderer.
  */
 
-let sharedRamp: THREE.DataTexture | null = null;
+const sharedRamps = new Map<number, THREE.DataTexture>();
 
 /**
- * The tone ramp. Three hard steps: shadow, mid, light.
+ * Ramp levels by band count.
+ *
+ * Three is the house look: shadow, mid, light. Five exists for one job — the
+ * moulded wave cap — and the reason is worth stating, because "more bands" is
+ * otherwise just a slider back toward smooth shading.
+ *
+ * A cel band boundary is a *contour line* of surface curvature: it shows where
+ * the normal crosses a threshold. Three bands give two boundaries, and a gently
+ * rolling surface whose normal only sweeps through part of the range crosses
+ * neither of them — so a sculpted wave renders as one flat plate and the
+ * modelling is thrown away. Five bands put four contour lines across the same
+ * sweep, which is what makes the crests read as rolling metal.
+ *
+ * The five levels are not evenly spaced. The gaps widen toward the light end so
+ * the bright side keeps the hard, graphic top band that reads as cartoon metal,
+ * while the extra resolution goes into the mid tones where the wave actually
+ * turns over.
+ */
+const RAMP_LEVELS: Record<number, number[]> = {
+  3: [70, 150, 255],
+  5: [62, 112, 158, 206, 255],
+};
+
+/**
+ * The tone ramp, cached per band count.
  *
  * NearestFilter is the entire trick — with linear filtering this interpolates
  * back into the smooth gradient it is supposed to be replacing.
  */
-export function toonRamp(): THREE.DataTexture {
-  if (sharedRamp) return sharedRamp;
+export function toonRamp(bands = 3): THREE.DataTexture {
+  const cached = sharedRamps.get(bands);
+  if (cached) return cached;
 
-  const steps = new Uint8Array([70, 150, 255]);
+  const levels = RAMP_LEVELS[bands] ?? RAMP_LEVELS[3];
+  const steps = new Uint8Array(levels);
   const tex = new THREE.DataTexture(steps, steps.length, 1, THREE.RedFormat);
   tex.minFilter = THREE.NearestFilter;
   tex.magFilter = THREE.NearestFilter;
   tex.generateMipmaps = false;
   tex.needsUpdate = true;
-  sharedRamp = tex;
+  sharedRamps.set(bands, tex);
   return tex;
 }
 
@@ -96,6 +122,8 @@ export interface MetalToonOptions {
   specTint?: number;
   /** Rim colour. Defaults to the base barely lifted, so it keeps the metal's hue. */
   rimTint?: number;
+  /** Diffuse band count. 3 is the house look; 5 is for moulded surfaces. */
+  bands?: number;
 }
 
 const WHITE = new THREE.Color(0xffffff);
@@ -202,7 +230,7 @@ export function metalToonMaterial(
   const base = new THREE.Color(colour);
   const mat = new THREE.MeshToonMaterial({
     color: colour,
-    gradientMap: toonRamp(),
+    gradientMap: toonRamp(opts.bands ?? 3),
     emissive: base.clone().multiplyScalar(opts.emissive ?? 0),
   });
 

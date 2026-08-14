@@ -331,7 +331,7 @@ function buildToonBey(build: BeyBuild, skin: Skin): THREE.Group {
   // per revolution. Cut this to ~0.15 and the waves are still there
   // geometrically and gone optically.
   const seam = wavy
-    ? waveTopCap(geo, { shape, curveSegments, radius: r, blades, amplitude: layerDepth * 0.24 })
+    ? waveTopCap(geo, { shape, curveSegments, radius: r, blades, amplitude: WAVE_AMPLITUDE(layerDepth) })
     : 0;
 
   // The face is unlit for the same reason the dish is: anime stickers are
@@ -494,7 +494,17 @@ const LAYER_METAL: MetalToonOptions = { gloss: 34, specular: 0.3, rim: 0.32 };
  * ridge rather than blinking. Specular and rim both go up because this face is
  * seen near flat-on at 34° and has no silhouette of its own to read.
  */
-const WAVE_METAL: MetalToonOptions = { gloss: 14, specular: 0.42, rim: 0.36 };
+/**
+ * Five bands, uniquely in the whole scene.
+ *
+ * This is the one surface built specifically to show curvature, and at three
+ * bands it did not: from directly above the moulded swirl was legible, but at
+ * the battle camera's angle the crests fell entirely inside one band and the
+ * face rendered as flat white plates — the thing the sculpt exists to avoid.
+ * Everything else keeps three, so the extra resolution buys the wave its relief
+ * without softening the cartoon look anywhere it is doing its job.
+ */
+const WAVE_METAL: MetalToonOptions = { gloss: 14, specular: 0.42, rim: 0.36, bands: 5 };
 
 /** Forge-disc material: cel metal with the bey-weight outline, in one call. */
 const forged = (colour: number, emissive = 0): THREE.Material =>
@@ -819,6 +829,25 @@ interface WaveCapOptions {
  * points, so ten rings is 5120 triangles on the face, built once per top.
  */
 const WAVE_RINGS = 10;
+
+/**
+ * Crest height, as a fraction of the layer's depth.
+ *
+ * Set by measurement, not taste. The first value was 0.24 and the sculpt was
+ * invisible at the battle camera: with `waves` crests around a mid-annulus
+ * radius of about 0.75r, the steepest surface slope is `A·waves/R`, so 0.24
+ * gave a 26° normal tilt. A 26° tilt moves N·L from 1.00 to 0.90 under a key
+ * light that is nearly normal to the cap — both values land in the same top
+ * band of any sane ramp, so the diffuse shading did not change at all and only
+ * the specular lobe picked the crests out, as scattered chips of light.
+ *
+ * 0.36 gives ~38°, which crosses a band boundary and turns the chips into
+ * rolling swells with mid-tone flanks. Higher was tried and starts to read as
+ * corrugation rather than moulding; the crest also rises above the layer's top
+ * edge, which is visible in silhouette and is *wanted* at this height but
+ * becomes a lump past it.
+ */
+const WAVE_AMPLITUDE = (layerDepth: number): number => layerDepth * 0.36;
 
 /**
  * Flat chip plateau, as a fraction of the collision radius, and the radius at

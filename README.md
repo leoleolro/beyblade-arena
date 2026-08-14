@@ -846,6 +846,40 @@ would exhaust the browser's ~16 context limit on their own, and the plan view is
 the honest angle anyway — it is where the blade profile reads, and roughly what
 the battle camera shows.
 
+### Making the moulded wave actually visible
+
+The wave cap shipped invisible, and the reason is worth writing down because it
+looks like a shading bug and is not.
+
+A cel band boundary is a contour line of surface curvature — it marks where the
+normal crosses a threshold. The crest slope is `A·waves/R`, so the original
+amplitude of `0.24·layerDepth` produced a 26° normal tilt, which moves `N·L`
+from 1.00 to 0.90 under a key light nearly normal to the cap. Both values land
+in the same top band, so the diffuse shading never changed and only the specular
+lobe picked the crests out — as scattered chips of light rather than a moulded
+surface. Verified from directly above, where the swirl *was* legible, and at the
+battle camera, where the face rendered as flat white plates.
+
+Two changes, and they only work together:
+
+- **Amplitude to `0.36·layerDepth`** (~38°), enough to cross a band boundary.
+  Higher starts reading as corrugation, and the crest — which rises above the
+  layer's top edge, visibly and deliberately, in silhouette — becomes a lump.
+- **A five-band ramp on this material only.** Three bands give two contour
+  lines; five give four, across the same normal sweep. Compared side by side at
+  the new amplitude: three bands posterise the swell into hard plates, five let
+  it roll. Everything else in the scene keeps three, so the cartoon look is
+  untouched anywhere it is already doing its job.
+
+The levels are unevenly spaced (`62, 112, 158, 206, 255`) so the extra
+resolution goes into the mid tones where the wave turns over, while the bright
+side keeps the hard graphic top band that reads as cartoon metal.
+
+Worth being clear about the limit: this reads at inspector scale and in
+silhouette. At the battle camera a top is about 60px across, where layer sculpt
+contributes to the read but is not the star — silhouette and colour still carry
+identification.
+
 ## Coins, crates and the shelf
 
 Two ways to acquire a part, on purpose, because either one alone is a worse
