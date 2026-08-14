@@ -24,6 +24,41 @@ function sparkSprite(): THREE.CanvasTexture {
 }
 
 /**
+ * The colour of a friction spark, as it cools.
+ *
+ * A grinding spark is not a coloured dot. It is a chip of steel torn off the
+ * surface, heated past its ignition point by the work done tearing it loose,
+ * burning in air and then cooling as it flies. So its colour is a *clock*: it
+ * leaves the contact white-hot, passes through straw yellow and orange, and
+ * dies deep red. Drawing every particle one flat colour throws that away, and
+ * it is the single strongest cue that what you are looking at is hot metal
+ * rather than confetti.
+ *
+ * Stops are eyeballed off the blackbody curve rather than computed from it:
+ * the real Planck locus at these temperatures runs through a pink-white that
+ * reads as washed-out on screen, and a saturated straw yellow sells "sparks"
+ * better than the physically exact colour does. This is the one place in this
+ * file where the reference is a photograph and not a formula.
+ */
+const HEAT_STOPS: number[][] = [
+  [1.0, 1.0, 0.98], // white hot, just torn loose
+  [1.0, 0.95, 0.62], // straw
+  [1.0, 0.68, 0.22], // orange
+  [0.92, 0.3, 0.06], // deep orange
+  [0.55, 0.08, 0.02], // dying red
+];
+
+/** Sample HEAT_STOPS at k (1 = hottest, 0 = dead), into `out`. */
+function heatColour(k: number, out: THREE.Color): void {
+  const t = (1 - (k < 0 ? 0 : k > 1 ? 1 : k)) * (HEAT_STOPS.length - 1);
+  const i = Math.min(HEAT_STOPS.length - 2, Math.floor(t));
+  const f = t - i;
+  const a = HEAT_STOPS[i];
+  const b = HEAT_STOPS[i + 1];
+  out.setRGB(a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f);
+}
+
+/**
  * A pooled additive-blended particle burst, used for clash sparks. Particles
  * are allocated once and recycled — a battle produces bursts constantly and
  * allocating per hit would sawtooth the frame time.
@@ -33,11 +68,30 @@ export class SparkBurst {
   private readonly positions: Float32Array;
   private readonly velocities: Float32Array;
   private readonly life: Float32Array;
+  /** Life this particle started with, so the cooling ramp has a denominator. */
+  private readonly maxLife: Float32Array;
+  /** Per-particle RGB, rewritten every frame from the cooling ramp. */
+  private readonly colours: Float32Array;
+  /**
+   * Seconds until this particle forks, or -1 for one that never will.
+   *
+   * Steel sparks fork because the chip is not pure iron: the carbon in it
+   * burns, the trapped CO2 bursts the chip open, and the fragments fly off as
+   * a little star. It is the most recognisable single feature of grinding
+   * sparks and no amount of tuning a plain particle spray produces it.
+   */
+  private readonly fork: Float32Array;
+  /** Air drag per particle. Grind chips are tiny and slow down hard. */
+  private readonly drag: Float32Array;
   private readonly max: number;
   private cursor = 0;
   /** Scratch for the directional cone basis; keeps `spawn` allocation-free. */
   private readonly dir = new THREE.Vector3();
   private readonly side = new THREE.Vector3();
+  /** Scratch for the cooling ramp; keeps `update` allocation-free. */
+  private readonly scratch = new THREE.Color();
+  /** The theme's spark hue, blended into the physical ramp. */
+  private readonly tint = new THREE.Color(0xffd28a);
 
   /**
    * 1200, up from 600.
@@ -55,6 +109,10 @@ export class SparkBurst {
     this.positions = new Float32Array(max * 3);
     this.velocities = new Float32Array(max * 3);
     this.life = new Float32Array(max);
+    this.maxLife = new Float32Array(max);
+    this.colours = new Float32Array(max * 3);
+    this.fork = new Float32Array(max).fill(-1);
+    this.drag = new Float32Array(max);
 
     // Park the whole pool below the stadium up front.
     //
@@ -68,18 +126,25 @@ export class SparkBurst {
 
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(this.positions, 3));
-    const alpha = new THREE.BufferAttribute(new Float32Array(max), 1);
-    geo.setAttribute('alpha', alpha);
+    geo.setAttribute('color', new THREE.BufferAttribute(this.colours, 3));
 
     const mat = new THREE.PointsMaterial({
       size: 0.028,
-      color: 0xffd28a,
+      // White, because the colour now lives per-particle. PointsMaterial
+      // MULTIPLIES `color` by the vertex colour, so anything else here would
+      // tint the whole cooling ramp a second time and a dying red spark under
+      // an orange theme came out near-black.
+      color: 0xffffff,
+      vertexColors: true,
       // PointsMaterial draws square points; the round falloff map is what
       // makes them sparks. Invisible on a dark dish, but on the anime theme's
       // near-white floor the bare squares read as boxes.
       map: sparkSprite(),
       transparent: true,
-      opacity: 0.95,
+      // 0.82, down from 0.95. These are additively blended, and a grind stream
+      // is dense: at 0.95 overlapping particles summed past white and the
+      // cooling ramp was invisible in exactly the place it matters most.
+      opacity: 0.82,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       sizeAttenuation: true,
@@ -89,11 +154,20 @@ export class SparkBurst {
     this.points.frustumCulled = false;
   }
 
-  /** Re-style for a theme. Same pool, different look. */
+  /**
+   * Re-style for a theme. Same pool, different look.
+   *
+   * The theme's colour is no longer applied to the material — it is kept as a
+   * TINT that the cooling ramp is pulled a third of the way toward, so each
+   * theme keeps its hue family (Arena's warm straw, Anime's hot orange) while
+   * every particle still travels white -> yellow -> orange -> red over its own
+   * life. Multiplying instead of blending was the first attempt and it crushed
+   * the cool end of the ramp to black.
+   */
   setStyle(colour: number, size: number): void {
     const mat = this.points.material as THREE.PointsMaterial;
-    mat.color.setHex(colour);
     mat.size = size;
+    this.tint.setHex(colour);
   }
 
   /**
@@ -111,6 +185,7 @@ export class SparkBurst {
     count = 24,
     along?: THREE.Vector3,
     cone = 0.32,
+    grind = false,
   ): void {
     // Clamp the strength term so a hit cannot throw sparks clean out of the
     // stadium. The clamp was 2.5, which is only a shade above the
@@ -162,7 +237,73 @@ export class SparkBurst {
         this.velocities[idx * 3 + 1] = up * speed;
         this.velocities[idx * 3 + 2] = Math.sin(theta) * radial;
       }
-      this.life[idx] = 0.35 + Math.random() * 0.3;
+      // GRIND PARTICLES ARE PHYSICALLY DIFFERENT PARTICLES, not restyled ones.
+      //
+      // A clash spark is debris thrown by an impact: comparatively large, and
+      // it coasts. A grind spark is a chip of steel a few tens of microns
+      // across, torn off by friction and burning. That size difference is the
+      // whole reason grinding looks the way it does:
+      //
+      //  - it decelerates hard, because drag scales with area/mass and the
+      //    chip has almost no mass. Real grinding sparks visibly stop in air.
+      //  - it burns out fast, so the stream is short and dense rather than
+      //    long and sparse.
+      //  - some of them FORK. The chip is steel, not iron: its carbon burns,
+      //    the trapped gas bursts the chip, and it opens into a little star.
+      //    Roughly a third do it here, at a random point in the second half of
+      //    their life, which is where it happens on a grinding wheel.
+      const life = grind ? 0.16 + Math.random() * 0.22 : 0.35 + Math.random() * 0.3;
+      this.life[idx] = life;
+      this.maxLife[idx] = life;
+      this.drag[idx] = grind ? 5.5 : 0.6;
+      this.fork[idx] = grind && Math.random() < 0.34 ? life * (0.25 + Math.random() * 0.3) : -1;
+      // Seeded hot so the first frame is not black; update() takes over.
+      this.colours[idx * 3] = 1;
+      this.colours[idx * 3 + 1] = 1;
+      this.colours[idx * 3 + 2] = 0.95;
+    }
+  }
+
+  /**
+   * The carbon burst: one chip becomes a handful of shorter-lived fragments.
+   *
+   * Deliberately NOT a call back into `spawn`. Fragments inherit the parent's
+   * velocity plus a wide isotropic kick, which is what makes the fork read as
+   * something bursting rather than as a second spray from the same origin, and
+   * they must not re-fork or a single spark can chain into a firework.
+   */
+  private burstCarbon(parent: number): void {
+    const px = this.positions[parent * 3];
+    const py = this.positions[parent * 3 + 1];
+    const pz = this.positions[parent * 3 + 2];
+    const vx = this.velocities[parent * 3];
+    const vy = this.velocities[parent * 3 + 1];
+    const vz = this.velocities[parent * 3 + 2];
+
+    const n = 2 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < n; i++) {
+      const idx = this.cursor;
+      this.cursor = (this.cursor + 1) % this.max;
+      // Skip the parent, or a full pool can have the burst overwrite the very
+      // particle it is bursting from mid-loop.
+      if (idx === parent) continue;
+
+      this.positions[idx * 3] = px;
+      this.positions[idx * 3 + 1] = py;
+      this.positions[idx * 3 + 2] = pz;
+
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(1 - 2 * Math.random());
+      const kick = 0.35 + Math.random() * 0.5;
+      this.velocities[idx * 3] = vx * 0.45 + Math.sin(phi) * Math.cos(theta) * kick;
+      this.velocities[idx * 3 + 1] = vy * 0.45 + Math.cos(phi) * kick * 0.6;
+      this.velocities[idx * 3 + 2] = vz * 0.45 + Math.sin(phi) * Math.sin(theta) * kick;
+
+      const life = 0.07 + Math.random() * 0.09;
+      this.life[idx] = life;
+      this.maxLife[idx] = life;
+      this.drag[idx] = 7;
+      this.fork[idx] = -1;
     }
   }
 
@@ -173,14 +314,43 @@ export class SparkBurst {
       if (this.life[i] <= 0) {
         // Park dead sparks far below the stadium instead of drawing them.
         this.positions[i * 3 + 1] = -999;
+        this.fork[i] = -1;
         continue;
       }
+
+      if (this.fork[i] > 0) {
+        this.fork[i] -= dt;
+        if (this.fork[i] <= 0) {
+          this.fork[i] = -1;
+          this.burstCarbon(i);
+        }
+      }
+
       this.velocities[i * 3 + 1] -= 3.2 * dt; // gravity
+      // Exponential drag, not linear: a linear term can drive the velocity
+      // through zero and backwards at a large dt, which sends sparks flying
+      // back into the top they came off.
+      const keep = Math.exp(-this.drag[i] * dt);
+      this.velocities[i * 3] *= keep;
+      this.velocities[i * 3 + 1] *= keep;
+      this.velocities[i * 3 + 2] *= keep;
+
       this.positions[i * 3] += this.velocities[i * 3] * dt;
       this.positions[i * 3 + 1] += this.velocities[i * 3 + 1] * dt;
       this.positions[i * 3 + 2] += this.velocities[i * 3 + 2] * dt;
+
+      // Cool. The ramp is driven by remaining life, and then pulled a third of
+      // the way toward the theme's hue so Arena and Anime still look like
+      // themselves.
+      const denom = this.maxLife[i] || 1;
+      heatColour(this.life[i] / denom, this.scratch);
+      this.scratch.lerp(this.tint, 0.25);
+      this.colours[i * 3] = this.scratch.r;
+      this.colours[i * 3 + 1] = this.scratch.g;
+      this.colours[i * 3 + 2] = this.scratch.b;
     }
     this.points.geometry.attributes.position.needsUpdate = true;
+    this.points.geometry.attributes.color.needsUpdate = true;
   }
 }
 

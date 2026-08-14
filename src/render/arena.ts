@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import * as C from '../sim/constants';
-import { spinNorm } from '../sim/physics';
+import { slipNorm, spinNorm, surfaceSlip } from '../sim/physics';
 import type { HitEvent } from '../sim/physics';
 import type { BeyState } from '../sim/types';
 import { buildBeyMesh } from './beyMesh';
@@ -172,6 +172,8 @@ export class ArenaRenderer {
   private readonly projected = new THREE.Vector3();
   /** Scratch for the drain stream's direction; no per-frame allocation. */
   private readonly drainDir = new THREE.Vector3();
+  /** Scratch for the grind stream's tangent; no per-hit allocation. */
+  private readonly grindDir = new THREE.Vector3();
   /** Throttle on the drain stream, so absorption glows instead of strobing. */
   private drainCooldown = 0;
   /**
@@ -474,6 +476,68 @@ export class ArenaRenderer {
     const aspect = this.camera.aspect || 1;
     const narrow = aspect < 1.6 ? 1.6 / Math.max(aspect, 0.5) : 1;
     this.camRadius = 1.62 * narrow * 1.35;
+  }
+
+  /**
+   * Friction sparks at the contact patch.
+   *
+   * Grinding metal throws sparks because the two surfaces are moving PAST each
+   * other: friction at the contact tears microscopic chips off, and the work
+   * that tears them loose is enough to heat them past ignition. So the thing
+   * that decides whether a contact sparks is not how hard it was — it is how
+   * fast the two surfaces SLIP against each other.
+   *
+   * `surfaceSlip` in the sim computes that slip and documents why it is a SUM
+   * rather than a difference — briefly, two touching tops are meshing gears,
+   * so the terms cancel in an opposite-spin matchup and add in a same-spin
+   * one. Same-spin is the case that grinds.
+   *
+   * Emitted as a big arc along the slip and a smaller counter-arc against it,
+   * which is what a grinding wheel actually throws.
+   */
+  private grindSparks(h: HitEvent, at: THREE.Vector3): void {
+    const a = this.lastBeys.find((x) => x.id === h.a);
+    const b = this.lastBeys.find((x) => x.id === h.b);
+    if (!a || !b) return;
+
+    const dx = b.pos.x - a.pos.x;
+    const dy = b.pos.y - a.pos.y;
+    const d = Math.hypot(dx, dy);
+    if (d < 1e-6) return;
+    // perp(n), in sim coordinates. Sim (x, y) is world (x, z).
+    const px = -dy / d;
+    const py = dx / d;
+
+    // The physics lives in the sim (see surfaceSlip / slipNorm) so it can be
+    // tested without a GL context; this function only turns it into particles.
+    const slip = surfaceSlip(a, b);
+    const k = slipNorm(a, b);
+    // Below this the surfaces are effectively rolling on each other and a real
+    // contact would polish rather than spark. Two dying tops throw nothing,
+    // and so does a clean opposite-spin head-on — measured, that pairing sits
+    // at k ≈ 0.018, because the two terms cancel to the difference in layer
+    // radii alone.
+    if (k < 0.04) return;
+
+    const sign = slip < 0 ? -1 : 1;
+    this.grindDir.set(px * sign, 0, py * sign);
+
+    // Scaled by slip, not by impact: a hard head-on between counter-rotating
+    // tops barely grinds, and a long same-spin scrape throws a lot.
+    const n = Math.round(3 + k * 30);
+    this.sparks.spawn(at, 0.5 + k * 3.4, n, this.grindDir, 0.42, true);
+
+    // The counter-arc: smaller, wider, and thrown the other way. Both surfaces
+    // shed chips, and a single one-sided jet reads as a rocket.
+    this.grindDir.multiplyScalar(-1);
+    this.sparks.spawn(
+      at,
+      0.4 + k * 2.2,
+      Math.max(2, Math.round(n * 0.35)),
+      this.grindDir,
+      0.6,
+      true,
+    );
   }
 
   /**
@@ -829,6 +893,7 @@ export class ArenaRenderer {
         Math.round((12 + h.strength * 14) * (h.opposite ? 1.25 : 1)),
       );
       this.sparks.spawn(at, h.strength, count);
+      this.grindSparks(h, at);
       this.shake = Math.min(0.09, this.shake + h.strength * 0.016);
       this.punch = Math.min(1, this.punch + h.strength * 0.14);
       if (this.theme.shockwave && h.strength >= C.HITSTOP_THRESHOLD) {

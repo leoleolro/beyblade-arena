@@ -80,6 +80,53 @@ export const spinNorm = (b: BeyState): number =>
   clamp(Math.abs(b.spin) / C.SPIN_REF, 0, 1);
 
 /**
+ * Relative surface speed of two touching tops at their contact point.
+ *
+ * This is the quantity that decides whether a contact GRINDS. Friction sparks
+ * are not thrown by force, they are thrown by slip: the two surfaces moving
+ * past each other tear microscopic chips off, and the work that tears them
+ * loose heats them past ignition. A hard head-on with no relative surface
+ * motion polishes; a light contact with a lot of slip throws a shower.
+ *
+ * With `n` the unit normal from a to b, each top's surface velocity at the
+ * contact is its angular velocity crossed with its own contact radius:
+ *
+ *     va = ωa · ra · perp(n)      (a's contact radius points along +n)
+ *     vb = −ωb · rb · perp(n)     (b's points along −n)
+ *     slip = va − vb = (ωa·ra + ωb·rb) · perp(n)
+ *
+ * Note the SUM, and that it is signed. Two touching tops are meshing gears,
+ * and meshing gears have to counter-rotate to roll without slipping — so the
+ * terms CANCEL in an opposite-spin matchup and ADD in a same-spin one. That is
+ * the reverse of where the rest of this game's drama lives, and it is useful:
+ * opposite-spin already owns the big normal impacts, the crits and the spin
+ * steal, while same-spin is sold in the garage as "a quieter attrition race"
+ * and had no signature of its own.
+ *
+ * Returned signed, along perp(n) = (−n.y, n.x). Pure, and used only by the
+ * renderer today — but it is physics, not presentation, so it lives here where
+ * it can be tested without a GL context.
+ */
+export const surfaceSlip = (a: BeyState, b: BeyState): number =>
+  a.spin * a.stats.radius + b.spin * b.stats.radius;
+
+/**
+ * `surfaceSlip` mapped to 0..1 against the hardest grind the game can produce:
+ * two full-spin tops of typical layer radius turning the same way.
+ *
+ * Worth having as its own function because the raw number is in units nobody
+ * has intuition for. Measured across the catalog at full spin: a same-spin
+ * pairing slips about 188, an opposite-spin one about 3.5 — a factor of 54,
+ * because the opposite case nearly cancels and only the difference in the two
+ * layers' radii survives. The first cut of the renderer's spark scaling was
+ * written against an assumed range of 0..5 and consequently pinned every
+ * contact at the maximum, which is exactly the "every hit looks identical"
+ * failure the strength-scaled sparks were meant to fix.
+ */
+export const slipNorm = (a: BeyState, b: BeyState): number =>
+  clamp(Math.abs(surfaceSlip(a, b)) / (2 * C.SPIN_REF * 0.106), 0, 1);
+
+/**
  * The X-Rail.
  *
  * Three phases, all driven off state already on the top:

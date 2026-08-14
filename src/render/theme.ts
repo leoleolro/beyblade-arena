@@ -309,7 +309,13 @@ export const OVERDRIVE: Theme = {
   rimBColour: 0x00e5ff,
   rimBIntensity: 3.4,
 
-  sparkColour: 0xffffff,
+  // A HUE FAMILY, not a brightness. Sparks carry their own white -> straw ->
+  // orange -> red cooling ramp per particle now, and the theme colour is
+  // blended into it rather than replacing it — so pure white here erased the
+  // ramp and every spark in the theme with the most sparks came out the same
+  // flat white. Hot straw keeps Overdrive reading hotter than Arena without
+  // flattening the temperature.
+  sparkColour: 0xffb45a,
   sparkSize: 0.05,
   // Was 1 when the trail was a one-pixel THREE.Line. It is a RibbonTrail now —
   // a real triangle strip roughly 30x the screen area — and at 1 under additive
