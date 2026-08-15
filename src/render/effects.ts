@@ -567,3 +567,95 @@ export class RibbonTrail implements TrailLike {
     (this.mesh.material as THREE.MeshBasicMaterial).opacity = o;
   }
 }
+
+let sharedMoonTexture: THREE.Texture | null = null;
+
+/**
+ * The pool of light a spinning top throws on the dish beneath it.
+ *
+ * Reported as missing, and the description is exact: "glowing lights on the
+ * bottom of beyblades when they collided — looked like moon, circle". It came
+ * from the per-top PointLight in the first themed build, which sat a few
+ * centimetres above the floor with a 1.6-unit falloff and therefore painted a
+ * bright disc on the dish under each top, flaring on `hitFlash`.
+ *
+ * Rebuilding it as a LIGHT again would be the obvious move and it is the wrong
+ * one. A point light's pool is not really a circle — its shape and brightness
+ * depend on the dish's local slope, its material, and how many other lights are
+ * competing, so it fades out toward the rim exactly where the fighting happens
+ * and it costs a real light in every material's shader permutation. What the
+ * effect actually wants is a *decal*: an additive disc lying flat on the floor,
+ * the same size and brightness wherever the top is.
+ *
+ * Two stops rather than a long gradient. A smooth falloff reads as a soft
+ * shadow-ish blob; the crisp inner plateau with a short shoulder is what makes
+ * it read as a projected circle of light — the moon in the description.
+ */
+function moonTexture(): THREE.Texture {
+  if (sharedMoonTexture) return sharedMoonTexture;
+  const size = 128;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+    g.addColorStop(0, 'rgba(255,255,255,0.95)');
+    g.addColorStop(0.45, 'rgba(255,255,255,0.55)');
+    g.addColorStop(0.72, 'rgba(255,255,255,0.16)');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, size, size);
+  }
+  sharedMoonTexture = new THREE.CanvasTexture(canvas);
+  return sharedMoonTexture;
+}
+
+export interface GroundGlow {
+  readonly mesh: THREE.Mesh;
+  /** Size and brightness follow spin, and flare on contact. */
+  update(spinNorm: number, hitFlash: number, grind: number): void;
+  setTint(colour: number): void;
+}
+
+/** A skin-tinted disc of light on the dish under one top. */
+export function buildGroundGlow(colour: number, radius: number): GroundGlow {
+  const mat = new THREE.MeshBasicMaterial({
+    map: moonTexture(),
+    color: colour,
+    transparent: true,
+    opacity: 0,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    // The dish is drawn before this and the glow must not fight it for depth;
+    // additive with depthTest still on keeps it from bleeding through the wall.
+    side: THREE.DoubleSide,
+  });
+  noOutline(mat);
+
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat);
+  mesh.rotation.x = -Math.PI / 2;
+  // Under the tops and the sparks, above the painted dish.
+  mesh.renderOrder = 0;
+  mesh.frustumCulled = false;
+
+  const base = radius * 3.4;
+
+  return {
+    mesh,
+    setTint(c: number): void {
+      mat.color.setHex(c);
+    },
+    update(sn: number, hitFlash: number, grind: number): void {
+      // Three inputs, three different jobs: spin is the resting glow so a
+      // healthy top sits in its own light and a dying one dims, hitFlash is the
+      // collision flare the effect was remembered for, and grind is the low
+      // continuous swell while two tops lean on each other — which is most of a
+      // round and used to be drawn as nothing at all.
+      const energy = 0.28 + sn * 0.5 + hitFlash * 1.5 + grind * 0.6;
+      mat.opacity = Math.min(0.85, energy * 0.45);
+      const scale = base * (0.85 + sn * 0.2 + hitFlash * 0.55 + grind * 0.25);
+      mesh.scale.set(scale, scale, 1);
+    },
+  };
+}

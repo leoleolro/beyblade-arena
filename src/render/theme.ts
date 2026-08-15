@@ -403,3 +403,37 @@ export function saveThemeId(id: string): void {
     // Storage unavailable; the choice still applies for this session.
   }
 }
+
+
+/* ----------------------------------------------------- the manga cut switch */
+
+const FRAME_KEY = 'beyblade-arena.impactFrames';
+
+/**
+ * Whether the manga impact frames are drawn at all.
+ *
+ * A switch rather than another round of tuning, because the report was
+ * 审美疲劳 — aesthetic fatigue — and that is not a frequency complaint you can
+ * solve by picking a better number. A full-screen stylised cut is a strong
+ * device: some players want it every heavy clash and some find any amount of it
+ * tiring, and there is no rate that satisfies both. The rate is now much lower
+ * for everyone (see IMPACT_FRAME in arena.ts) and this turns the rest off.
+ *
+ * Defaults ON, because it is one of the things that makes the Anime theme read
+ * as anime, and it only exists in that theme in the first place.
+ */
+export function loadImpactFrames(): boolean {
+  try {
+    return localStorage.getItem(FRAME_KEY) !== 'off';
+  } catch {
+    return true;
+  }
+}
+
+export function saveImpactFrames(on: boolean): void {
+  try {
+    localStorage.setItem(FRAME_KEY, on ? 'on' : 'off');
+  } catch {
+    // Storage unavailable. The session keeps the choice; only memory is lost.
+  }
+}

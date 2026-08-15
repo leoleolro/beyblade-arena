@@ -1191,6 +1191,32 @@ export class Ui {
     audioRow.appendChild(audioChips);
     panel.appendChild(audioRow);
 
+    // The manga cuts get their own switch beside the audio ones, for the same
+    // reason the spin drone does: it is the strongest, most repetitive device
+    // in the game, and how much of it is too much is a matter of taste rather
+    // than a number anyone can pick correctly for everybody.
+    const fxRow = document.createElement('div');
+    fxRow.className = 'slot';
+    fxRow.style.marginTop = '18px';
+    fxRow.innerHTML = '<h4>Effects</h4>';
+    const fxChips = document.createElement('div');
+    fxChips.className = 'chips';
+    const frameChip = document.createElement('button');
+    const setFrame = (): void => {
+      frameChip.className = 'chip' + (g.impactFrames ? ' on' : '');
+      frameChip.innerHTML = `<span>Impact frames<br><small>${
+        g.impactFrames ? 'manga cut on a crit — Anime theme' : 'off'
+      }</small></span>`;
+    };
+    setFrame();
+    frameChip.addEventListener('click', () => {
+      g.setImpactFrames(!g.impactFrames);
+      setFrame();
+    });
+    fxChips.appendChild(frameChip);
+    fxRow.appendChild(fxChips);
+    panel.appendChild(fxRow);
+
     overlay.appendChild(panel);
     return overlay;
   }

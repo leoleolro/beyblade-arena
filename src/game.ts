@@ -6,7 +6,7 @@ import { Progress } from './progress';
 import type { Difficulty } from './ai';
 import { ArenaRenderer } from './render/arena';
 import { pickContrastingSkin, skinById } from './render/skins';
-import { loadThemeId, saveThemeId } from './render/theme';
+import { loadImpactFrames, loadThemeId, saveImpactFrames, saveThemeId } from './render/theme';
 import { arenaById, ARENAS } from './sim/arena';
 import { Battle } from './sim/battle';
 import type { Fighter } from './sim/battle';
@@ -80,6 +80,15 @@ export class Game {
   setArena(id: string): void {
     this.arenaId = id;
     saveArenaId(id);
+  }
+
+  /** Manga impact frames, on or off. Anime theme only; cosmetic. */
+  impactFrames = loadImpactFrames();
+
+  setImpactFrames(on: boolean): void {
+    this.impactFrames = on;
+    saveImpactFrames(on);
+    this.renderer.setImpactFrames(on);
   }
 
   setTheme(id: string): void {

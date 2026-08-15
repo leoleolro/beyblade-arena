@@ -5,8 +5,8 @@ import type { ContactEvent, HitEvent } from '../sim/physics';
 import type { BeyState } from '../sim/types';
 import { buildBeyMesh } from './beyMesh';
 import type { BeyParts } from './beyMesh';
-import { RibbonTrail, SparkBurst } from './effects';
-import type { TrailLike } from './effects';
+import { RibbonTrail, SparkBurst, buildGroundGlow } from './effects';
+import type { GroundGlow, TrailLike } from './effects';
 import { buildSpinBlur } from './spinBlur';
 import type { SpinBlur } from './spinBlur';
 import { ImpactFrame } from './impactFrame';
@@ -18,7 +18,7 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { applyStadiumTheme, beyWorldPosition, buildStadium } from './stadium';
 import type { StadiumHandles } from './stadium';
-import { ARENA, THEMES, themeById } from './theme';
+import { ARENA, THEMES, loadImpactFrames, themeById } from './theme';
 import type { Theme } from './theme';
 import { Shockwave } from './shockwave';
 import type { ArenaSpec } from '../sim/arena';
@@ -47,6 +47,14 @@ interface BeyVisual {
   light: THREE.PointLight;
   /** Energy shell, present only in themes that use one. */
   aura: Aura | null;
+  /**
+   * The disc of light on the dish beneath this top. Present in every theme —
+   * it is the one effect that reads at the battle camera's distance, where the
+   * tops are only about 60px across and everything drawn ON them is lost.
+   */
+  glow: GroundGlow;
+  /** Grind level this frame, 0..1, for the glow to swell on. */
+  grind: number;
   /**
    * Drawn contact shadow, used by the toon theme.
    *
@@ -181,6 +189,8 @@ export class ArenaRenderer {
   private drainCooldown = 0;
   /** Throttle on the continuous grind, which can fire on every single frame. */
   private grindCooldown = 0;
+  /** Player switch for the manga cuts. See loadImpactFrames. */
+  private impactFrames = loadImpactFrames();
   /**
    * Seconds until another impact frame may fire.
    *
@@ -310,6 +320,11 @@ export class ArenaRenderer {
    * when a theme doesn't want it — building and disposing a render target on
    * every toggle would be the only real leak risk here.
    */
+  /** Turn the manga impact frames on or off. Persisted by the caller. */
+  setImpactFrames(on: boolean): void {
+    this.impactFrames = on;
+  }
+
   setTheme(id: string): void {
     const t = themeById(id);
     const toonChanged = t.toon !== this.theme.toon;
@@ -629,6 +644,8 @@ export class ArenaRenderer {
       // aura ever built and must outlive any one of them, which is why
       // disposeTree only disposes materials and geometry, never maps.
       disposeTree(v.group);
+      this.beyRoot.remove(v.glow.mesh);
+      disposeTree(v.glow.mesh);
       this.beyRoot.remove(v.trail.object);
       disposeTree(v.trail.object);
       if (v.shadow) {
@@ -699,6 +716,12 @@ export class ArenaRenderer {
       const shadow = this.theme.toon ? contactShadow(b.stats.radius) : null;
       if (shadow) this.beyRoot.add(shadow);
 
+      // A sibling of the top, not a child: the group leans and precesses for
+      // wobble, and a parented decal would tip up off the floor with it — the
+      // same reason the contact shadow above is a sibling.
+      const glow = buildGroundGlow(skin.primary, b.stats.radius);
+      this.beyRoot.add(glow.mesh);
+
       this.beyRoot.add(group);
       this.beyRoot.add(trail.object);
       this.visuals.set(b.id, {
@@ -709,6 +732,8 @@ export class ArenaRenderer {
         light,
         aura,
         shadow,
+        glow,
+        grind: 0,
         wobblePhase: Math.random() * Math.PI * 2,
         death: 0,
         defeatOpened: false,
@@ -844,6 +869,15 @@ export class ArenaRenderer {
         mat.opacity = 0.18 + 0.5 * sn + b.hitFlash * 0.5;
       }
 
+      // The moon on the dish. Sits just above the bowl floor beneath the top,
+      // flat regardless of how far the top has leaned.
+      v.glow.mesh.position.set(p.x, beyWorldPosition(b.pos.x, b.pos.y).y + 0.004, p.z);
+      v.glow.update(sn, b.hitFlash, v.grind);
+      // Decays fast: the grind term is re-armed every frame the tops are
+      // actually touching, so a slow decay would leave the glow swollen for a
+      // second after they part.
+      v.grind = Math.max(0, v.grind - dt * 4);
+
       if (v.aura) {
         v.aura.sprite.visible = this.theme.aura;
         if (this.theme.aura) {
@@ -904,12 +938,24 @@ export class ArenaRenderer {
     // path never fired for them. A same-spin lean is the hardest grind in the
     // game and it produces no hit event whatsoever.
     for (const c of contacts) {
-      if (this.grindCooldown > 0) break;
       // `grind`, not slipNorm: see `abrasion` in the sim. Measured on real
       // leaning contacts, slipNorm peaks at 0.018 for an opposite-spin pair —
       // under any sane floor — because the idealised formula treats a bladed
       // layer as a smooth disc and counter-rotating discs roll. Blades do not.
       const k = c.grind;
+
+      // The ground glow swells on EVERY leaning contact, ungated and
+      // unthrottled, before either of the spark gates below. It is one lerp on
+      // a material, and it is the half of this effect that survives the battle
+      // camera: at that distance a top is about 60px across and a particle is
+      // a pixel, while a disc of light on the floor under it is unmissable.
+      const va = this.visuals.get(c.a);
+      const vb = this.visuals.get(c.b);
+      if (va) va.grind = Math.max(va.grind, k);
+      if (vb) vb.grind = Math.max(vb.grind, k);
+
+      // Sparks are the expensive half, so they are both throttled and floored.
+      if (this.grindCooldown > 0) continue;
       if (k < 0.12) continue;
       const a = this.lastBeys.find((x) => x.id === c.a);
       const b = this.lastBeys.find((x) => x.id === c.b);
@@ -987,16 +1033,29 @@ export class ArenaRenderer {
       // threshold as hitstop: the sim freezes for a beat and this is the frame
       // it freezes on. Camera matrices are one frame stale here, which is
       // invisible at these speeds.
-      // Crits always earn one; otherwise the hit has to clear a bar well above
-      // hitstop AND the refractory window has to have expired.
-      // A perfect block earns one unconditionally, refractory window included.
-      // It is the rarest thing in the move triangle — it needs contact to land
-      // inside the opening beat of a block that was thrown on the read — so it
-      // cannot strobe, and being cut out by a refractory window that an
-      // ordinary trade opened a moment earlier is precisely backwards.
-      const frameWorthy = h.crit || h.strength >= C.IMPACT_FRAME_THRESHOLD;
+      // RESERVED FOR THE MOMENTS THAT DESERVE ONE.
+      //
+      // This gate has now been tightened twice off the same report, and the
+      // second time it was not a frequency problem: 审美疲劳, aesthetic
+      // fatigue — a strong full-screen device stops landing when it is the
+      // ordinary case. Cutting the rate again would have kept the same
+      // trajectory, so the rule changed shape instead.
+      //
+      // A frame is no longer earned by being HARD. `IMPACT_FRAME_THRESHOLD`
+      // caught ordinary heavy trades, and heavy trades are most of a round — a
+      // manga cut for the median exchange is a manga cut for nothing. Now only
+      // a crit or a perfect block earns one: both are genuinely rare, both are
+      // moments the player did something, and neither happens twice in a row by
+      // accident. Measured before: 1.5 frames a round. Expect well under one.
+      //
+      // A perfect block still bypasses the refractory window. It is the rarest
+      // thing in the move triangle — contact has to land inside the opening
+      // beat of a block thrown on the read — so it cannot strobe, and being cut
+      // out by a window an ordinary trade opened a moment earlier is precisely
+      // backwards.
+      const frameWorthy = h.crit;
       const framed = h.perfectBlock || (frameWorthy && this.frameCooldown <= 0);
-      if (this.theme.toon && framed) {
+      if (this.theme.toon && this.impactFrames && framed) {
         this.frameCooldown = C.IMPACT_FRAME_COOLDOWN;
         this.projected.copy(at).project(this.camera);
         // Design primaries feed the clash-tone frame style; the sim only
