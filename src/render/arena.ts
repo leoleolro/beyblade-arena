@@ -916,7 +916,7 @@ export class ArenaRenderer {
         // most visible thing in the restored theme and it was not an effect
         // anyone would recognise as a touchdown. Landing is a small, sharp
         // event; the ring should sit under the top, not cross the arena.
-        if (this.theme.shockwave) this.shockwaves.spawn(at, 0xffffff, 0.5);
+        if (this.theme.shockwave) this.shockwaves.spawn(at, 0xffffff, 0.55, 1, 0.22);
         this.sparks.spawn(at, 3.0, 40);
       }
       this.shake = Math.max(this.shake, 0.05);
@@ -1015,19 +1015,29 @@ export class ArenaRenderer {
         // stadium, and something covering the whole arena reads as weather,
         // not as an impact.
         //
-        // A concussion ring has to stay LOCAL to the hit. Measured now: 0.29
-        // at the hitstop bar, 0.32 at the impact-frame bar, 0.42 at the cap —
-        // under half the 1.0 stadium radius, so it always reads as energy
-        // coming off the two tops rather than as a wave crossing the dish.
-        const span = Math.min(0.42, 0.18 + h.strength * 0.045) + (h.crit ? 0.05 : 0);
+        // The span went back UP once the ring became a real wavefront. The
+        // 0.42 cap was a correct fix for the WRONG defect: at that size, with
+        // the old hard-edged annulus born at a point and brightest at birth,
+        // there was no travel long enough to read as a wave and every hit was
+        // a white ball. A soft front that fades up as it forms can afford to
+        // cross real ground. Now: 0.50 at the hitstop bar, 0.60 at the
+        // impact-frame bar, 0.82 at the cap — still inside the 1.0 stadium
+        // radius, so it dies at the wall rather than sailing over it.
+        const span = Math.min(0.82, 0.34 + h.strength * 0.1) + (h.crit ? 0.1 : 0);
         // A perfect block is the DEFENDER's moment, so it gets the defender's
         // colour and a second inner ring travelling the other way in size. The
         // sim has computed perfectBlock since the move triangle landed and
         // nothing has ever drawn it: the one exchange that rewards reading the
         // opponent looked exactly like a lucky bump.
         const colour = h.perfectBlock ? 0x7dd3fc : h.crit ? 0xfff0a0 : 0xffffff;
-        this.shockwaves.spawn(at, colour, span);
-        if (h.perfectBlock) this.shockwaves.spawn(at, colour, span * 0.55);
+        // Two fronts on an ordinary clash, three on a crit. One expanding
+        // circle reads as a bubble; a train reads as waves radiating out.
+        // 0.26 peak, not 0.6. Additive white on a bloomed scene saturates almost
+        // immediately, and two overlapping fronts double it — the two-front
+        // train is what makes this read as waves, so the per-front brightness
+        // has to come down to pay for it.
+        this.shockwaves.spawn(at, colour, span, h.crit ? 3 : 2, 0.26);
+        if (h.perfectBlock) this.shockwaves.spawn(at, colour, span * 0.62, 2, 0.24);
       }
       // The manga cut, centred on where the clash actually happened. Same
       // threshold as hitstop: the sim freezes for a beat and this is the frame
@@ -1341,13 +1351,12 @@ export class ArenaRenderer {
         // White, and larger than any clash ring can be, so a burst can never
         // be mistaken for one more heavy hit. That is an invariant, not a
         // wish: the clash span above caps at 1.55 + 0.12 on a crit = 1.67, so
-        // this must stay strictly above the clash cap of 0.42 + 0.05 = 0.47 —
+        // this must stay strictly above the clash cap of 0.82 + 0.1 = 0.92 —
         // and it still has to die near the skirt rather than sail off into
         // empty air, which is why it is a hair over rather than double. TWO rings a beat apart carry the extra
         // weight instead of one huge one.
         if (this.theme.shockwave) {
-          this.shockwaves.spawn(at, 0xffffff, 0.66);
-          this.shockwaves.spawn(at, 0xffffff, 0.4);
+          this.shockwaves.spawn(at, 0xffffff, 1.05, 3, 0.34);
         }
         this.sparks.spawn(at, 4.5, 64);
         // Only in themes that already light the arena from the tops. ARENA
