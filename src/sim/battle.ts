@@ -2,7 +2,7 @@ import * as C from './constants';
 import { clamp, len, makeRng, vec } from './math';
 import { deriveStats } from './parts';
 import { step } from './physics';
-import type { HitEvent } from './physics';
+import type { ContactEvent, HitEvent } from './physics';
 import { STANDARD } from './arena';
 import type { ArenaSpec } from './arena';
 import type {
@@ -122,6 +122,14 @@ export class Battle {
 
   /** Collision events produced by the most recent update, for effects. */
   hits: HitEvent[] = [];
+  /**
+   * Contacts that touched but did not score, this frame.
+   *
+   * Kept beside `hits` rather than merged into it because they are a different
+   * kind of thing: a hit changes the game, a contact only changes the picture.
+   * The renderer grinds sparks off these; nothing in the sim reads them.
+   */
+  contacts: ContactEvent[] = [];
 
   private accumulator = 0;
   private rng: () => number;
@@ -141,6 +149,7 @@ export class Battle {
     this.roundTime = 0;
     this.accumulator = 0;
     this.hits = [];
+    this.contacts = [];
     this.beys = this.fighters.map((f) => {
       const l = launches[f.id] ?? {
         power: 0.75,
@@ -207,13 +216,14 @@ export class Battle {
     // shake from the round's final clash on every frame of the result screen,
     // the garage and the home screen, until the next launch reset it.
     this.hits = [];
+    this.contacts = [];
     if (this.phase !== 'battle') return;
 
     this.accumulator += Math.min(deltaSeconds, 0.25);
 
     let steps = 0;
     while (this.accumulator >= C.FIXED_DT && steps < C.MAX_SUBSTEPS) {
-      const hits = step(this.beys, C.FIXED_DT, this.rng, this.arena);
+      const hits = step(this.beys, C.FIXED_DT, this.rng, this.arena, this.contacts);
       if (hits.length) this.hits.push(...hits);
       this.accumulator -= C.FIXED_DT;
       this.roundTime += C.FIXED_DT;

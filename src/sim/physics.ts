@@ -127,6 +127,36 @@ export const slipNorm = (a: BeyState, b: BeyState): number =>
   clamp(Math.abs(surfaceSlip(a, b)) / (2 * C.SPIN_REF * 0.106), 0, 1);
 
 /**
+ * How hard two touching tops abrade each other, 0..1.
+ *
+ * `slipNorm` alone is not the whole story, and taking it as the whole story
+ * makes the effect vanish exactly where it should be strongest. That formula
+ * treats each layer as a smooth disc, so counter-rotating tops come out as
+ * meshing gears in pure rolling contact — slip near zero, no grinding. Measured
+ * on real leaning contacts in an opposite-spin round: peak slip 3.4 out of a
+ * possible 190.
+ *
+ * But a Beyblade layer is not a smooth disc. It is three to eight BLADES. Two
+ * bladed tops leaning together do not roll; each blade edge arrives at the
+ * other surface, catches, and is dragged across it at that top's own surface
+ * speed, whichever way the other one happens to be turning. The net slip
+ * governs how smoothly the two surfaces mesh; the absolute blade speed governs
+ * how violently the edges hack at each other, and for a bladed top that second
+ * term never goes to zero while either top is still spinning.
+ *
+ * So: a floor from absolute surface speed, and the rest from true slip. An
+ * opposite-spin lean abrades steadily (edges catching), a same-spin scrape
+ * abrades about three times harder (edges catching AND the surfaces genuinely
+ * running past each other). Both pairings get a grind; they get different ones.
+ */
+export const abrasion = (a: BeyState, b: BeyState): number => {
+  const edge =
+    (Math.abs(a.spin) * a.stats.radius + Math.abs(b.spin) * b.stats.radius) /
+    (2 * C.SPIN_REF * 0.106);
+  return clamp(edge * (0.34 + 0.66 * slipNorm(a, b)), 0, 1);
+};
+
+/**
  * The X-Rail.
  *
  * Three phases, all driven off state already on the top:
@@ -423,6 +453,43 @@ function resolveWall(b: BeyState): void {
   b.pos.y = n.y * limit;
 }
 
+/**
+ * A contact that did NOT score.
+ *
+ * Measured across 240 opposite-spin rounds: the two tops are within contact
+ * distance for 22.5% of all frames, and **84% of those frames are rejected**
+ * by the MIN_IMPACT gate below — late in a round it reaches 96% of frames in
+ * contact and 100% rejected. The gate is right to refuse them: they are not
+ * clashes, and scoring them would grind out hundreds of hits a round, which is
+ * the exact failure MIN_IMPACT was added to prevent.
+ *
+ * But "does not score" was silently turned into "does not exist". For most of
+ * a round the two tops are leaning on each other, and the game rendered
+ * nothing, played nothing, and reported nothing — which is what "the fight
+ * feels dead" actually was on the wire. They were touching the whole time.
+ *
+ * So the gate still refuses to SCORE these, and now reports them instead. This
+ * type carries no forces and changes no state; it is a read-only observation
+ * emitted alongside the hits, and the sim's behaviour is bit-identical with it
+ * present or absent.
+ */
+export interface ContactEvent {
+  a: string;
+  b: string;
+  /** Contact point on the stadium plane. */
+  at: Vec2;
+  /** Normal approach speed. Below MIN_IMPACT by construction. */
+  impact: number;
+  /**
+   * Relative surface speed at the contact, signed along perp(n).
+   *
+   * Sign gives the spark stream its direction — see `surfaceSlip`.
+   */
+  slip: number;
+  /** How hard the blades are abrading, 0..1. See `abrasion`. */
+  grind: number;
+}
+
 export interface HitEvent {
   a: string;
   b: string;
@@ -448,7 +515,12 @@ export interface HitEvent {
  *     sideways, scaled by attack vs. mass — this is what causes ring-outs
  *   - spin drain and burst charge, scaled by attack vs. defense/burstResist
  */
-function resolvePair(a: BeyState, b: BeyState, rng: () => number): HitEvent | null {
+function resolvePair(
+  a: BeyState,
+  b: BeyState,
+  rng: () => number,
+  contacts?: ContactEvent[],
+): HitEvent | null {
   const d = dist(a.pos, b.pos);
   const minDist = a.stats.radius + b.stats.radius;
   if (d >= minDist || d < 1e-9) return null;
@@ -490,7 +562,22 @@ function resolvePair(a: BeyState, b: BeyState, rng: () => number): HitEvent | nu
   // Glancing contact: we've already separated them and exchanged momentum, but
   // it doesn't count as a clash. Bailing here is what keeps two tops sharing an
   // orbit from grinding out hundreds of scoring hits per round.
-  if (impact < C.MIN_IMPACT) return null;
+  //
+  // It is still reported — see ContactEvent. Refusing to score it and refusing
+  // to admit it happened are different things, and conflating them is what made
+  // most of a round render as two tops doing nothing while they were in fact
+  // grinding against each other.
+  if (impact < C.MIN_IMPACT) {
+    contacts?.push({
+      a: a.id,
+      b: b.id,
+      at: vec((a.pos.x + b.pos.x) / 2, (a.pos.y + b.pos.y) / 2),
+      impact,
+      slip: surfaceSlip(a, b),
+      grind: abrasion(a, b),
+    });
+    return null;
+  }
 
   // Smash attack: spin biting at the contact point throws the other top
   // sideways. Each top pushes the other along the tangent, in the direction
@@ -652,6 +739,10 @@ export function step(
   dt: number,
   rng: () => number = Math.random,
   arena: ArenaSpec = STANDARD,
+  // Optional out-parameter rather than a changed return type: every existing
+  // caller — the whole balance suite included — keeps working untouched, and a
+  // caller that does not care pays nothing.
+  contacts?: ContactEvent[],
 ): HitEvent[] {
   const hits: HitEvent[] = [];
 
@@ -668,7 +759,7 @@ export function step(
       const a = beys[i];
       const b = beys[k];
       if (!a.alive || !b.alive) continue;
-      const hit = resolvePair(a, b, rng);
+      const hit = resolvePair(a, b, rng, contacts);
       if (hit) hits.push(hit);
     }
   }

@@ -508,7 +508,8 @@ export class Game {
     // Belt and braces alongside the fix in Battle.update: effects are only ever
     // driven by hits from a round that is actually running.
     const hits = this.screen === 'battle' ? this.battle.hits : EMPTY_HITS;
-    this.renderer.update(this.battle.beys, hits, renderDt);
+    const contacts = this.screen === 'battle' ? this.battle.contacts : EMPTY_HITS;
+    this.renderer.update(this.battle.beys, hits, renderDt, contacts);
     this.events.onFrame();
     requestAnimationFrame(this.tick);
   };

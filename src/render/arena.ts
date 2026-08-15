@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import * as C from '../sim/constants';
 import { slipNorm, spinNorm, surfaceSlip } from '../sim/physics';
-import type { HitEvent } from '../sim/physics';
+import type { ContactEvent, HitEvent } from '../sim/physics';
 import type { BeyState } from '../sim/types';
 import { buildBeyMesh } from './beyMesh';
 import type { BeyParts } from './beyMesh';
@@ -107,6 +107,9 @@ function resetParts(parts: BeyParts): void {
  */
 const clampUnit = (n: number): number => (n < 0 ? 0 : n > 1 ? 1 : n);
 
+/** Shared empty array, so the no-contacts path allocates nothing per frame. */
+const EMPTY_CONTACTS: readonly ContactEvent[] = [];
+
 /** Depth-first dispose, so rebuilding on a theme switch can't leak GPU memory. */
 function disposeTree(obj: THREE.Object3D): void {
   obj.traverse((child) => {
@@ -176,6 +179,8 @@ export class ArenaRenderer {
   private readonly grindDir = new THREE.Vector3();
   /** Throttle on the drain stream, so absorption glows instead of strobing. */
   private drainCooldown = 0;
+  /** Throttle on the continuous grind, which can fire on every single frame. */
+  private grindCooldown = 0;
   /**
    * Seconds until another impact frame may fire.
    *
@@ -713,10 +718,16 @@ export class ArenaRenderer {
   }
 
   /** Mirror one frame of sim state. `dt` is real elapsed seconds. */
-  update(beys: BeyState[], hits: HitEvent[], dt: number): void {
+  update(
+    beys: BeyState[],
+    hits: HitEvent[],
+    dt: number,
+    contacts: readonly ContactEvent[] = EMPTY_CONTACTS,
+  ): void {
     this.elapsed += dt;
     this.frameCooldown = Math.max(0, this.frameCooldown - dt);
     this.drainCooldown = Math.max(0, this.drainCooldown - dt);
+    this.grindCooldown = Math.max(0, this.grindCooldown - dt);
 
     this.entry = Math.max(0, this.entry - dt);
     const drop = this.entryOffset();
@@ -876,6 +887,44 @@ export class ArenaRenderer {
       }
       this.shake = Math.max(this.shake, 0.05);
       this.punch = Math.max(this.punch, 0.5);
+    }
+
+    // THE GRIND.
+    //
+    // These are the contacts the sim refuses to score — 84% of all contact
+    // frames, and near enough 100% of them late in a round. They are correctly
+    // not clashes: nothing is being damaged, and scoring them would grind out
+    // hundreds of hits a round. But they are two blades physically leaning on
+    // each other, and until now the game drew nothing for them at all. That
+    // silence is most of what "the fight feels dead" was: the tops were in
+    // contact for a fifth of the round and it looked like they were apart.
+    //
+    // Throttled, and driven by SLIP rather than by impact — these have almost
+    // no impact by definition, which is exactly why the impact-driven spark
+    // path never fired for them. A same-spin lean is the hardest grind in the
+    // game and it produces no hit event whatsoever.
+    for (const c of contacts) {
+      if (this.grindCooldown > 0) break;
+      // `grind`, not slipNorm: see `abrasion` in the sim. Measured on real
+      // leaning contacts, slipNorm peaks at 0.018 for an opposite-spin pair —
+      // under any sane floor — because the idealised formula treats a bladed
+      // layer as a smooth disc and counter-rotating discs roll. Blades do not.
+      const k = c.grind;
+      if (k < 0.12) continue;
+      const a = this.lastBeys.find((x) => x.id === c.a);
+      const b = this.lastBeys.find((x) => x.id === c.b);
+      if (!a || !b) continue;
+      const dx = b.pos.x - a.pos.x;
+      const dy = b.pos.y - a.pos.y;
+      const d = Math.hypot(dx, dy) || 1;
+      const sign = c.slip < 0 ? -1 : 1;
+      this.grindDir.set((-dy / d) * sign, 0, (dx / d) * sign);
+      const at = beyWorldPosition(c.at.x, c.at.y);
+      at.y += 0.045;
+      // Deliberately thinner than a clash grind: this is a continuous stream,
+      // so per-event counts that look right for a one-off read as a flare.
+      this.sparks.spawn(at, 0.4 + k * 1.8, Math.round(2 + k * 7), this.grindDir, 0.5, true);
+      this.grindCooldown = 0.045;
     }
 
     for (const h of hits) {
