@@ -79,7 +79,45 @@ export const WALL_RESTITUTION = 0.55;
  * contact and register hundreds of "hits" a round, which turns every match into
  * a war of attrition that only stamina builds can win.
  */
-export const MIN_IMPACT = 0.32;
+export const MIN_IMPACT = 0.22;
+/*
+ * 0.22, down from 0.32, and this is the ONLY pacing change that survived.
+ *
+ * Three independent tuning passes tried to roughly double the contacts in a
+ * median round while keeping the suite green. All three failed, and they failed
+ * the same way, so the result is worth recording rather than retrying:
+ *
+ *  - SMASH_MAX is the only constant that moves median hits at all. Everything
+ *    else — HIT_SPIN_LOSS, HIT_SPIN_RECOIL, BURST_PER_HIT, MAX_SPIN_LOSS_PER_HIT,
+ *    SMASH_COEFF, RESTITUTION, DRAG_BASE, both decay constants in both
+ *    directions, the pocket knobs, a contact-radius scale — leaves hits per
+ *    round pinned at 5-6.
+ *  - And SMASH_MAX cannot be moved, because it IS the ring-out mechanism.
+ *    Measuring knockout TIMING rather than knockout share makes this
+ *    unmistakable: at SMASH_MAX 0.9 the earned mid-round ring-out is already
+ *    extinct (0.2% of rounds, against 8.4% here), and the knockouts still
+ *    showing in the mix are first-second launch accidents. The share stays
+ *    respectable while the mechanic is gone.
+ *  - The binding constraint is not the balance bands, it is contact.test.ts.
+ *    Doubling scoring hits inverts `contacts > hits` and collapses the grind
+ *    floor — and that ratio is the stated justification for the renderer's
+ *    entire grind stream, so it is not a number to renumber.
+ *
+ * A CLASH_OUTWARD term — a scoring clash shoving both tops away from the dish
+ * centre, to stop the fight sinking into the middle — was built and swept here
+ * (0.04 / 0.08 / 0.14 / 0.22). It raises knockouts from 17.3% to 22.3% and
+ * halves sub-2s rounds, but it does NOT add contacts (hits p50 stays 5) and it
+ * barely moves the mean clash radius (0.260 -> 0.255), because drag eats the
+ * impulse before it changes the orbit. Combined with this constant it broke
+ * three tests. Removed rather than kept as a knockout tweak wearing a pacing
+ * label.
+ *
+ * So: +11% hit rate, p90 round 35.9s -> 32.0s, median hits unchanged. A real
+ * but modest gain, honestly labelled. Getting to 2x needs a conditional smash
+ * cap in physics.ts — low on ordinary clashes, exceeded by criticals, the way
+ * CRIT_SPIN_CAP already works for spin loss — which is a mechanism change and
+ * needs contact.test's ratio re-derived deliberately alongside it.
+ */
 
 /** Spin knocked off the *defender* per unit of normal impact speed. */
 export const HIT_SPIN_LOSS = 26.0;
