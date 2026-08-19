@@ -34,6 +34,14 @@ export interface ProgressData {
    * a part was retuned shows the new price instead of an outdated one.
    */
   offer: { kind: keyof Unlocks; id: string }[];
+  /**
+   * How many endless rivals have been beaten in the CURRENT run. Reset to 0 by
+   * a loss — that reset is what makes an endless run a run rather than a
+   * counter that only ever goes up.
+   */
+  endless: number;
+  /** Deepest endless run ever reached. The number worth bragging about. */
+  bestEndless: number;
 }
 
 const fresh = (): ProgressData => ({
@@ -52,6 +60,8 @@ const fresh = (): ProgressData => ({
   // Empty, not pre-rolled: the roll needs to know what the player owns, and
   // Game fills it on first read.
   offer: [],
+  endless: 0,
+  bestEndless: 0,
 });
 
 export class Progress {
@@ -170,10 +180,21 @@ export class Progress {
           }
         }
         this.data.rung += 1;
+      } else {
+        // Past the ladder, a win pushes the endless run one deeper. No unlocks
+        // here by design — the catalog is already complete, and handing out a
+        // part would duplicate a ladder grant.
+        this.data.endless += 1;
+        this.data.bestEndless = Math.max(this.data.bestEndless, this.data.endless);
       }
     } else {
       this.data.losses += 1;
       this.data.streak = 0;
+      // A loss ENDS the run. This is the one place the game takes something
+      // back, and it is what gives an endless ladder stakes: without it the
+      // depth counter only ever rises and "how far can you get" has no answer.
+      // Nothing else is lost — parts, coins and the cleared ladder all stay.
+      this.data.endless = 0;
     }
     this.save();
     return gained;

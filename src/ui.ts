@@ -720,9 +720,19 @@ export class Ui {
     const career = document.createElement('div');
     career.className = 'career';
     if (g.progress.cleared) {
+      // Past the ladder the game used to just say "cleared" and stop. Now the
+      // run itself is the content, so this shows the two numbers that matter:
+      // how deep you are right now, and how deep you have ever been.
+      const next = g.currentRival;
       career.innerHTML = `
-        <div class="career-line"><b>Ladder cleared</b> — all ${LADDER.length} bladers beaten</div>
-        <div class="career-stats">${d.wins}W · ${d.losses}L · best streak ${d.bestStreak}</div>`;
+        <div class="career-line">Endless · <b>Round ${d.endless + 1}</b> — ${escapeHtml(
+          next.name,
+        )}, ${escapeHtml(next.beyName)}</div>
+        <div class="career-stats">
+          ${d.endless > 0 ? `${d.endless} deep this run · ` : ''}best ${d.bestEndless} ·
+          ${d.wins}W · ${d.losses}L
+        </div>
+        <div class="career-stats">Ladder cleared — a loss ends the run, nothing else.</div>`;
     } else {
       const next = g.currentRival;
       career.innerHTML = `

@@ -1,5 +1,5 @@
 import type { Difficulty } from './ai';
-import { makeBuild } from './sim/parts';
+import { makeBuild, PRESETS } from './sim/parts';
 import type { BeyBuild } from './sim/types';
 
 /**
@@ -128,3 +128,73 @@ export const STARTING_UNLOCKS: Required<Unlocks> = {
 
 export const rivalAt = (index: number): Rival =>
   LADDER[Math.min(index, LADDER.length - 1)];
+
+/* --------------------------------------------------------------- endless */
+
+/**
+ * Names for the endless run, cycled with a rank suffix.
+ *
+ * Deliberately a small pool rather than a generator: a rival is meant to be a
+ * specific person you can remember losing to, and procedurally-assembled
+ * syllables read as filler. Eight names cycling with a rising rank keeps the
+ * "someone is next" feeling without pretending to infinite authorship.
+ */
+const ENDLESS_NAMES = ['Kade', 'Sable', 'Iri', 'Tor', 'Wren', 'Ash', 'Juno', 'Vex'];
+
+const ENDLESS_LINES = [
+  'No introductions. You know what this is by now.',
+  'Everyone who got this far made the same mistake next.',
+  'Beaten the ladder? Good. That was the tutorial.',
+  'I have watched every one of your matches.',
+  'Nothing new here. Just better.',
+];
+
+/**
+ * The rival for endless round `n` (1-based), after the ladder is cleared.
+ *
+ * WHY THIS EXISTS. The ladder is six rivals and then `rivalAt` clamped forever
+ * to Zeph — roughly twenty minutes of content, after which the game had no
+ * reason to be opened again. Everything needed for more was already here: the
+ * sim is deterministic and seeded, the AI escalates in skill, and there are six
+ * balanced anchor builds. This is the loop that uses them.
+ *
+ * TWO RULES, both inherited from the ladder above and both load-bearing:
+ *
+ *  1. **No unlocks, ever.** By the time this runs the catalog is complete, and
+ *     `progress.test.ts` asserts the ladder distributes it exactly once. An
+ *     endless rival handing out parts would either break that or duplicate a
+ *     grant. Coins still accrue, so a run is still worth playing.
+ *  2. **Escalation is skill and matchup, never stats.** Every build here is one
+ *     of the six PRESETS the balance suite already sweeps, so an endless rival
+ *     is provably beatable — it is not a stat-inflated boss. What rises is the
+ *     difficulty tier and, past the early rounds, that it counter-picks.
+ *
+ * Deterministic in `n`: the same round always produces the same opponent, so a
+ * run is a fair sequence rather than a slot machine, and two players comparing
+ * "I got to 12" are comparing the same twelve fights.
+ */
+export function endlessRival(n: number): Rival {
+  const i = Math.max(1, Math.floor(n));
+  const preset = PRESETS[(i - 1) % PRESETS.length];
+  const name = ENDLESS_NAMES[(i - 1) % ENDLESS_NAMES.length];
+  // Rank climbs one every full pass through the name pool, so "Kade II" is
+  // genuinely a later, harder fight than "Kade".
+  const rank = Math.floor((i - 1) / ENDLESS_NAMES.length);
+  const suffix = rank > 0 ? ` ${'I'.repeat(Math.min(rank + 1, 3))}${rank >= 3 ? `+${rank - 2}` : ''}` : '';
+  // The first two endless rounds stay at blader so clearing the ladder does not
+  // slam straight into a wall; everything after is champion.
+  const difficulty: Difficulty = i <= 2 ? 'blader' : 'champion';
+  const skins = ['void', 'ember', 'venom', 'solar', 'rose', 'frost'];
+
+  return {
+    id: `endless-${i}`,
+    name: `${name}${suffix}`,
+    title: `Endless · Round ${i}`,
+    beyName: preset.name,
+    build: preset.build,
+    skinId: skins[(i - 1) % skins.length],
+    difficulty,
+    line: ENDLESS_LINES[(i - 1) % ENDLESS_LINES.length],
+    unlocks: {},
+  };
+}

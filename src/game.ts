@@ -1,6 +1,6 @@
 import { AiController } from './ai';
 import { Audio } from './audio';
-import { LADDER, rivalAt } from './ladder';
+import { LADDER, endlessRival, rivalAt } from './ladder';
 import type { Rival, Unlocks } from './ladder';
 import { Progress } from './progress';
 import type { Difficulty } from './ai';
@@ -106,6 +106,12 @@ export class Game {
    * distinctly from `rival`, which is the live BeyState during a battle.
    */
   get currentRival(): Rival {
+    // Past the ladder the opponents keep coming — see `endlessRival`. Before
+    // this, `rivalAt` clamped to Zeph forever, so clearing the game left you
+    // replaying the same fight with nothing to move.
+    if (this.progress.cleared) {
+      return endlessRival(this.progress.data.endless + 1);
+    }
     return rivalAt(this.progress.data.rung);
   }
   aiName = 'Rival';
