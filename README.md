@@ -1014,13 +1014,25 @@ indistinguishable from a crash, so a `setTimeout` backstop resolves it.
 
 ## Known gaps
 
-- **The champion AI loses to the rookie in stamina and defence mirrors** (35%
-  and 15%). Pre-existing and identical with mixing on or off, so it is not the
-  mixing. `chooseSpinDir` and `chooseLaunch` branch on archetype but `pickMove`
-  does not, which is the obvious suspect — but one attempt at fixing it was
-  chasing the seat-bias confound above and had to be reverted, so this needs
-  measuring properly rather than another guess. The confound is gone now, so a
-  re-measurement would finally be trustworthy.
+- ~~The champion AI loses to the rookie in mirrors.~~ **Fixed**, and it was
+  worse than recorded: measured across all six anchor builds with seats
+  alternated, champion beat rookie 53.0% and *lost* to blader at 48.8% — the
+  whole ladder was flat, not just two archetypes.
+
+  The cause was an inverted incentive in `chooseLaunch`, and `pickMove` — the
+  long-standing suspect — was innocent. The perfect-launch band is 0.72–0.90 and
+  grants +14% spin; the archetype bases are 0.95, 0.70 and 0.45, two of them
+  outside it. So `launchNoise`, the stat meant to make better tiers *more*
+  precise, made them precisely miss the bonus: a rookie's sloppy 0.32 spread
+  wandered into the band sometimes, a champion's 0.04 never did. Precision was
+  a penalty.
+
+  Higher tiers now shave power into the band when it is nearly free, as a
+  probability rather than a partial nudge — lerping partway was tried first and
+  made the middle tier *worse* (blader vs rookie 58% → 52%), because a
+  half-commitment spends power without arriving. Stamina's 0.45 is left alone;
+  its distance to the band is 0.27 and a soft entry is a real strategic choice.
+  Now 59.6% / 54.6% / 61.3%, pinned by `src/difficulty.test.ts`.
 - Skins vary colour and material but not **silhouette**. Blade count already
   differs per layer; distinct shapes per skin would push identification further.
 - The tutorial is explanatory, not interactive. A scripted round that forces

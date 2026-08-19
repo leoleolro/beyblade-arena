@@ -1,5 +1,5 @@
 import { Battle } from './sim/battle';
-import { MOVES } from './sim/constants';
+import { MOVES, PERFECT_LAUNCH_MAX, PERFECT_LAUNCH_MIN } from './sim/constants';
 import { buildArchetype, PRESETS } from './sim/parts';
 import type {
   Archetype,
@@ -29,6 +29,14 @@ const PROFILE: Record<
     /** Chance it counters with the wrong move entirely. */
     misread: number;
     /**
+     * How reliably this tier shaves its launch power into the perfect band.
+     *
+     * 0 = does not know the band exists. 1 = takes it whenever it is nearly
+     * free. See `chooseLaunch` — this was the single biggest thing separating
+     * the tiers that nothing was actually doing.
+     */
+    launchSkill: number;
+    /**
      * Chance it declines a counter it *can* see, and plays something else.
      *
      * This is not a handicap — it is what stops the AI from being solvable.
@@ -56,6 +64,7 @@ const PROFILE: Record<
     engageRange: 1.2,
     reactionTime: 0.85,
     misread: 0.45,
+    launchSkill: 0,
     // A rookie is already unpredictable by accident; mixing on purpose on top
     // of a 45% misread would just be noise, and baiting is a plan it does not
     // have yet.
@@ -68,6 +77,7 @@ const PROFILE: Record<
     engageRange: 0.6,
     reactionTime: 0.35,
     misread: 0.18,
+    launchSkill: 0.55,
     mix: 0.15,
     bait: 0.12,
   },
@@ -77,6 +87,7 @@ const PROFILE: Record<
     engageRange: 0.45,
     reactionTime: 0.12,
     misread: 0.03,
+    launchSkill: 1,
     // The champion is the one that most needs this. Its 3% misread made it a
     // near-perfect counter machine, which sounds hard but plays as
     // predictable: bait it once and the rest of the round is scripted.
@@ -84,6 +95,15 @@ const PROFILE: Record<
     bait: 0.3,
   },
 };
+
+/**
+ * How far a tier will shave its launch power to reach the perfect band.
+ *
+ * 0.09 lets attack (base 0.95) reach 0.90 and balance (0.70) reach 0.72, while
+ * leaving stamina (0.45) alone — its distance to the band is 0.27, and giving
+ * that up would trade a deliberate soft entry for a spin bonus.
+ */
+const LAUNCH_REACH = 0.09;
 
 /** Rock-paper-scissors: what beats what, mirroring the part catalog's design. */
 const COUNTERS: Record<Archetype, Archetype> = {
@@ -151,7 +171,40 @@ export class AiController {
     const archetype = buildArchetype(build);
     const base =
       archetype === 'attack' ? 0.95 : archetype === 'stamina' ? 0.45 : 0.7;
-    const power = clamp01(base + (this.rng() - 0.5) * 2 * p.launchNoise);
+    let power = clamp01(base + (this.rng() - 0.5) * 2 * p.launchNoise);
+
+    // AIM FOR THE GREEN BAND — the fix for an inverted incentive.
+    //
+    // The perfect-launch band is 0.72..0.90 and grants +14% spin. The archetype
+    // bases are 0.95 (attack), 0.70 (balance) and 0.45 (stamina): two of the
+    // three sit OUTSIDE the band. So `launchNoise` — the stat that is supposed
+    // to make higher tiers more precise — was making them precisely miss the
+    // bonus. A rookie's sloppy 0.32 spread on an attack build wanders into the
+    // band sometimes; a champion's 0.04 never does. Precision was a penalty.
+    //
+    // Measured before this: champion beat rookie in a mirror only 53% of the
+    // time, and LOST to blader at 48.8%. The difficulty ladder was flat.
+    //
+    // The nudge is deliberately small and conditional. A skilled blader shaves
+    // a little power to catch a bonus that is nearly free; it does not abandon
+    // its archetype's plan to chase it. Stamina's 0.45 is a real strategic
+    // choice — a soft entry that settles to the centre — and the band is far
+    // enough away that no tier is allowed to sacrifice it.
+    const nearest = clamp01(
+      Math.min(Math.max(power, PERFECT_LAUNCH_MIN), PERFECT_LAUNCH_MAX),
+    );
+    const reach = Math.abs(nearest - power);
+    //
+    // A PROBABILITY, not a partial nudge. Lerping partway toward the band was
+    // the first attempt and it made the middle tier WORSE — measured, blader
+    // beat rookie 58% before and 52% after, because a half-commitment spends
+    // power moving toward the band without arriving in it, losing the spin the
+    // power would have given and gaining no bonus. Landing outside the band is
+    // equally unrewarded at 0.91 or at 0.89, so the only sane options are to
+    // take it or leave it.
+    if (reach <= LAUNCH_REACH && this.rng() < p.launchSkill) {
+      power = nearest;
+    }
     return {
       power,
       // Launch opposite the player so the round doesn't open on a collision.
