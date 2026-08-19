@@ -1012,6 +1012,43 @@ switching away mid-reveal froze the reel with no caption and left it frozen on
 return. Nothing was lost — the item is already banked — but a stalled reel is
 indistinguishable from a crash, so a `setTimeout` backstop resolves it.
 
+## The outline that ate the hardware
+
+Reported three times — "these black stuff", "still very prominent black lines
+and shards around the edge" — as a comb of black bars ringing every bey in the
+Anime theme. Two fixes failed before the cause was found, and the cause is a
+unit error worth writing down.
+
+three's `OutlineEffect` draws an inverted hull, and its vertex shader ends:
+
+```glsl
+return pos + norm * thickness * pos.w;
+```
+
+`pos` is **clip space**, and multiplying by `pos.w` exactly cancels the
+perspective divide. So the offset is constant in NDC: **`thickness` is a
+fraction of the screen**, independent both of how far away a part is and of how
+big it is. At `BEY_OUTLINE = 0.02` that is about 1% of screen height — roughly
+6–8 px — applied identically to a layer filling a third of the frame and to a
+driver fin three pixels across. Anything small on screen is swallowed whole by
+its own outline.
+
+Both earlier attempts missed this. Removing the ink from the blade detail fixed
+only the parts it touched and left the disc and driver still doing it. `clampInk`
+then capped thickness against each mesh's **world-space** bounding box, comparing
+a screen fraction against numbers between 0.003 and 0.036 — which is why it
+dimmed the shards without removing them, and thinned the layer's own silhouette
+unpredictably at the same time. There was no correct value for it, so it was
+deleted rather than retuned.
+
+The fix is one constant: hardware gets `HARDWARE_OUTLINE = 0.005`, a quarter of
+the silhouette weight — enough to separate a disc plate from the one behind it,
+small enough that a three-pixel fin keeps a core. The layer keeps the full
+`BEY_OUTLINE`, because the silhouette is what makes the top read as drawn.
+
+The lesson generalises: when an effect looks wrong at one scale and right at
+another, check what units its parameter is actually in before tuning it.
+
 ## Known gaps
 
 - ~~The champion AI loses to the rookie in mirrors.~~ **Fixed**, and it was

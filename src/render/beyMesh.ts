@@ -18,6 +18,37 @@ import { classicByLayer } from './classicdex';
  */
 const BEY_OUTLINE = 0.02;
 
+/**
+ * Outline weight for the disc and driver hardware, as opposed to the layer's
+ * silhouette.
+ *
+ * THE UNIT IS THE SCREEN, NOT THE WORLD, and getting that wrong cost two failed
+ * fixes. three's OutlineEffect vertex shader ends with
+ *
+ *     return pos + norm * thickness * pos.w;
+ *
+ * where `pos` is CLIP space. Multiplying by `pos.w` exactly cancels the
+ * perspective divide, so the offset is constant in NDC — `thickness` is a
+ * fraction of the viewport, independent of how far away the part is AND of how
+ * big the part is. At BEY_OUTLINE = 0.02 that is roughly 1% of screen height,
+ * about 6-8px, applied identically to a layer that fills a third of the screen
+ * and to a driver fin three pixels across. Anything small on screen is
+ * swallowed whole by its own outline, which is the comb of black shards that
+ * was reported three times.
+ *
+ * The two earlier attempts both missed this. Removing the ink from the blade
+ * detail fixed only the parts it touched and left the disc and driver doing it.
+ * `clampInk` then compared this screen-space number against world-space
+ * bounding boxes of 0.003-0.036 — a category error, which is why it dimmed the
+ * shards without removing them and thinned the silhouette unpredictably at the
+ * same time. It is deleted rather than retuned; there was no correct value for
+ * it.
+ *
+ * 0.005 is a quarter of the silhouette weight: enough to separate a disc plate
+ * from the one behind it, small enough that a three-pixel fin keeps a core.
+ */
+const HARDWARE_OUTLINE = 0.005;
+
 /** The three part sub-groups, so a caller can address them individually. */
 export interface BeyParts {
   driver: THREE.Group;
@@ -541,90 +572,14 @@ function buildToonBey(build: BeyBuild, skin: Skin): THREE.Group {
     disc: discY,
     layer: layerY,
   };
-  // Last, once every part exists: no outline may be thicker than a quarter of
-  // the part it wraps. See clampInk.
-  clampInk(group);
   return group;
 }
 
 /** Toon material with the bey-weight outline, in one call. Plastic. */
 
-/**
- * Largest fraction of a part's own thinnest dimension that its outline may be.
- *
- * An inverted-hull outline is a back-facing copy of the mesh pushed out along
- * its normals. It reads as a drawn line only while the push is SMALL next to
- * the thing being pushed; once the hull approaches the part's own thickness the
- * black back-faces swallow it whole and it renders as a solid sliver.
- *
- * 0.38 was found by looking, in two steps. 0.25 killed the shards but also took
- * the layer's own cartoon line down with them — the layer's THINNEST axis is
- * its depth, about r*0.3, so a ratio tuned for a disc plate starves the
- * silhouette. 0.38 keeps a real ink line on the layer while still leaving a
- * 0.006-unit disc plate with more core than shell.
- */
-const INK_RATIO = 0.38;
-
-/**
- * Clamp every outline in a built top against the geometry it actually wraps.
- *
- * Reported twice — "these black stuff", "still very prominent black lines and
- * shards around the edge" — as a comb of black bars ringing every bey. It is
- * not a shading bug and not a z-fight: the ink weight was a single global
- * constant while the parts it was applied to differ in size by two orders of
- * magnitude.
- *
- * Measured at the catalog's r of about 0.106, against BEY_OUTLINE = 0.02:
- *   layer extrusion      ~0.036 deep   hull is 55% of it   fine
- *   disc boss block      r*0.06 = 0.0064   hull is 3.1x the part
- *   disc rim plate       r*0.07 = 0.0074   hull is 2.7x the part
- *   driver collar fin    r*0.06 = 0.0064   hull is 3.1x the part
- *   blade ridge/slot     r*0.03..0.06      hull is 2-3x the part
- *
- * So most of the hardware on a top was wearing an outline thicker than itself.
- * Removing the ink from the blade detail fixed one third of it and left the
- * disc and driver still doing it, which is what the second report was.
- *
- * Fixing it per call site is whack-a-mole — there are thirty of them and the
- * next part added would reintroduce it. This derives the bound instead: walk
- * the finished top, and for every material take the SMALLEST part it is used
- * on, then cap its ink at a quarter of that. Shared materials take the minimum,
- * which is the safe direction. Nothing else needs to know the rule.
- *
- * Runs before buildSpinBlur, so the blur's ink-thinning (collectInk) reads
- * these clamped values as its baseline rather than the unclamped ones.
- */
-function clampInk(root: THREE.Object3D): void {
-  const smallest = new Map<THREE.Material, number>();
-
-  root.traverse((child) => {
-    const mesh = child as THREE.Mesh;
-    if (!mesh.geometry || !mesh.material) return;
-    mesh.geometry.computeBoundingBox();
-    const bb = mesh.geometry.boundingBox;
-    if (!bb) return;
-    const dim = Math.min(
-      (bb.max.x - bb.min.x) * Math.abs(mesh.scale.x),
-      (bb.max.y - bb.min.y) * Math.abs(mesh.scale.y),
-      (bb.max.z - bb.min.z) * Math.abs(mesh.scale.z),
-    );
-    if (!Number.isFinite(dim) || dim <= 0) return;
-    const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-    for (const m of mats) smallest.set(m, Math.min(smallest.get(m) ?? Infinity, dim));
-  });
-
-  for (const [mat, dim] of smallest) {
-    const params = mat.userData.outlineParameters as
-      | { thickness?: number; visible?: boolean }
-      | undefined;
-    if (!params || params.visible === false) continue;
-    if (typeof params.thickness !== 'number') continue;
-    params.thickness = Math.min(params.thickness, dim * INK_RATIO);
-  }
-}
 
 const inked = (colour: number, emissive = 0): THREE.Material =>
-  setOutline(toonMaterial(colour, emissive), { thickness: BEY_OUTLINE });
+  setOutline(toonMaterial(colour, emissive), { thickness: HARDWARE_OUTLINE });
 
 /**
  * Which parts get the metal treatment, and why it is only some of them.
@@ -674,7 +629,7 @@ const WAVE_METAL: MetalToonOptions = { gloss: 14, specular: 0.42, rim: 0.36, ban
 /** Forge-disc material: cel metal with the bey-weight outline, in one call. */
 const forged = (colour: number, emissive = 0): THREE.Material =>
   setOutline(metalToonMaterial(colour, { ...DISC_METAL, emissive }), {
-    thickness: BEY_OUTLINE,
+    thickness: HARDWARE_OUTLINE,
   });
 
 /**
