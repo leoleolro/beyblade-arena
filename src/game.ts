@@ -33,6 +33,8 @@ export interface GameEvents {
   onFinish(reason: string, playerWon: boolean): void;
   /** A heavy clash, in themes that pulse the screen. 0–1 strength. */
   onImpactFlash(strength: number): void;
+  /** The player's rip landed in the launch meter's green band. */
+  onPerfectLaunch(): void;
 }
 
 /** Shared empty array, so the no-hits path allocates nothing per frame. */
@@ -227,6 +229,21 @@ export class Game {
     this.renderer.start(playerAngle);
     this.audio.resume();
     this.audio.launch(this.lockedPower);
+
+    // Confirm a perfect launch.
+    //
+    // `perfectLaunch` has been written by the sim since the launch minigame got
+    // stakes and read by NOTHING — the bonus spin was applied silently, while
+    // the tutorial told the player to aim for the green band and promised them
+    // they would know when they hit it. Perfect BLOCK is plumbed all the way
+    // through to a colour, a shockwave and a guaranteed impact frame; this was
+    // its missing twin.
+    const me = this.battle.beys.find((b) => b.id === PLAYER_ID);
+    if (me?.perfectLaunch) {
+      this.audio.perfectLaunch();
+      this.events.onPerfectLaunch();
+    }
+
     this.setScreen('battle');
   }
 

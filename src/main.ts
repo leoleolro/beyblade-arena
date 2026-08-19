@@ -13,6 +13,7 @@ const game = new Game(canvas, {
   onFrame: () => ui.tick(),
   onFinish: (reason, won) => ui.showFinisher(reason, won),
   onImpactFlash: (strength) => ui.impactFlash(strength),
+  onPerfectLaunch: () => ui.showPerfectLaunch(),
 });
 
 ui = new Ui(uiRoot, game);

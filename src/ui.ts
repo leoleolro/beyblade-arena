@@ -185,6 +185,29 @@ export class Ui {
   }
 
   /**
+   * "PERFECT LAUNCH" — the confirmation the launch minigame never had.
+   *
+   * The green band on the meter grants real spin (PERFECT_LAUNCH_SPIN_BONUS),
+   * and the how-to-play screen tells the player to aim for it. But the sim's
+   * `perfectLaunch` flag was written and read by nothing, so hitting it felt
+   * identical to missing it — the one input the player makes before the round
+   * starts had no response at all.
+   *
+   * Deliberately brief and out of the way. It fires at the exact moment the
+   * tops are dropping in, so it must not compete with the entry: 900ms, above
+   * the dish, and gone before the first clash.
+   */
+  showPerfectLaunch(): void {
+    const el = document.createElement('div');
+    el.className = 'perfect-launch';
+    el.innerHTML = `<span>PERFECT LAUNCH</span><small>+${Math.round(
+      C.PERFECT_LAUNCH_SPIN_BONUS * 100,
+    )}% spin</small>`;
+    this.root.appendChild(el);
+    window.setTimeout(() => el.remove(), 900);
+  }
+
+  /**
    * Leave the match. Present on every in-match screen, because there was no
    * way out of a battle at all — once launched, the only exit was to finish.
    *

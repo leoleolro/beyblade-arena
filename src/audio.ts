@@ -209,6 +209,20 @@ export class Audio {
   }
 
   /**
+   * The rip landed in the green band.
+   *
+   * A rising two-note chime laid OVER the launch roar rather than replacing it,
+   * because the launch itself must still sound the same — this is a bonus on
+   * top of an action, not a different action. Deliberately bright and short: it
+   * has to cut through a 0.55s burst that is already playing.
+   */
+  perfectLaunch(): void {
+    this.resume();
+    this.tone({ freq: 880, duration: 0.12, gain: 0.14, type: 'triangle', sweepTo: 1320 });
+    this.tone({ freq: 1320, duration: 0.22, gain: 0.11, type: 'triangle', sweepTo: 1760 });
+  }
+
+  /**
    * Metal on metal. Pitch and brightness follow the actual impact strength, so
    * a glancing tap and a full smash are audibly different events.
    */
