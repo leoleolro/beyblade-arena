@@ -35,8 +35,12 @@ function match(
   dB: Difficulty,
   seed: number,
 ): 'a' | 'b' | null {
-  const aiA = new AiController('a', dA);
-  const aiB = new AiController('b', dB);
+  // SEEDED. AiController defaults its rng to Math.random, and without this the
+  // whole measurement is non-deterministic — an earlier version of this test
+  // reported 61.3% and 48.8% for the same pairing on consecutive runs, which is
+  // not a flaky assertion but a flaky experiment.
+  const aiA = new AiController('a', dA, makeRng(seed * 3 + 1));
+  const aiB = new AiController('b', dB, makeRng(seed * 7 + 2));
   const rng = makeRng(seed);
   const fighters: Fighter[] = [
     { id: 'a', name: 'A', build: build(), spinDir: 1 },

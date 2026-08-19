@@ -1069,7 +1069,11 @@ another, check what units its parameter is actually in before tuning it.
   made the middle tier *worse* (blader vs rookie 58% → 52%), because a
   half-commitment spends power without arriving. Stamina's 0.45 is left alone;
   its distance to the band is 0.27 and a soft entry is a real strategic choice.
-  Now 59.6% / 54.6% / 61.3%, pinned by `src/difficulty.test.ts`.
+  Now 66.7% / 51.7% / 59.2%, pinned by `src/difficulty.test.ts`. Champion vs
+  blader is the thin one — the two tiers differ mostly in reaction time and
+  misread rate, and the earlier finding that the AI can only afford about two
+  moves a round means those have little surface to act through. Worth revisiting
+  alongside the pacing work.
 - Skins vary colour and material but not **silhouette**. Blade count already
   differs per layer; distinct shapes per skin would push identification further.
 - The tutorial is explanatory, not interactive. A scripted round that forces
