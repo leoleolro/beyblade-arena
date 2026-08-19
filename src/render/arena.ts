@@ -494,7 +494,7 @@ export class ArenaRenderer {
     // so the push-in runs for most of the 1.25s settle window and finishes
     // about when the tops are first allowed to hurt each other.
     const aspect = this.camera.aspect || 1;
-    const narrow = aspect < 1.6 ? 1.6 / Math.max(aspect, 0.5) : 1;
+    const narrow = aspect < 1.6 ? 1.6 / Math.max(aspect, 0.62) : 1;
     this.camRadius = 1.62 * narrow * 1.35;
   }
 
@@ -1253,7 +1253,14 @@ export class ArenaRenderer {
     // a portrait window has a much smaller horizontal one — without this the
     // tops slide off the sides of the screen exactly when they separate.
     const aspect = this.camera.aspect || 1;
-    const narrow = aspect < 1.6 ? 1.6 / Math.max(aspect, 0.5) : 1;
+    // The 0.62 floor, not 0.5. The compensation itself is exact — it keeps the
+    // same horizontal world-extent visible as a 1.6-aspect desktop — but a
+    // phone does not need a desktop's extent. At 375x812 the old floor pulled
+    // the camera back 3.2x and the stadium became a small object adrift in a
+    // tall empty frame. 0.62 gives 2.58x: measurably closer, with the tops
+    // still inside the frame at the rim, which is the property the pullback
+    // exists to protect.
+    const narrow = aspect < 1.6 ? 1.6 / Math.max(aspect, 0.62) : 1;
 
     // ------------------------------------------------------------ punch ----
     // Decays over ~0.4s from a full hit. Accumulated in the hits loop, and by

@@ -585,16 +585,95 @@ button.primary:hover {
   color: var(--warn);
 }
 
+/* ------------------------------------------------------------- phone play
+ *
+ * The old narrow-screen rule stacked the two fighter cards vertically, and at
+ * 375px that filled the entire screen: both cards together covered the dish
+ * completely, so on a phone you could not see the fight you were playing. The
+ * scoreboard also collided with the Quit button, and the move bar advertised
+ * SPACE / A / S — keys a phone does not have.
+ *
+ * The fix is to stop treating a phone as a narrow desktop. The dish is the
+ * game; everything else compresses around it. Cards become a compact row along
+ * the TOP, showing the two things that actually change during a round (spin and
+ * meter), and the bottom is given entirely to thumbs.
+ */
 @media (max-width: 760px) {
   .fighters {
-    flex-direction: column;
-    align-items: stretch;
-    /* Clear the move bar, which sits at the bottom on narrow screens too. */
-    bottom: 86px;
+    /* Top, not bottom: the middle of the screen belongs to the stadium. */
+    top: 76px;
+    bottom: auto;
+    flex-direction: row;
+    align-items: flex-start;
+    padding: 0 8px;
     gap: 8px;
   }
   .card {
     width: auto;
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 7px 9px;
+  }
+  .card h3 {
+    font-size: 12px;
+  }
+  /* The build line is reference material, not live state — it is in the garage
+     and on the result screen, and it costs two lines here. */
+  .card .parts {
+    display: none;
+  }
+  .card .bar-label {
+    font-size: 8px;
+    margin-bottom: 2px;
+  }
+  .bar {
+    height: 5px;
+    margin-bottom: 4px;
+  }
+  .scoreboard {
+    /* Clear the Quit button, which sits top-left. */
+    top: 10px;
+    padding: 4px 12px;
+    gap: 10px;
+    font-size: 11px;
+    /* Leaves room for the Quit button on the left and the same margin on the
+       right, since the board is centred. Measured: at 375px this keeps the
+       board's left edge clear of Quit's right edge. */
+    max-width: calc(100vw - 200px);
+  }
+  /* "FIRST TO 4" is static rules text — it wrapped to its own line and pushed
+     the whole board down onto the fighter cards. The round number is the part
+     that actually changes. */
+  .scoreboard .vs {
+    display: none;
+  }
+  .scoreboard .name {
+    /* Long rival names wrapped to three lines and doubled the board's height. */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 96px;
+  }
+  .scoreboard .side {
+    min-width: 0;
+  }
+  .scoreboard .pts {
+    font-size: 20px;
+  }
+  .scoreboard .name {
+    font-size: 9px;
+  }
+  .coach {
+    bottom: 96px;
+    font-size: 11px;
+  }
+  .quit-btn {
+    padding: 4px 10px;
+    font-size: 11px;
+  }
+  .quit-btn small {
+    /* Esc does not exist on a phone. */
+    display: none;
   }
   .launch {
     bottom: 300px;
@@ -1708,4 +1787,61 @@ body.theme-anime .coach.on {
 
 @media (prefers-reduced-motion: reduce) {
   .perfect-launch { animation: none; opacity: 1; }
+}
+
+/* ------------------------------------------------- touch-first controls */
+
+/* A coarse pointer means no keyboard, so the key caps are not a hint — they are
+   a lie taking up the left third of every button. The move bar becomes three
+   equal, thumb-sized targets instead.
+   Keyed on the POINTER, not the width: a small window on a desktop still has a
+   keyboard, and a large tablet still does not. */
+@media (pointer: coarse) {
+  .move-key {
+    display: none;
+  }
+  .moves {
+    left: 8px;
+    right: 8px;
+    bottom: 12px;
+    transform: none;
+    gap: 6px;
+  }
+  .move {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+    /* 56px clears the ~44px minimum comfortable touch target with room for a
+       thumb arriving at an angle. */
+    min-height: 56px;
+    padding: 8px 6px;
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      'name'
+      'blurb';
+    text-align: center;
+  }
+  .move-name {
+    font-size: 14px;
+  }
+  .move-blurb {
+    font-size: 9px;
+  }
+  .launch-hint kbd {
+    display: none;
+  }
+}
+
+/* Phones in landscape are shorter than they are narrow: the top card row and
+   the bottom move bar meet in the middle and squeeze the dish out entirely. */
+@media (max-height: 480px) and (orientation: landscape) {
+  .fighters {
+    top: 56px;
+  }
+  .card .bar-label {
+    display: none;
+  }
+  .coach {
+    display: none;
+  }
 }
