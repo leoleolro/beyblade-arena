@@ -292,8 +292,30 @@ export const MOVES: Record<'charge' | 'block' | 'dodge', MoveProfile> = {
   },
 };
 
-/** Meter gained per second of the round. */
-export const METER_GAIN_PER_SEC = 0.145;
+/**
+ * Meter gained per second of the round.
+ *
+ * 0.20, up from 0.145, and it is a PACING change rather than a power one.
+ *
+ * Measured at 0.145: 2.66 moves per top per round in an 11.9s round — one
+ * decision every 4.5 seconds, across a three-way triangle. That is the reason
+ * the difficulty tiers barely separated: reaction time and misread rate are the
+ * champion's whole advantage, and they had almost nothing to act through.
+ *
+ * At 0.20: 2.94 moves in a 10.5s round. The important part is what does NOT
+ * change — hits per round stay at 8.0 across the entire swept range. So this is
+ * the same fight in less time, not a shorter or thinner one, which is exactly
+ * the axis the earlier pacing attempts kept failing to move: every lever they
+ * tried bought contacts by shortening the round or lengthened the round without
+ * adding any.
+ *
+ * THE CEILING IS THE MOVE TRIANGLE, and it is close. Block-beats-charge is the
+ * tightest leg, and more meter means more charges: measured, the leg holds at
+ * 0.145 and 0.20 and breaks at 0.24 (0.454 against a 0.5 floor). 0.21-0.22 sit
+ * on a knife edge where the suite flips on sampling noise. 0.20 is the last
+ * value with real margin, so this is the top of the range, not a waypoint.
+ */
+export const METER_GAIN_PER_SEC = 0.20;
 /** Landing a clash banks extra charge, rewarding aggression. */
 export const METER_GAIN_PER_HIT = 0.11;
 
