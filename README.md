@@ -20,6 +20,25 @@ npm run build
 npx vitest run
 ```
 
+### Publishing it
+
+The game is a static site with no server and no accounts, which is what makes
+deploying it a nine-line workflow rather than an infrastructure project.
+`.github/workflows/deploy.yml` typechecks, runs the whole suite, builds, and
+publishes to GitHub Pages on every push to `main` — a red build never becomes
+the thing people play.
+
+One manual step is needed once: in the repository's **Settings → Pages**, set
+the source to **GitHub Actions**. Until that is done the workflow builds and
+tests but has nowhere to publish.
+
+The only setting that is not optional is `base` in `vite.config.ts`. Pages
+serves a project site from `/<repo>/` rather than the domain root, so a build
+made with the default base emits absolute `/assets/...` URLs that work perfectly
+in `vite dev` and 404 in production. It is scoped to `command === 'build'` so
+the dev server stays on localhost root, and read from `BASE` so the same repo
+can serve from a root domain without editing the file.
+
 ## Controls
 
 | Screen | Key | Action |

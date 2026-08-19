@@ -1,0 +1,56 @@
+# Build and publish the game to GitHub Pages.
+#
+# The game is a static site with no server and no accounts, which is what makes
+# this a nine-line deploy rather than an infrastructure project. Tests and the
+# typecheck run first: a red build must not become the thing people play.
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  # So a broken deploy can be re-run without an empty commit.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never let two deploys race. `cancel-in-progress: false` because a half-done
+# Pages deploy is worse than a queued one.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Typecheck and test
+        # The whole suite, at the long timeout the balance sweeps need. A CI
+        # runner is exactly the "busy machine" that makes the 5s default lie.
+        run: npx tsc --noEmit && npx vitest run --no-file-parallelism --testTimeout=120000
+      - name: Build
+        # BASE must match the Pages path, which for a project site is /<repo>/.
+        run: npm run build
+        env:
+          BASE: /${{ github.event.repository.name }}/
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
