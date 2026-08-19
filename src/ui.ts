@@ -510,6 +510,21 @@ export class Ui {
               : ''
           }
           <tr><td>Biggest hit</td><td>${you.biggestHit.toFixed(1)}</td><td>${them.biggestHit.toFixed(1)}</td></tr>
+          ${
+            // Arena-specific rows, shown only when the arena that produces them
+            // was actually played. Both numbers were computed by the sim and
+            // documented as "shown in the breakdown" while the breakdown showed
+            // neither — so the arena's whole effect on a round was invisible in
+            // the one screen that explains what just happened.
+            you.railRides > 0 || them.railRides > 0
+              ? `<tr><td>Rail rides</td><td>${you.railRides}</td><td>${them.railRides}</td></tr>`
+              : ''
+          }
+          ${
+            you.pitDrained > 0 || them.pitDrained > 0
+              ? `<tr><td>Spin lost to the pit</td><td>${Math.round(you.pitDrained)}</td><td>${Math.round(them.pitDrained)}</td></tr>`
+              : ''
+          }
           <tr><td>Moves used</td><td>${you.movesUsed}</td><td>${them.movesUsed}</td></tr>
           <tr><td>Burst charge</td><td>${pct(you.burst)}</td><td>${pct(them.burst)}</td></tr>
         </tbody>
@@ -769,11 +784,15 @@ export class Ui {
       <div class="slot">
         <h4>Arenas</h4>
         <p class="howto-body">
-          The <b>Standard Dish</b> is a plain bowl. The <b>X-Rail Stadium</b> adds a
-          glowing rail around the outside: a top moving fast enough gets caught,
-          accelerated, then flung back across the arena. Rounds there are faster
-          and deadlier. Pick it in the garage — it's the one setting that changes
-          how the match actually plays, rather than how it looks.
+          The <b>Standard Dish</b> is a plain bowl — no archetype is favoured.
+          The <b>X-Rail Stadium</b> adds a glowing rail around the outside: a top
+          moving fast enough gets caught, accelerated, then flung back across the
+          arena. Rounds there are faster and deadlier.
+          The <b>Spike Pit</b> drains spin from anything that sits in the middle,
+          and the longer you loiter the harder it bites — so camping the centre,
+          which is otherwise the safest place to be, stops being free.
+          Pick one in the garage: the arena is the one setting that changes how
+          the match actually <em>plays</em> rather than how it looks.
         </p>
       </div>
 

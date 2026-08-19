@@ -24,7 +24,7 @@ npx vitest run
 
 | Screen | Key | Action |
 | --- | --- | --- |
-| Garage | mouse | pick parts, spin direction, and rival difficulty |
+| Garage | mouse | pick a bey or parts, the arena, and spin direction |
 | Launch | `Space` | stop the meter — green zone is the widest, most aggressive orbit |
 | Battle | `Space` | **Charge** — hunt and hit hard (costs a full meter) |
 | Battle | `A` | **Block** — absorb a hit and punish the attacker (65%) |
@@ -405,7 +405,7 @@ Two things the tuning taught, both preserved in `rail.test.ts`:
 
 ## Visual themes
 
-Two looks, switchable in the garage and persisted:
+Three looks, switchable in the garage and persisted:
 
 - **Arena** — the original clean technical style. `ARENA` in `src/render/theme.ts`
   is a literal transcription of the values that used to be hardcoded across
@@ -935,7 +935,8 @@ adding three common layers would quietly make every crate worse.
 **The shelf** is choice. Four named parts at fixed prices, restocked free after
 every match, with a flat 45-coin reroll for impatience. It exists so that
 wanting a specific part never requires gambling for it. Chasing one particular
-legendary through Relic Crates costs roughly 4,700 coins in expectation and
+legendary through Relic Crates costs roughly 2,300 coins in expectation (420 /
+0.18) and
 hands you a random one at the end; the shelf sells the exact part for 1,500 and
 cannot disappoint you. `economy.test.ts` pins that relation for every rarity —
 if the certain path ever became the worse deal, the crate would stop being

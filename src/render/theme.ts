@@ -250,7 +250,14 @@ export const ANIME: Theme = {
   toon: true,
   aura: true,
   speedLines: true,
-  impactFlash: true,
+  // FALSE, and it must stay false while this theme is the toon one.
+  //
+  // The only consumer is `impactFlash && !theme.toon` (arena.ts) — the manga
+  // cut and a full-screen white fade on the same hit undercut each other, so
+  // toon themes deliberately get the cut instead. This read `true` for a long
+  // time and was silently gated off, which is worse than either answer: a flag
+  // that says a feature is on while the code guarantees it is off.
+  impactFlash: false,
 
   bodyClass: 'theme-anime',
 };

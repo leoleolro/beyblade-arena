@@ -9,7 +9,6 @@ export const vec = (x = 0, y = 0): Vec2 => ({ x, y });
 
 export const len = (v: Vec2): number => Math.hypot(v.x, v.y);
 
-export const lenSq = (v: Vec2): number => v.x * v.x + v.y * v.y;
 
 export function norm(v: Vec2): Vec2 {
   const l = Math.hypot(v.x, v.y);

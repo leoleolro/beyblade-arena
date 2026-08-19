@@ -1,7 +1,5 @@
 import type { Vec2 } from './math';
 
-/** The three slots that make up a top. */
-export type PartKind = 'layer' | 'disc' | 'driver';
 
 /** Archetype, used for AI behaviour hints and UI colour coding. */
 export type Archetype = 'attack' | 'defense' | 'stamina' | 'balance';

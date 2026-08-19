@@ -1,4 +1,3 @@
-import * as THREE from 'three';
 import { registryDesigns, registryPresets } from './beys/registry';
 import { ink } from './emblems';
 import type { EmblemDraw } from './emblems';
@@ -245,9 +244,3 @@ export function beastEmblem(design: BeyDesign, size = 256): HTMLCanvasElement {
   return canvas;
 }
 
-/** The emblem as a texture, for material maps. */
-export function beastEmblemTexture(design: BeyDesign, size = 256): THREE.CanvasTexture {
-  const tex = new THREE.CanvasTexture(beastEmblem(design, size));
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
-}
