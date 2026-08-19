@@ -1251,16 +1251,36 @@ function addBladeDetail(
       ? metalToonMaterial(c, { ...LAYER_METAL, emissive })
       : toonMaterial(c, emissive);
 
-  const detailMat = setOutline(surface(dark), { thickness: BEY_OUTLINE * 0.55 });
+  // NO INK ON THE INTERIOR HARDWARE, and the reason is arithmetic rather than
+  // taste.
+  //
+  // OutlineEffect draws an inverted hull: a back-facing copy of the mesh pushed
+  // outward along its normals by `thickness`. That only reads as a drawn line
+  // when the push is small next to the thing being pushed. These pieces are
+  // ridges, slots, plates and fins, and their thinnest dimensions are r*0.03 to
+  // r*0.06 — at the catalog's r of about 0.106 that is 0.003 to 0.006 world
+  // units, against a hull of BEY_OUTLINE * 0.55 = 0.011.
+  //
+  // So the hull was two to three times THICKER than the hardware it was meant
+  // to outline. The black back-faces engulfed the part completely and, arrayed
+  // around the rim, rendered as a comb of black slivers sticking out past the
+  // silhouette. Reported as "these black stuff" on a zoomed screenshot, and
+  // visible on every layer with surface hardware.
+  //
+  // Cel art inks the silhouette, not every rivet. The layer's own extrusion
+  // still carries the full-weight outline, which is what makes the top read as
+  // drawn; the jewellery on top of it does not need its own line, and at these
+  // sizes there is no thickness that would give it one — anything small enough
+  // not to swallow the part is sub-pixel at the battle camera.
+  const detailMat = noOutline(surface(dark));
   // Contact chips, bands and outer plates are the layer's jewellery: plated
   // hardware on every design, so these are metal unconditionally. They are also
   // the pieces that strike, which puts the highlight exactly where the eye
   // already is during a clash.
-  const accentMat = setOutline(
+  const accentMat = noOutline(
     metalToonMaterial(design.accent, { ...LAYER_METAL, emissive: 0.1 }),
-    { thickness: BEY_OUTLINE * 0.55 },
   );
-  const liftMat = setOutline(surface(light), { thickness: BEY_OUTLINE * 0.55 });
+  const liftMat = noOutline(surface(light));
 
   for (let i = 0; i < blades; i++) {
     const a = i * step;
