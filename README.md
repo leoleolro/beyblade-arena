@@ -1012,6 +1012,48 @@ switching away mid-reveal froze the reel with no caption and left it frozen on
 return. Nothing was lost — the item is already banked — but a stalled reel is
 indistinguishable from a crash, so a `setTimeout` backstop resolves it.
 
+## The benchmark measured a game nobody plays
+
+The most useful thing found in this whole pacing thread, and it invalidates a
+number I reported repeatedly.
+
+`pacing.test.ts`, `tuning.test.ts` and `sim.test.ts` all construct
+`LaunchParams` directly and **never activate a single move**. Verified by grep:
+before `played.test.ts` existed, no test in the suite drove an `AiController` or
+called `activateMove`. So every pacing and balance figure this project has ever
+produced described a game in which nobody uses the move triangle — the central
+mechanic.
+
+The gap is not small:
+
+| | no moves (the old benchmark) | moves driven (as played) |
+|---|---|---|
+| round p50 | 15.5s | **7.4s** |
+| hits per round (p50 / mean) | 5 | **6 / 7.6** |
+| heavy hits per round | — | 3.28 |
+| under 2s | 10.4% | 8.8% |
+
+The played round is **less than half as long and has more contact**. "A median
+round is 16 seconds and contains five collisions", which drove three separate
+investigations and which I stated to the owner as fact, was an artefact of the
+harness rather than a property of the game.
+
+It also casts doubt on a conclusion built on top of it. The deepest of those
+investigations found hits-per-round "pinned near 5 across the whole test-safe
+region" and concluded that only `SMASH_MAX` could move it, and that `SMASH_MAX`
+could not be moved without deleting earned ring-outs. That search was conducted
+entirely in the no-moves world. The lever it went looking for may not have been
+missing.
+
+`played.test.ts` measures the played game and asserts only what a real
+regression would break — a median round must contain a fight, must not become a
+blur of taps, and a top must be able to afford about two moves. Tight assertions
+on a stochastic AI are how you get a suite people learn to ignore.
+
+The general lesson is the expensive one: **a benchmark that omits the main
+mechanic will confidently answer the wrong question**, and it will keep doing so
+for as long as everyone trusts it.
+
 ## The outline that ate the hardware
 
 Reported three times — "these black stuff", "still very prominent black lines
