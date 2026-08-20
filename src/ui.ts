@@ -3,6 +3,7 @@ import { DISCS, DRIVERS, LAYERS, deriveStats, makeBuild } from './sim/parts';
 import { BEY_PRESETS } from './render/beydex';
 import { beyThumb } from './render/beyThumb';
 import { shopSection } from './render/shopSection';
+import { topModelFor } from './render/topModelIndex';
 import * as C from './sim/constants';
 import { SKINS, skinById } from './render/skins';
 import type { Channel } from './audio';
@@ -1024,6 +1025,20 @@ export class Ui {
     // Crates sit in Collection because acquiring is what this tab is for; the
     // Workshop is about tuning what you already own.
     collection.appendChild(shopSection(g, () => this.render()));
+
+    // Attribution for an imported model, when one is equipped.
+    //
+    // Not politeness — a CC-BY licence requires the credit wherever the work is
+    // shared, and this game is meant to be shared. A credit that lives only in
+    // the licence.txt inside a downloaded folder is a credit nobody will ever
+    // see, and it disappears the first time someone tidies the directory.
+    const model = topModelFor(g.playerBuild.layer.id);
+    if (model?.credit) {
+      const credit = document.createElement('p');
+      credit.className = 'sub model-credit';
+      credit.textContent = `3D model: ${model.credit}`;
+      collection.appendChild(credit);
+    }
 
     const slots: [string, { id: string; name: string; colour?: number; note: string }[], string][] = [
       [

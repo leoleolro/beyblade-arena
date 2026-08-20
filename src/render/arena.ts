@@ -31,6 +31,21 @@ import { buildAura } from './aura';
 import type { Aura } from './aura';
 import { contactShadow, noOutline } from './toon';
 import { designByLayer } from './beydex';
+import { finishAsMetal, loadTopModel, normaliseToRadius, seatOnOrigin } from './topModels';
+import { topModelFor } from './topModelIndex';
+
+/**
+ * Finish colour for imported tops.
+ *
+ * Near-white rather than a design colour, on the owner's read of the first
+ * model: bare machined metal is the look, and tinting it toward a bey's palette
+ * turns it back into painted plastic. The banded specular and fresnel rim in
+ * `metalToonMaterial` supply all the colour it needs.
+ */
+const MODEL_TINT = 0xd8dde3;
+
+/** Imported tops carry the silhouette ink weight, being one solid object. */
+const BEY_MODEL_OUTLINE = 0.02;
 
 interface BeyVisual {
   group: THREE.Group;
@@ -658,6 +673,11 @@ export class ArenaRenderer {
     for (const b of beys) {
       const skin: Skin = skinById(skins[b.id] ?? 'frost');
       const group = buildBeyMesh(b.build, skin, this.theme.toon);
+      // An imported top, if this bey has one, swapped in when it resolves.
+      // Deliberately after the procedural build rather than instead of it: the
+      // round starts on the frame it starts, and a model that is slow or
+      // missing must never be able to delay or empty the arena.
+      this.applyTopModel(group, b.build.layer.id, b.stats.radius);
 
       // The ribbon is not a toon effect — it is simply a trail you can SEE.
       // The fallback `Trail` is a THREE.Line, which no desktop GL driver draws
@@ -740,6 +760,42 @@ export class ArenaRenderer {
         exit: new THREE.Vector3(1, 0, 0),
       });
     }
+  }
+
+  /**
+   * Swap a procedural top for an imported model, if one exists.
+   *
+   * Async and fire-and-forget. The procedural mesh is already on screen and
+   * stays there until the model resolves; if there is no model, or it fails,
+   * nothing happens at all and the top is simply the one the game drew.
+   *
+   * The model replaces the LAYER group's contents and hides the procedural
+   * disc and driver, because an imported file is a whole assembled beyblade —
+   * see topModels.ts. The part groups themselves are left in place and keep
+   * their transforms, so the burst scatter, the garage explode and the spin
+   * blur all keep working against the same three handles they always used.
+   */
+  private applyTopModel(group: THREE.Group, layerId: string, radius: number): void {
+    const entry = topModelFor(layerId);
+    if (!entry) return;
+    const parts = group.userData.parts as BeyParts | undefined;
+    if (!parts) return;
+
+    void loadTopModel(entry.url).then((src) => {
+      if (!src) return;
+      // The group may already have been torn down for the next round.
+      if (!group.parent) return;
+
+      const model = src.clone(true);
+      normaliseToRadius(model, radius);
+      seatOnOrigin(model);
+      finishAsMetal(model, MODEL_TINT, BEY_MODEL_OUTLINE, this.theme.toon);
+
+      parts.layer.clear();
+      parts.layer.add(model);
+      parts.disc.visible = false;
+      parts.driver.visible = false;
+    });
   }
 
   /** Mirror one frame of sim state. `dt` is real elapsed seconds. */

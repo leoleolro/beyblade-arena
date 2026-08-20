@@ -1,62 +1,62 @@
-# Beyblade part models
+# Beyblade models
 
-Drop `.glb` files here. Any part without one keeps its procedural mesh, so the
-game runs fine with this folder empty — which is how it ships today.
+Drop a model here and add one line to `src/render/topModelIndex.ts`. A bey with
+no entry keeps its procedural mesh, so the game runs fine with this folder
+empty — which is how it shipped before the first file arrived.
 
-## Naming
+## Whole tops, not parts
 
-**One file per PART, not per beyblade.**
+**One file per beyblade.** Not one per layer/disc/driver.
 
-```
-<partId>-layer.glb      crossx-layer.glb    phoenix-layer.glb
-<partId>-disc.glb       gravity-disc.glb    heavy-disc.glb
-<partId>-driver.glb     xtreme-driver.glb   atomic-driver.glb
-```
+That is a deliberate reversal of the original plan. Per-part files would keep
+all 330 build combinations visually swappable, but real models are whole
+beyblades and splitting them is fiddly and unwanted. So a model overrides the
+whole top.
 
-The ids are the ones in `src/sim/parts.ts`. Per-part is not a stylistic
-preference: the game lets you build **11 layers × 5 discs × 6 drivers = 330
-combinations**, and modelling those as whole tops would be 330 files. As parts
-it is 22, and every combination keeps working.
+What it costs, stated plainly: while an imported top is showing, changing the
+disc or driver does not change what you see. What it does **not** cost is
+anything mechanical — the sim still reads stats from the parts, so a different
+disc still flies differently. The model is a skin over the build, not the build.
 
-## Format
+## Format: GLB, glTF or STL — all three work
 
-**GLB.** It is glTF binary — the format three.js loads natively, in one file,
-carrying materials, colours, UVs and node names.
+**STL is supported, which is not the obvious call.** STL is normally the worst
+format to build on: no materials, no colours, no UVs, no node names, no
+hierarchy, and 3D-printing triangle counts.
 
-Not STL. STL is triangle soup: no materials, no colours, no node names, no
-hierarchy, and usually 100k+ triangles because it is a 3D-printing format.
-Converting is fine — Blender: File → Import → STL, then File → Export → glTF 2.0
-(.glb) — but decimate and assign materials while you are in there.
+Every one of those objections assumes you wanted per-part structure and authored
+colour. This project wants neither — a top is one object, finished in one metal,
+and the finish comes from the game rather than the file. The format's weaknesses
+land entirely outside what is asked of it, and in exchange it removes a
+conversion step from the loop that decides how often new beys actually get
+added. That trade is worth more than the theoretical purity.
 
-Not USDZ. three.js has no usable loader for it in core.
+So use whatever you have. GLB is still the nicest if you have a choice, because
+it is one file and can carry real materials later if that ever matters.
 
-## The rules that actually matter
+## What actually matters
 
-**Origin at the mounting point, +Y up.** The whole renderer assumes a top's
-group origin is where the driver tip touches the dish. The burst-scatter
-animation and the garage's exploded view are both built on that, and a model
-with its origin at the centre of mass will float or sink.
-
-**≤ 3,000 triangles per part.** At the battle camera a top is about 60 px
-across; detail past that is invisible there and costs load time on every visit.
-The garage view is where detail shows, and 3k is plenty for it.
+**Triangle budget.** Aim under ~20k. The first import was 14k and is fine. This
+is the one STL weakness that does bite, because printing exports are often
+100k+; decimate in Blender if yours is.
 
 **Scale does not matter.** Do not try to match the game's units. Every model is
 measured and scaled so its widest horizontal point sits exactly on the sim's
-collision circle — see `normaliseToRadius`, pinned by `partModels.test.ts`
-across scales from 0.001 to 1000. This is a stronger guarantee than the
-procedural meshes get.
+collision circle, so what you see is what hits. The first import was 39 units
+across and needed no adjustment.
 
-**Skip metalness and roughness maps.** The cel-shaded theme uses
-`MeshToonMaterial`, which has no slot for either, so they have nowhere to go.
-Base colour and a colour map are used. Mark a material metallic (metalness > 0.5)
-and it gets the cel-metal treatment automatically.
+**Orientation does not matter much either.** The model is recentred
+horizontally and dropped so its lowest point sits on the dish. A model lying on
+its side will look wrong — beyond that, do not worry about it.
 
-**Keep it one object per file.** Sub-meshes are fine and are preserved; just do
-not pack two different parts into one file.
+**Colour is ignored.** The finish is applied by the game: cel metal in the Anime
+theme, a genuinely reflective metal in the lit themes. A file's own materials
+are replaced, so there is no point authoring them.
 
-## Checking your work
+## Licensing
 
-Load the game and open the garage — the exploded view is the honest test, since
-it shows each part separately at a size where you can see it. `/inspect.html`
-renders a single top full-frame with pitch and spin controls.
+If a model requires attribution, put the credit in its `topModelIndex.ts` entry
+rather than trusting the downloaded `license.txt`. The game renders it in the
+garage whenever that bey is equipped. A credit sitting in a text file inside a
+folder is a credit nobody sees, and it vanishes the first time the directory is
+tidied.

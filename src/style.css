@@ -1845,3 +1845,12 @@ body.theme-anime .coach.on {
     display: none;
   }
 }
+
+/* Imported-model attribution. Small, but it must be present and legible —
+   CC-BY requires the credit wherever the work is shared. */
+.model-credit {
+  margin-top: 14px;
+  font-size: 10px;
+  line-height: 1.5;
+  opacity: 0.7;
+}
