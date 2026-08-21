@@ -1116,15 +1116,24 @@ another, check what units its parameter is actually in before tuning it.
   misread rate, and the earlier finding that the AI can only afford about two
   moves a round means those have little surface to act through. Worth revisiting
   alongside the pacing work.
+- **An imported top hides the disc and driver.** A model overrides the whole
+  bey, so swapping those parts changes how it flies but not how it looks.
+  Mechanically harmless, visually a compromise — see `topModels.ts`.
+- **Only `src/sim/` is really tested.** `src/render/` has geometry and model
+  tests now, but nothing exercises materials, the effect pipeline or `ui.ts`,
+  because those need a GL context. Every visual claim is still verified by eye.
 - Skins vary colour and material but not **silhouette**. Blade count already
   differs per layer; distinct shapes per skin would push identification further.
 - The tutorial is explanatory, not interactive. A scripted round that forces
   each situation in turn would teach the triangle faster than reading it.
 - The garage labels sit at fixed thirds rather than tracking the projected
   screen position of each part, so they drift when the model is rotated steeply.
-- The ladder ends. After Zeph there is no endless mode, no ranked ladder and no
-  daily challenge — and the deterministic seeded sim makes a seeded daily run
-  nearly free, so that is the obvious next step.
+- ~~The ladder ends.~~ **Fixed** — endless mode runs after Zeph, deterministic
+  in the round number, no unlocks, escalating in skill only. A loss ends the run
+  and resets the depth, which is what gives "how far can you get" an answer.
+  Still no ranked ladder and no daily challenge; the seeded sim makes a seeded
+  daily run nearly free, so that remains the obvious next step.
 - The shelf restocks per match but does not rotate on a clock, so there is no
   reason to come back tomorrow specifically.
-- Bundle is ~700 kB (182 kB gzipped), almost entirely Three.js.
+- Bundle is ~745 kB (198 kB gzipped), almost entirely Three.js. Split into two
+  chunks so an update does not invalidate three: 154 kB app / 591 kB three.
