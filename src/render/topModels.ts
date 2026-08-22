@@ -238,6 +238,37 @@ export function finishImported(
  * and reads as a hole in the top. 0.7/0.42 keeps it obviously metal while
  * letting the authored colour survive being reflected at.
  */
+/**
+ * Darkest albedo a converted material is allowed to keep.
+ *
+ * Gemstone's MTL has two materials at `Kd 0.000000 0.000000 0.000000` and one
+ * at 0.008. As a Phong diffuse that is a black plastic panel and renders fine.
+ * As a METAL it is a void: a metal has no meaningful diffuse term, so its
+ * colour comes from tinting what it reflects — and a black tint reflects
+ * nothing. Those parts came out as holes punched through the top, which is
+ * exactly how Gemstone looked in the garage.
+ *
+ * Lifting to 0.16 makes them dark graphite: still obviously the darkest part of
+ * the model, still reading as the panel lines they are, but now with enough
+ * albedo to return an image of the environment.
+ *
+ * A pure-black `Kd` in an exported MTL is also very often "nobody set this"
+ * rather than a considered choice, which makes overriding it the safer default
+ * of the two.
+ */
+const MIN_METAL_ALBEDO = 0.16;
+
+function liftBlacks(colour: THREE.Color | undefined): THREE.Color {
+  const c = colour ? colour.clone() : new THREE.Color(0xffffff);
+  const peak = Math.max(c.r, c.g, c.b);
+  if (peak >= MIN_METAL_ALBEDO) return c;
+  // Scale rather than replace, so a very dark BLUE stays blue. Only a true
+  // zero has no hue to preserve, and setScalar is the right answer there.
+  if (peak < 1e-4) c.setScalar(MIN_METAL_ALBEDO);
+  else c.multiplyScalar(MIN_METAL_ALBEDO / peak);
+  return c;
+}
+
 function keepOwnMaterials(
   obj: THREE.Object3D,
   env: THREE.Texture | null,
@@ -254,7 +285,7 @@ function keepOwnMaterials(
 
     const from = src as THREE.MeshPhongMaterial;
     const mat = new THREE.MeshStandardMaterial({
-      color: from.color ? from.color.clone() : new THREE.Color(0xffffff),
+      color: liftBlacks(from.color),
       map: from.map ?? null,
       metalness: 0.7,
       roughness: 0.42,
