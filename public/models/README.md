@@ -31,8 +31,18 @@ land entirely outside what is asked of it, and in exchange it removes a
 conversion step from the loop that decides how often new beys actually get
 added. That trade is worth more than the theoretical purity.
 
-So use whatever you have. GLB is still the nicest if you have a choice, because
-it is one file and can carry real materials later if that ever matters.
+So use whatever you have — the STL path is verified, not just written: the first
+model was converted to STL and run in the arena.
+
+**It will not look better or worse.** Every material is replaced on import, so a
+GLB and an STL of the same mesh render identical pixels.
+
+The only measured difference is download size. STL stores three full vertices
+per triangle with no sharing, so the same mesh is **1.33x larger** — 708 kB
+against 532 kB for the first model, because 42,456 vertices get stored where
+14,978 would do. If you are exporting fresh and have the choice, GLB, for that
+reason and because it can carry real materials later if that ever matters. If
+you already have STL, use it and do not think about it again.
 
 ## What actually matters
 

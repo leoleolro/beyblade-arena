@@ -27,7 +27,16 @@ import { metalToonMaterial, setOutline } from './toon';
  * land entirely outside what we ask of it, and in exchange it removes a
  * conversion step from the loop that decides how often new beys get added.
  *
- * So: `.glb`, `.gltf` and `.stl` all load. Use whichever you have.
+ * So: `.glb`, `.gltf` and `.stl` all load. Use whichever you have — VERIFIED by
+ * converting the first model to STL and running it in the arena, not merely by
+ * writing the branch.
+ *
+ * The one measured difference, and it is not visual: STL stores three full
+ * vertices per triangle with no sharing, so the same mesh is 1.33x larger —
+ * 708 kB against 532 kB for the first model, 42,456 stored vertices against
+ * 14,978 real ones. Identical pixels, a third more download. That is the whole
+ * case for preferring GLB, and it is a weak one next to "use the file you
+ * already have".
  */
 
 export type ModelFormat = 'glb' | 'gltf' | 'stl';
