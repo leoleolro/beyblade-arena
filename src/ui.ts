@@ -2,6 +2,7 @@ import type { Game } from './game';
 import { DISCS, DRIVERS, LAYERS, deriveStats, makeBuild } from './sim/parts';
 import { BEY_PRESETS } from './render/beydex';
 import { beyThumb } from './render/beyThumb';
+import { modelThumb } from './render/modelThumb';
 import { shopSection } from './render/shopSection';
 import { topModelFor } from './render/topModelIndex';
 import * as C from './sim/constants';
@@ -1006,8 +1007,29 @@ export class Ui {
       // The chip draws the design set the active theme actually renders —
       // Classic has its own (see classicdex), so an anime chip in Classic would
       // advertise a bey the player will not get.
-      chip.appendChild(
-        beyThumb(p.layerId, 64, themeById(g.themeId).toon ? 'anime' : 'classic'),
+      const thumb = beyThumb(p.layerId, 64, themeById(g.themeId).toon ? 'anime' : 'classic');
+      chip.appendChild(thumb);
+
+      // A bey with an imported model gets a picture of THAT, replacing the
+      // traced silhouette above once it has rendered. The Canvas2D thumbnail
+      // stays as the immediate paint — it is already drawn, it is right for
+      // most of the roster, and swapping it late is invisible next to leaving
+      // the chip blank while a model loads.
+      //
+      // Resolves null for every bey without a model, which is most of them.
+      const layer = LAYERS.find((l) => l.id === p.layerId);
+      void modelThumb(p.layerId, layer?.radius ?? 0.1, layer?.colour ?? 0x8899aa).then(
+        (url) => {
+          if (!url || !thumb.isConnected) return;
+          const img = new Image();
+          img.className = thumb.className;
+          img.width = 64;
+          img.height = 64;
+          img.decoding = 'async';
+          img.alt = '';
+          img.src = url;
+          thumb.replaceWith(img);
+        },
       );
       const label = document.createElement('span');
       label.innerHTML = `${escapeHtml(p.name)}<br><small>${escapeHtml(
