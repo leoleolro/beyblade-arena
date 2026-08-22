@@ -1116,6 +1116,24 @@ another, check what units its parameter is actually in before tuning it.
   misread rate, and the earlier finding that the AI can only afford about two
   moves a round means those have little surface to act through. Worth revisiting
   alongside the pacing work.
+- **`buildToonBey` is unreached.** Tops are metal in every theme now, so the
+  cel construction — several hundred lines of anime layer building — is
+  exported and parked rather than called. Delete it and its helpers once the
+  metal decision has survived a few matches in every theme; keeping a second
+  renderer nobody exercises is the worse end state.
+- **The garage preview mis-frames imported models.** The camera distance comes
+  from `mesh.userData.partY`, which describes the procedural layer/disc/driver
+  stack, so an imported top — which replaces all three — sits small,
+  off-centre and at whatever pitch the file was authored at.
+- **Picker chips still draw the procedural silhouette.** The thumbnails are
+  Canvas2D and sample a `Shape`; an imported model has no shape to sample, so
+  the chip for a modelled bey shows the old artwork.
+- **The X-Rail dish carries chevron arrows** that are absent from the Overdrive
+  reference and read as busy under bloom.
+- **Nothing captures an *achieved* screenshot automatically.**
+  `docs/design-targets/` holds the target frames, but adding a new one means
+  taking the shot by hand — `toDataURL` on the arena canvas returns blank
+  unless the renderer is built with `preserveDrawingBuffer`.
 - **An imported top hides the disc and driver.** A model overrides the whole
   bey, so swapping those parts changes how it flies but not how it looks.
   Mechanically harmless, visually a compromise — see `topModels.ts`.

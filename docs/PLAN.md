@@ -1,9 +1,12 @@
 # Working plan
 
+> **Status, 22 Aug.** A, B and C are done and committed. D and E are open.
+> Decisions taken since this was written are recorded inline below.
+
 Ordered by what unblocks what. Everything here is either verified in the
 browser today or marked as an assumption.
 
-## A. Testing access — first, because it unblocks the rest
+## A. Testing access — **DONE** (`eb628cb`)
 
 **A1. Unlock everything.** A dev switch that grants every layer, disc, driver
 and skin plus a coin float. Deliberately *not* written to the real save by
@@ -16,7 +19,7 @@ page in the build and there is no link to it anywhere, so getting to it means
 remembering the filename. Add a discreet link on the title screen and record the
 URL in the README.
 
-## B. Imported beyblades
+## B. Imported beyblades — **DONE** (`de82794`, `58519e7`)
 
 **B1. Take the ink back off imported tops.** Owner's call, and it matches what
 the screenshots show: at battle scale a 0.02 screen-space outline swallows a
@@ -46,7 +49,7 @@ every material with one silver finish, which would throw that away. Proposal:
 keep a model's own materials when it ships with usable ones, and fall back to
 the silver finish when it does not.
 
-## C. Overdrive — back to the reference
+## C. Overdrive — **DONE** (`116dcbf`)
 
 Target images live in `docs/design-targets/`. The gap, stated as ratios rather
 than hexes: the reference is **mostly black** with a few bright lines; the
@@ -86,7 +89,7 @@ so an idle arena sits dark and a clash lights it.
 at `h.strength >= HITSTOP_THRESHOLD` (1.6), so ordinary contacts draw nothing.
 Lower or re-shape the gate and check against `overdrive-target-clash.png`.
 
-## D. Motion — speed should be visible
+## D. Motion — speed should be visible — **OPEN, next**
 
 `speedKick` already exists (Charge 1.15, Dodge 1.6), so the sim does change
 speed; it does not *read* as changing. Two parts, and the first is a
@@ -95,7 +98,7 @@ than damping it out within a few frames. Then make it legible — trail length
 and brightness scaled by speed, spin-blur rate following it, and a short camera
 push on a burst.
 
-## E. Arena concepts
+## E. Arena concepts — **OPEN**
 
 Research the real X-Accelerator rail stadium and produce concrete proposals for
 arena mechanics and layout. Design output, not code.
@@ -118,3 +121,31 @@ arena mechanics and layout. Design output, not code.
 - The tutorial is explanatory, not interactive.
 - Garage labels sit at fixed thirds and drift when the model is rotated.
 - The shelf restocks per match but does not rotate on a clock.
+
+
+---
+
+## What the work changed about the plan
+
+**B2 was decided "metallic everywhere".** Tops are hardware in all three
+themes; the theme dresses the arena. That retired the cel bey construction and,
+in doing so, exposed a bug the project had carried from the start: no
+environment map anywhere, so every high-metalness material had been rendering
+near-black. Cel metal fakes its highlights and needs no environment, which is
+why nothing had noticed. See `environment.ts`.
+
+**B3's premise was wrong and the answer survived anyway.** "Keep Gemstone's
+textures" assumed textures. The MTL references none of the four images in its
+folder — six materials, all greys and blacks, no maps. Kept `own` regardless,
+because the blacks are panel lines and losing them makes it Valtryek.
+
+**C5 needed no code change, which is the useful result.** The clash shockwave
+was blamed in writing before being measured. `played.test.ts` reports 3.28
+heavy hits per round against 7.6 total — the ring fires on 43% of hits and
+always did. It was invisible in the bloom haze, and fixing C1 fixed it.
+
+**C's real lesson is recorded in `docs/design-targets/`.** The Overdrive theme's
+colour values never drifted; a diff of `theme.ts` against the commit that
+introduced them is empty. The washout lived in the product of emissive strength
+and bloom radius, which no diff shows. Screenshots of approved states are the
+only thing that would have caught it early.
