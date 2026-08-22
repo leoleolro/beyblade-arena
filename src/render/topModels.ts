@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
-import { metalToonMaterial, setOutline } from './toon';
+import { metalToonMaterial, noOutline } from './toon';
 
 /**
  * Imported beyblade models — a whole top per file.
@@ -170,7 +170,22 @@ export function finishAsMetal(
         metalness: 0.92,
         roughness: 0.28,
       });
-  setOutline(mat, { thickness: outline });
+
+  // NO INK ON AN IMPORTED TOP, and this one is structural rather than a tuning
+  // choice. An inverted-hull outline renders back-faces pushed outward along
+  // their normals; that only reads as a line on a broadly convex mesh with
+  // smooth normals. An imported top is neither — 14k triangles, concave
+  // recesses between every blade, and flat per-face normals from the original
+  // STL. Each face's hull is pushed out independently, so they poke straight
+  // through the front faces and the whole model comes out plastered in black
+  // shards. Reported exactly that way, and no thickness fixes it: the geometry
+  // violates the technique's assumptions.
+  //
+  // It also does not need ink. The procedural tops are simple shapes that rely
+  // on a drawn line to read as objects; an imported top has real modelled
+  // detail doing that job already.
+  noOutline(mat);
+  void outline;
   obj.traverse((child) => {
     const mesh = child as THREE.Mesh;
     if (mesh.isMesh) mesh.material = mat;

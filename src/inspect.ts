@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { finishAsMetal, loadTopModel, normaliseToRadius, seatOnOrigin } from './render/topModels';
 import { OutlineEffect } from 'three/examples/jsm/effects/OutlineEffect.js';
 import { buildBeyMesh } from './render/beyMesh';
 import { BEY_PRESETS } from './render/beydex';
@@ -51,6 +52,35 @@ const tops: THREE.Group[] = BEY_PRESETS.map((p) => {
   mesh.visible = false;
   root.add(mesh);
   return mesh;
+});
+
+// The imported top, appended to the roster so it can be compared with the
+// procedural version of the same bey at the same size, held still.
+void loadTopModel('models/wonder_valtryek_beyblade/scene.gltf').then((src) => {
+  if (!src) return;
+  const g = new THREE.Group();
+  g.add(src.clone(true));
+  normaliseToRadius(g, 0.1066);
+  seatOnOrigin(g);
+  finishAsMetal(g, 0xd8dde3, 0.02, true);
+  const box = new THREE.Box3().setFromObject(g);
+  const size = new THREE.Vector3();
+  box.getSize(size);
+  console.log(
+    `[import] after normalise: ${size.x.toFixed(3)} x ${size.y.toFixed(3)} x ${size.z.toFixed(3)}` +
+      `  (a procedural layer is ~0.213 wide and ~0.24 tall)`,
+  );
+  g.visible = false;
+  root.add(g);
+  tops.push(g);
+  const btn = document.createElement('button');
+  btn.textContent = 'IMPORTED';
+  btn.addEventListener('click', () => {
+    current = tops.length - 1;
+    for (const b of picker?.children ?? []) b.classList.remove('on');
+    btn.classList.add('on');
+  });
+  picker?.appendChild(btn);
 });
 
 let current = 0;

@@ -4,6 +4,8 @@ import { buildBeyMesh } from './beyMesh';
 import type { BeyParts } from './beyMesh';
 import { skinById } from './skins';
 import { themeById } from './theme';
+import { finishAsMetal, loadTopModel, normaliseToRadius, seatOnOrigin } from './topModels';
+import { topModelFor } from './topModelIndex';
 import type { BeyBuild } from '../sim/types';
 
 /**
@@ -48,6 +50,12 @@ export class GarageView {
    */
   private outline: OutlineEffect | null = null;
   private toon = false;
+  /**
+   * Guards against a slow model landing on a build the player has since
+   * changed. The garage re-renders on every part click, so two loads can be in
+   * flight at once and the slower one must not win.
+   */
+  private modelToken = 0;
   private readonly hemi: THREE.HemisphereLight;
   private readonly key: THREE.DirectionalLight;
   private readonly fill: THREE.PointLight;
@@ -132,6 +140,32 @@ export class GarageView {
     this.mesh = mesh;
     this.parts = mesh.userData.parts as BeyParts;
     this.root.add(mesh);
+
+    // The imported top, if this bey has one.
+    //
+    // The arena had this and the garage did not, which is the worst possible
+    // split: you picked a bey, saw the old procedural model in the preview,
+    // started a match and got a different one. The preview is where a player
+    // decides what to equip, so it is the place the real thing matters most.
+    const entry = topModelFor(build.layer.id);
+    if (entry) {
+      const parts = this.parts;
+      const token = ++this.modelToken;
+      void loadTopModel(entry.url).then((src) => {
+        // A later setBuild may have replaced this mesh while the file loaded;
+        // the token says whether this result is still the one being asked for.
+        if (!src || token !== this.modelToken) return;
+        const model = src.clone(true);
+        normaliseToRadius(model, build.layer.radius);
+        seatOnOrigin(model);
+        finishAsMetal(model, 0xd8dde3, 0, this.toon);
+        parts.layer.clear();
+        parts.layer.add(model);
+        parts.disc.visible = false;
+        parts.driver.visible = false;
+        this.layout();
+      });
+    }
 
     // Rates from the parts themselves. Opposed directions, and the driver is
     // the fastest because it's the part that actually meets the floor.
