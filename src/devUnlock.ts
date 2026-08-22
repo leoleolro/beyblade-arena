@@ -1,7 +1,6 @@
 import { LAYERS, DISCS, DRIVERS } from './sim/parts';
 import { SKINS } from './render/skins';
 import type { Progress } from './progress';
-import { LADDER } from './ladder';
 
 /**
  * Own everything, for testing.
@@ -49,12 +48,19 @@ export function unlockMode(search: string = location.search): UnlockMode {
 }
 
 /**
- * Grant every part, skin and rung.
+ * Grant every part and skin, and leave the ladder exactly where it was.
  *
- * `rung` matters as much as the part lists and is easy to forget: several parts
- * are gated on ladder position rather than on ownership, and the shop's offer
- * is rolled against what is already owned. Clearing the ladder as well is what
- * makes this actually "everything" rather than "every part, on a fresh career".
+ * THE LADDER IS DELIBERATELY UNTOUCHED, correcting an earlier version of this
+ * function that set `rung = LADDER.length` on the theory that some parts were
+ * gated on ladder position. They are not — `rung` is read in exactly three
+ * places and every one of them is about WHO YOU FIGHT or how the career line
+ * renders. Ownership comes entirely from the four lists below.
+ *
+ * So clearing it bought nothing and cost a lot: `progress.cleared` flips true,
+ * which puts the tester into endless mode against escalating rivals instead of
+ * the ladder opponent they expected. Symptom was rounds ending in a burst
+ * inside a second while trying to look at a beyblade, which reads as a broken
+ * game rather than as a much better opponent.
  */
 export function applyUnlockAll(progress: Progress, mode: UnlockMode): boolean {
   if (mode === 'off') return false;
@@ -68,7 +74,6 @@ export function applyUnlockAll(progress: Progress, mode: UnlockMode): boolean {
   d.drivers = DRIVERS.map((p) => p.id);
   d.skins = SKINS.map((s) => s.id);
   d.coins = Math.max(d.coins, DEV_COINS);
-  d.rung = LADDER.length;
 
   if (mode === 'persist') progress.save();
   return true;

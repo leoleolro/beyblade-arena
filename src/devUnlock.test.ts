@@ -3,7 +3,6 @@ import { Progress } from './progress';
 import { applyUnlockAll, unlockMode } from './devUnlock';
 import { DISCS, DRIVERS, LAYERS } from './sim/parts';
 import { SKINS } from './render/skins';
-import { LADDER } from './ladder';
 
 /** Minimal in-memory localStorage, so these run headlessly. */
 function installStorage(): void {
@@ -65,7 +64,7 @@ describe('unlockMode', () => {
 });
 
 describe('applyUnlockAll', () => {
-  it('grants the whole catalog and clears the ladder', () => {
+  it('grants the whole catalog and leaves the ladder alone', () => {
     const p = new Progress();
     expect(applyUnlockAll(p, 'session')).toBe(true);
 
@@ -73,9 +72,11 @@ describe('applyUnlockAll', () => {
     expect(p.data.discs).toHaveLength(DISCS.length);
     expect(p.data.drivers).toHaveLength(DRIVERS.length);
     expect(p.data.skins).toHaveLength(SKINS.length);
-    // Several parts gate on ladder position rather than ownership, so a grant
-    // that leaves `rung` alone is not actually "everything".
-    expect(p.data.rung).toBe(LADDER.length);
+    // `rung` decides WHO YOU FIGHT, not what you own. An earlier version
+    // cleared it and silently dropped the tester into endless mode against
+    // escalating rivals — rounds ended in a burst inside a second, which looks
+    // like a broken game rather than a much better opponent.
+    expect(p.data.rung).toBe(2);
   });
 
   it('does nothing at all when off', () => {
@@ -124,7 +125,7 @@ describe('applyUnlockAll', () => {
       rung: number;
       layers: string[];
     };
-    expect(onDisk.rung).toBe(LADDER.length);
+    expect(onDisk.rung).toBe(2);
     expect(onDisk.layers).toHaveLength(LAYERS.length);
   });
 
