@@ -3,6 +3,7 @@ import type { BeyBuild } from '../sim/types';
 import { skinMaterial } from './skins';
 import type { Skin } from './skins';
 import { metalToonMaterial, noOutline, setOutline, toonMaterial } from './toon';
+import { weldInkNormals } from './outlineHull';
 import type { MetalToonOptions } from './toon';
 import { beastEmblem, designByLayer } from './beydex';
 import type { BeyDesign, BladeStyle } from './beydex';
@@ -76,7 +77,24 @@ export interface BeyParts {
  * userData.parts / partY / ring / layerMat, and the tip at local origin.
  */
 export function buildBeyMesh(build: BeyBuild, skin: Skin, toon = false): THREE.Group {
-  return toon ? buildToonBey(build, skin) : buildClassicBey(build, skin);
+  if (!toon) return buildClassicBey(build, skin);
+
+  const group = buildToonBey(build, skin);
+
+  // WELD THE INK NORMALS ONCE THE WHOLE TOP EXISTS, because the outline hull is
+  // the one thing here that cares about a vertex's neighbours rather than about
+  // the vertex. Every part of a toon top is an extrusion or a lathe with hard
+  // bevels, which means a shared position holding two normals at ninety degrees
+  // at every one of those bevels — and three's inverted hull pushes each of
+  // those two vertices its own way, so the shell splits open along every edge
+  // and the black backfaces show through. That is the comb of shards around the
+  // rim that has been reported repeatedly and survived two thickness fixes.
+  //
+  // The averaged set is used by the outline pass and by nothing else, so the
+  // hard normals that give these parts their faceted, moulded read are exactly
+  // as hard as they were. See outlineHull.ts.
+  weldInkNormals(group);
+  return group;
 }
 
 // ---------------------------------------------------------------------------

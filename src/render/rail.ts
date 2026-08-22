@@ -52,10 +52,21 @@ export function buildRail(radius: number): RailHandles {
 
   // Warm and hot: the rail is the one aggressive object on the dish and should
   // not share the stadium's blues.
+  //
+  // 0.4 at rest, not 1.4. There is a flare path in arena.ts that adds 2.6 while
+  // a top is locked onto the rail, and at a 1.4 baseline that range was 1.4 to
+  // 4.0 — both ends well past the bloom threshold, so the rail was a solid band
+  // of fire whether or not anybody was riding it and the flare had nowhere to
+  // go. An effect that is already at full brightness cannot mark an event.
+  //
+  // At 0.4 the rail is warm metal you can see the teeth on, and the same flare
+  // now takes it to 3.0 — a real dark-to-hot swing that reads as the rail
+  // catching a top and slinging it. Same principle as the posts: the arena
+  // should be dark until something happens in it.
   const railMat = new THREE.MeshStandardMaterial({
     color: 0xffb020,
     emissive: 0xff7a00,
-    emissiveIntensity: 1.4,
+    emissiveIntensity: 0.4,
     metalness: 0.7,
     roughness: 0.3,
   });

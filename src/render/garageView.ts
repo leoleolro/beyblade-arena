@@ -4,7 +4,15 @@ import { buildBeyMesh } from './beyMesh';
 import type { BeyParts } from './beyMesh';
 import { skinById } from './skins';
 import { themeById } from './theme';
-import { finishAsMetal, loadTopModel, normaliseToRadius, seatOnOrigin } from './topModels';
+import {
+  MODEL_INK,
+  MODEL_TINT,
+  finishAsMetal,
+  loadTopModel,
+  normaliseToRadius,
+  seatOnOrigin,
+} from './topModels';
+import { renderInked } from './outlineHull';
 import { topModelFor } from './topModelIndex';
 import type { BeyBuild } from '../sim/types';
 
@@ -158,7 +166,7 @@ export class GarageView {
         const model = src.clone(true);
         normaliseToRadius(model, build.layer.radius);
         seatOnOrigin(model);
-        finishAsMetal(model, 0xd8dde3, 0, this.toon);
+        finishAsMetal(model, MODEL_TINT, MODEL_INK, this.toon);
         parts.layer.clear();
         parts.layer.add(model);
         parts.disc.visible = false;
@@ -271,7 +279,9 @@ export class GarageView {
           defaultAlpha: 1,
         });
       }
-      this.outline.render(this.scene, this.camera);
+      // The arena's note applies here too: the ink pass runs against the
+      // welded normals, so `renderInked` rather than `outline.render`.
+      renderInked(this.renderer, this.outline, this.scene, this.camera);
     } else {
       this.renderer.render(this.scene, this.camera);
     }

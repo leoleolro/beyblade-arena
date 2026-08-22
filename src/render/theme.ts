@@ -292,7 +292,7 @@ export const OVERDRIVE: Theme = {
   dishColour: 0x140a26,
   dishMetalness: 0.2,
   dishRoughness: 0.8,
-  ridgeColour: 0xffe066,
+  ridgeColour: 0x00e5ff,
   ridgeOpacity: 1,
   guideColour: 0x35205c,
   guideOpacity: 0.6,
@@ -300,8 +300,23 @@ export const OVERDRIVE: Theme = {
   wallColour: 0x140a28,
   wallMetalness: 0.3,
   wallRoughness: 0.7,
-  postColour: 0x00e5ff,
-  postEmissive: 3,
+  postColour: 0xff2e88,
+  // 0.35, down from 3, and this one number was most of what people meant by
+  // "glowing led light bulbs hitting, full of light pollution".
+  //
+  // A post is a cylinder of radius 0.012 — a thin bar, about four pixels wide
+  // at match framing. At emissive 3 it saturates to white well past the bloom
+  // threshold, and bloom at radius 0.62 then smears those four pixels into a
+  // forty-pixel capsule. Twelve of them ring the stadium, so the frame gained
+  // twelve fat glowing pills and lost its blacks. The geometry was never the
+  // problem and no amount of shrinking it would have helped.
+  //
+  // At 0.35 the bar stops being a light source and goes back to being an
+  // object lit by the rim lights — which is what it looks like in the
+  // reference capture, where the posts read magenta because `rimAColour` is
+  // magenta and nothing is drowning it out. Confirmed in the browser before
+  // this was written down: thin bars, dark between them, tops readable.
+  postEmissive: 0.35,
   skirtColour: 0x050110,
 
   // Deliberately dim ambient with hot rims. The tops carry their own light
@@ -341,15 +356,35 @@ export const OVERDRIVE: Theme = {
   // the head — the brightest 20% of the fade ramp — blooms, which is exactly
   // the read wanted: a hot streak at the top with a coloured wake behind it.
   trailOpacity: 0.32,
-  beyLightIntensity: 2.1,
+  // 1.1, halved. Each top carries a point light, and at 2.1 a single one lit
+  // the whole basin — in the capture that produced this change the dish under
+  // the player's top was a white disc a third of the arena across, with no
+  // floor texture left inside it. Two tops did it twice.
+  //
+  // The reference has this exactly right and it is worth naming precisely: the
+  // underglow is a TIGHT bright pool right at the tip, maybe a top's width
+  // across, sitting on a dish that stays dark everywhere else. That reads as a
+  // top glowing onto the floor. A wide even wash reads as the floor being lit,
+  // which is a different picture and a much duller one.
+  beyLightIntensity: 1.1,
   beyLightFlash: 6,
   shockwave: true,
   finisherBlackout: true,
   postBloom: true,
   // Threshold matters more than strength: raising it means only genuinely hot
   // things bloom, so the glow reads as emissive rather than as fog.
-  bloomStrength: 0.72,
-  bloomRadius: 0.62,
+  //
+  // RADIUS is the one that had actually gone wrong. Strength says how much a
+  // hot pixel adds; radius says how far it travels, and travel is what turns
+  // glow into fog. At 0.62 every bright element in the frame reached most of
+  // the way to every other one, so the arena had a permanent haze over it that
+  // survived even when nothing was happening — the "light pollution" report.
+  // 0.32 keeps the halo attached to the object making it.
+  //
+  // Strength comes down with it, but only a little and only because a tighter
+  // halo concentrates what is left; the look is set by radius.
+  bloomStrength: 0.5,
+  bloomRadius: 0.32,
   bloomThreshold: 0.7,
   // The `toon` flag did not exist when this theme was written. It is false
   // because Overdrive's entire proposition is *3D with glow* — cel bands and

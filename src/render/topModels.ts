@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
-import { metalToonMaterial, noOutline } from './toon';
+import { metalToonMaterial, setOutline } from './toon';
+import { weldInkNormals } from './outlineHull';
 
 /**
  * Imported beyblade models — a whole top per file.
@@ -40,6 +41,26 @@ import { metalToonMaterial, noOutline } from './toon';
  */
 
 export type ModelFormat = 'glb' | 'gltf' | 'stl';
+
+/**
+ * Finish colour for imported tops.
+ *
+ * Near-white rather than a design colour, on the owner's read of the first
+ * model: bare machined metal is the look, and tinting it toward a bey's palette
+ * turns it back into painted plastic. The banded specular and fresnel rim in
+ * `metalToonMaterial` supply all the colour it needs.
+ */
+export const MODEL_TINT = 0xd8dde3;
+
+/**
+ * Imported tops carry the silhouette ink weight, being one solid object.
+ *
+ * Lives here rather than at a call site because there are three of them — the
+ * arena, the garage preview and the inspector — and they had drifted: the
+ * garage was passing 0, which is a top with no line on it standing next to
+ * procedural tops that have one. One number, one meaning, three callers.
+ */
+export const MODEL_INK = Number(new URLSearchParams(location.search).get('ink') ?? 0.02);
 
 const formatOf = (url: string): ModelFormat =>
   url.endsWith('.stl') ? 'stl' : url.endsWith('.gltf') ? 'gltf' : 'glb';
@@ -171,23 +192,25 @@ export function finishAsMetal(
         roughness: 0.28,
       });
 
-  // NO INK ON AN IMPORTED TOP, and this one is structural rather than a tuning
-  // choice. An inverted-hull outline renders back-faces pushed outward along
-  // their normals; that only reads as a line on a broadly convex mesh with
-  // smooth normals. An imported top is neither — 14k triangles, concave
-  // recesses between every blade, and flat per-face normals from the original
-  // STL. Each face's hull is pushed out independently, so they poke straight
-  // through the front faces and the whole model comes out plastered in black
-  // shards. Reported exactly that way, and no thickness fixes it: the geometry
-  // violates the technique's assumptions.
+  // AN IMPORTED TOP IS INKED LIKE EVERYTHING ELSE, and getting back to that
+  // took the fix in outlineHull.ts. It was un-inked for a while — the whole
+  // model came out plastered in black shards, one per hard edge, because
+  // three's inverted hull pushes every vertex along its OWN normal and this
+  // mesh has 98.1% of its positions carrying more than one. Turning the ink off
+  // removed the shards by removing the line, which left the imported top as the
+  // one object in a fully cel-shaded scene with no outline on it.
   //
-  // It also does not need ink. The procedural tops are simple shapes that rely
-  // on a drawn line to read as objects; an imported top has real modelled
-  // detail doing that job already.
-  noOutline(mat);
-  void outline;
+  // Welded ink normals fix the cause instead, so the ink can come back at the
+  // silhouette weight the procedural tops use. See `weldInkNormals` below and
+  // the block comment in outlineHull.ts.
+  setOutline(mat, { thickness: outline });
   obj.traverse((child) => {
     const mesh = child as THREE.Mesh;
     if (mesh.isMesh) mesh.material = mat;
   });
+
+  // Only the cel themes draw a hull at all, and the welded set costs a
+  // Float32Array per geometry plus a GPU buffer nothing binds. No reason to
+  // build it for a theme that will never ask for it.
+  if (toon) weldInkNormals(obj);
 }

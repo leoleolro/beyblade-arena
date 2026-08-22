@@ -1,5 +1,13 @@
 import * as THREE from 'three';
-import { finishAsMetal, loadTopModel, normaliseToRadius, seatOnOrigin } from './render/topModels';
+import {
+  MODEL_INK,
+  MODEL_TINT,
+  finishAsMetal,
+  loadTopModel,
+  normaliseToRadius,
+  seatOnOrigin,
+} from './render/topModels';
+import { renderInked } from './render/outlineHull';
 import { OutlineEffect } from 'three/examples/jsm/effects/OutlineEffect.js';
 import { buildBeyMesh } from './render/beyMesh';
 import { BEY_PRESETS } from './render/beydex';
@@ -62,7 +70,7 @@ void loadTopModel('models/wonder_valtryek_beyblade/scene.gltf').then((src) => {
   g.add(src.clone(true));
   normaliseToRadius(g, 0.1066);
   seatOnOrigin(g);
-  finishAsMetal(g, 0xd8dde3, 0.02, true);
+  finishAsMetal(g, MODEL_TINT, MODEL_INK, true);
   const box = new THREE.Box3().setFromObject(g);
   const size = new THREE.Vector3();
   box.getSize(size);
@@ -139,7 +147,7 @@ function tick(now: number): void {
   camera.position.set(0, Math.sin(pitch) * dist, Math.cos(pitch) * dist);
   camera.lookAt(0, 0.11, 0);
 
-  outline.render(scene, camera);
+  renderInked(renderer, outline, scene, camera);
   requestAnimationFrame(tick);
 }
 requestAnimationFrame(tick);

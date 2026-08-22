@@ -31,21 +31,16 @@ import { buildAura } from './aura';
 import type { Aura } from './aura';
 import { contactShadow, noOutline } from './toon';
 import { designByLayer } from './beydex';
-import { finishAsMetal, loadTopModel, normaliseToRadius, seatOnOrigin } from './topModels';
+import {
+  MODEL_INK,
+  MODEL_TINT,
+  finishAsMetal,
+  loadTopModel,
+  normaliseToRadius,
+  seatOnOrigin,
+} from './topModels';
+import { renderInked } from './outlineHull';
 import { topModelFor } from './topModelIndex';
-
-/**
- * Finish colour for imported tops.
- *
- * Near-white rather than a design colour, on the owner's read of the first
- * model: bare machined metal is the look, and tinting it toward a bey's palette
- * turns it back into painted plastic. The banded specular and fresnel rim in
- * `metalToonMaterial` supply all the colour it needs.
- */
-const MODEL_TINT = 0xd8dde3;
-
-/** Imported tops carry the silhouette ink weight, being one solid object. */
-const BEY_MODEL_OUTLINE = 0.02;
 
 interface BeyVisual {
   group: THREE.Group;
@@ -789,7 +784,7 @@ export class ArenaRenderer {
       const model = src.clone(true);
       normaliseToRadius(model, radius);
       seatOnOrigin(model);
-      finishAsMetal(model, MODEL_TINT, BEY_MODEL_OUTLINE, this.theme.toon);
+      finishAsMetal(model, MODEL_TINT, MODEL_INK, this.theme.toon);
 
       parts.layer.clear();
       parts.layer.add(model);
@@ -1177,7 +1172,15 @@ export class ArenaRenderer {
           this.sparks.spawn(at, 1.8, 14, this.railStream, 0.28);
         }
       }
-      const flare = riders.length > 0 ? 2.6 : 0;
+      // 1.4, down from 2.6, and the reason is how OFTEN this is on rather than
+      // how bright it is. 94% of rounds engage the rail inside the first
+      // quarter-second and X-Rail keeps a top locked on for long stretches, so
+      // "riding" is close to the resting state of that arena — a flare tuned
+      // as a rare event was in practice the arena's normal brightness, and at
+      // 0.4 + 2.6 that normal was a solid wall of fire with the teeth blown
+      // out. 0.4 -> 1.8 still reads clearly as the rail catching someone,
+      // while leaving the band gold instead of white.
+      const flare = riders.length > 0 ? 1.4 : 0;
       const mat = this.rail.material;
       mat.emissiveIntensity +=
         (this.rail.baseEmissive + flare - mat.emissiveIntensity) *
@@ -1239,7 +1242,11 @@ export class ArenaRenderer {
           defaultAlpha: 1,
         });
       }
-      this.outline.render(this.scene, this.camera);
+      // Not `outline.render()`: that is these same two passes back to back, and
+      // the ink pass has to run against the welded normals rather than the
+      // shading ones or the hull tears itself apart on every hard edge in the
+      // scene. See outlineHull.ts — this is still exactly one render path.
+      renderInked(this.renderer, this.outline, this.scene, this.camera);
     } else if (this.theme.postBloom && this.composer) {
       this.composer.render();
     } else {
