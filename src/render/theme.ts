@@ -100,6 +100,29 @@ export interface Theme {
   bloomThreshold: number;
 
   /**
+   * How hard the studio environment reflects off an imported top's metal.
+   *
+   * A theme-level value because it is the only dial that makes one metal finish
+   * survive three very different lighting rigs, and a single number for all
+   * three failed in three different ways at once. Measured in a match, same
+   * top, same model:
+   *
+   *   Arena      dark dish, no bloom      — chrome reads perfectly at 0.85
+   *   Anime      pale polycarbonate dish  — a bright silver top on a near-white
+   *                                         bowl has almost no contrast left and
+   *                                         dissolves into the floor
+   *   Overdrive  dark dish, heavy bloom   — the reflection clears the 0.7 bloom
+   *                                         threshold across the whole top, which
+   *                                         then blooms into a featureless white
+   *                                         blob with no geometry visible at all
+   *
+   * So it comes DOWN where the scene is already doing the work. Lower intensity
+   * is a darker metal, which is what buys back contrast against a pale floor and
+   * what keeps a surface under a bloom threshold. It is not a quality setting.
+   */
+  envIntensity: number;
+
+  /**
    * Cel shading: banded lighting and a hard outline on every silhouette.
    *
    * This is the switch that turns the game from "3D" into "cartoon". It changes
@@ -170,6 +193,10 @@ export const ARENA: Theme = {
   aura: false,
   speedLines: false,
   impactFlash: false,
+
+  // The reference case. A dark blue dish and no bloom, so a chrome top has
+  // both the contrast and the headroom to be fully reflective.
+  envIntensity: 0.85,
 
   bodyClass: 'theme-arena',
 };
@@ -258,6 +285,12 @@ export const ANIME: Theme = {
   // time and was silently gated off, which is worse than either answer: a flag
   // that says a feature is on while the code guarantees it is off.
   impactFlash: false,
+
+  // 0.45, because the dish here is near-white polycarbonate and the top has to
+  // read AGAINST it. At 0.85 an imported silver top and a pale bowl sit at
+  // almost the same value and the top dissolves into the floor — visible in a
+  // match, not a theoretical worry. Darker metal is the whole fix.
+  envIntensity: 0.45,
 
   bodyClass: 'theme-anime',
 };
@@ -393,6 +426,14 @@ export const OVERDRIVE: Theme = {
   aura: true,
   speedLines: true,
   impactFlash: true,
+
+  // 0.3, the lowest of the three, because this is the theme with a bloom pass.
+  // At 0.85 the studio reflection put the entire top above `bloomThreshold`
+  // 0.7, so bloom ate it: a white blob with no geometry, in a theme whose
+  // whole point is that you can see the hardware glowing. Same lesson as the
+  // posts and the rail — something already at full brightness has nothing left
+  // to say.
+  envIntensity: 0.3,
 
   bodyClass: 'theme-overdrive',
 };

@@ -216,9 +216,10 @@ export function finishImported(
   tint: number,
   env: THREE.Texture | null,
   finish: ModelFinish = 'silver',
+  envIntensity = 0.85,
 ): void {
-  if (finish === 'own') keepOwnMaterials(obj, env);
-  else finishAsMetal(obj, tint, env);
+  if (finish === 'own') keepOwnMaterials(obj, env, envIntensity);
+  else finishAsMetal(obj, tint, env, envIntensity);
 }
 
 /**
@@ -237,7 +238,11 @@ export function finishImported(
  * and reads as a hole in the top. 0.7/0.42 keeps it obviously metal while
  * letting the authored colour survive being reflected at.
  */
-function keepOwnMaterials(obj: THREE.Object3D, env: THREE.Texture | null): void {
+function keepOwnMaterials(
+  obj: THREE.Object3D,
+  env: THREE.Texture | null,
+  envIntensity: number,
+): void {
   // One converted material per source material, not per mesh: an OBJ splits
   // into a child mesh per `usemtl` group, and Gemstone's six groups share six
   // materials across far more meshes than that.
@@ -258,7 +263,7 @@ function keepOwnMaterials(obj: THREE.Object3D, env: THREE.Texture | null): void 
       opacity: from.opacity,
     });
     noOutline(mat);
-    if (env) applyEnvironment(mat, env);
+    if (env) applyEnvironment(mat, env, envIntensity);
 
     converted.set(src, mat);
     return mat;
@@ -289,6 +294,7 @@ export function finishAsMetal(
   obj: THREE.Object3D,
   tint: number,
   env: THREE.Texture | null = null,
+  envIntensity = 0.85,
 ): void {
   // ONE FINISH, EVERY THEME. This used to branch on `toon` and hand back cel
   // metal for the cartoon theme, which was the wrong axis to vary on: a top is
@@ -327,7 +333,7 @@ export function finishAsMetal(
   // reflection, so at metalness 0.92 there is nothing to see until something is
   // being reflected — see environment.ts, which is where that is explained and
   // where the decision not to light the whole scene with it lives.
-  if (env) applyEnvironment(mat, env);
+  if (env) applyEnvironment(mat, env, envIntensity);
 
   obj.traverse((child) => {
     const mesh = child as THREE.Mesh;

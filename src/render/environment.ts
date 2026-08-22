@@ -81,3 +81,32 @@ export function applyEnvironment(
   m.envMapIntensity = intensity;
   m.needsUpdate = true;
 }
+
+/**
+ * Re-expose every already-reflective material under `root`.
+ *
+ * Needed because a theme switch does not rebuild the scene. `setTheme` only
+ * reconstructs the tops when the `toon` flag flips, and the two themes whose
+ * exposures differ most — Arena at 0.85 and Overdrive at 0.3 — are BOTH
+ * non-toon. So switching between exactly those two left an imported top holding
+ * whichever intensity it happened to be built with, and going Arena → Overdrive
+ * put a 0.85 chrome top under a bloom pass tuned for 0.3: the white blob, back
+ * again, but only for players who had switched rather than started there. The
+ * kind of bug that never appears in a fresh load and always appears in real use.
+ *
+ * Only touches materials that already carry an `envMap`, so it cannot
+ * accidentally make the dish or the wall reflective — those were deliberately
+ * left out of the environment and must stay out. See the note above about not
+ * using `scene.environment`.
+ */
+export function setEnvironmentIntensity(root: THREE.Object3D, intensity: number): void {
+  root.traverse((child) => {
+    const mesh = child as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    const list = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    for (const mat of list) {
+      const m = mat as THREE.MeshStandardMaterial;
+      if (m && m.envMap) m.envMapIntensity = intensity;
+    }
+  });
+}

@@ -166,7 +166,13 @@ export class GarageView {
         const model = src.clone(true);
         normaliseToRadius(model, build.layer.radius);
         seatOnOrigin(model);
-        finishImported(model, MODEL_TINT, studioEnvironment(this.renderer), entry.finish);
+        finishImported(
+          model,
+          MODEL_TINT,
+          studioEnvironment(this.renderer),
+          entry.finish,
+          themeById(themeId).envIntensity,
+        );
         parts.layer.clear();
         parts.layer.add(model);
         parts.disc.visible = false;

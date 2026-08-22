@@ -39,7 +39,7 @@ import {
   seatOnOrigin,
 } from './topModels';
 import { renderInked } from './outlineHull';
-import { studioEnvironment } from './environment';
+import { setEnvironmentIntensity, studioEnvironment } from './environment';
 import { topModelFor } from './topModelIndex';
 
 interface BeyVisual {
@@ -389,6 +389,11 @@ export class ArenaRenderer {
       v.trail.setOpacity(t.trailOpacity);
       v.light.intensity = t.beyLightIntensity;
       if (v.aura) v.aura.sprite.visible = t.aura;
+      // Imported tops are built with the exposure of whatever theme was active
+      // at the time, and the two themes that differ most here are both non-toon
+      // — so the rebuild above does not cover the switch that matters. See
+      // setEnvironmentIntensity.
+      setEnvironmentIntensity(v.group, t.envIntensity);
     }
 
     if (t.postBloom) {
@@ -717,8 +722,20 @@ export class ArenaRenderer {
       if (blur) group.add(blur.mesh);
 
       // Parented to the group, so it tracks the top for free.
+      //
+      // AT THE TIP, not at the waist. This sat at y = 0.1 — roughly mid-body on
+      // a top whose whole height is about 0.24 — which put a point light INSIDE
+      // the object it was meant to light. The top flooded from within and came
+      // out as a bright mass, brightest at the middle where there should be a
+      // shaded underside.
+      //
+      // The reference capture is unambiguous about what this effect is: a tight
+      // bright pool on the dish right at the contact point, with the body of the
+      // top staying dark above it. That is a light sitting just off the floor,
+      // raking up. y = 0.03 puts it there, and the same intensity now spends
+      // itself on the dish rather than on the top's own interior.
       const light = new THREE.PointLight(skin.primary, this.theme.beyLightIntensity, 1.6);
-      light.position.y = 0.1;
+      light.position.y = 0.03;
       group.add(light);
 
       // Parented to the top so it tracks for free. Built regardless of theme
@@ -784,7 +801,7 @@ export class ArenaRenderer {
       const model = src.clone(true);
       normaliseToRadius(model, radius);
       seatOnOrigin(model);
-      finishImported(model, MODEL_TINT, studioEnvironment(this.renderer), entry.finish);
+      finishImported(model, MODEL_TINT, studioEnvironment(this.renderer), entry.finish, this.theme.envIntensity);
 
       parts.layer.clear();
       parts.layer.add(model);
