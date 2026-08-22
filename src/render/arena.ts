@@ -768,9 +768,17 @@ export class ArenaRenderer {
       const design = designByLayer(b.build.layer.id);
       const parts = group.userData.parts as BeyParts;
       resetParts(parts);
-      const blur = this.theme.toon
-        ? buildSpinBlur(design, b.stats.radius, parts.layer, b.build.layer.blades)
-        : null;
+      // NOT ON AN IMPORTED TOP, and the reason is in the sentence above: the
+      // afterimages are copies of the layer group's silhouette. A model
+      // replaces that group wholesale a few frames later, so the blur ends up
+      // smearing a shape that is no longer on screen over an object it was
+      // never measured against — a coloured dome sitting on a silver top.
+      // Caught by the contact sheet rather than by a player, which is the
+      // point of the contact sheet.
+      const blur =
+        this.theme.toon && !topModelFor(b.build.layer.id)
+          ? buildSpinBlur(design, b.stats.radius, parts.layer, b.build.layer.blades)
+          : null;
       if (blur) group.add(blur.mesh);
 
       // Parented to the group, so it tracks the top for free.

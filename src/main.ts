@@ -2,6 +2,7 @@ import './style.css';
 import { Game } from './game';
 import { Ui } from './ui';
 import { applyUnlockAll, unlockMode } from './devUnlock';
+import { showContactSheet } from './render/contactSheet';
 import type { MoveKind } from './sim/types';
 
 const canvas = document.getElementById('arena') as HTMLCanvasElement;
@@ -80,6 +81,17 @@ Object.assign(window as unknown as Record<string, unknown>, { game, ui });
  * `toDataURL()` on a live WebGL canvas does and is a genuinely confusing
  * half-hour to debug.
  */
+/**
+ * Every bey in every theme, as one picture, replacing the page.
+ *
+ * The cheap way to check a rendering change against all thirty-three
+ * combinations instead of the one or two that get driven by hand. See
+ * contactSheet.ts.
+ */
+Object.assign(window as unknown as Record<string, unknown>, {
+  __sweep: (ids?: string[]): Promise<void> => showContactSheet(ids),
+});
+
 Object.assign(window as unknown as Record<string, unknown>, {
   __shot(name = 'shot'): string | null {
     const url = game.renderer.snapshot();
