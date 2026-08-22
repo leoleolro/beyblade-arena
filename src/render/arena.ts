@@ -135,6 +135,16 @@ function resetParts(parts: BeyParts): void {
  */
 const clampUnit = (n: number): number => (n < 0 ? 0 : n > 1 ? 1 : n);
 
+/**
+ * Whether this session can screenshot itself. See the renderer construction.
+ *
+ * Read once at module load rather than per-frame: `preserveDrawingBuffer` is a
+ * context-creation attribute and cannot be changed afterwards, so a later
+ * change of mind would need a reload anyway.
+ */
+const SHOT_MODE =
+  typeof location !== 'undefined' && /[?&]shot\b/.test(location.search);
+
 
 
 /** Shared empty array, so the no-contacts path allocates nothing per frame. */
@@ -302,6 +312,19 @@ export class ArenaRenderer {
       canvas,
       antialias: true,
       alpha: false,
+      // OPT-IN SCREENSHOTS, off by default.
+      //
+      // A WebGL back buffer is cleared the moment it is composited, so
+      // `canvas.toDataURL()` on a live arena returns a blank image — which is
+      // why "keep a screenshot of the state we agreed on" (docs/design-targets)
+      // was a manual, take-it-with-your-phone step.
+      //
+      // `preserveDrawingBuffer` fixes that and is NOT free: it forces the
+      // driver to keep a readable copy of every frame, which costs bandwidth on
+      // exactly the mobile GPUs least able to spare it. So it is behind a flag
+      // rather than on for everyone, and the game every player actually loads
+      // is unchanged. Add `?shot` to the URL, then call `__shot()`.
+      preserveDrawingBuffer: SHOT_MODE,
     });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
@@ -345,6 +368,20 @@ export class ArenaRenderer {
   /** Turn the manga impact frames on or off. Persisted by the caller. */
   setImpactFrames(on: boolean): void {
     this.impactFrames = on;
+  }
+
+  /**
+   * The current frame as a PNG data URL, or null when `?shot` was not set.
+   *
+   * Renders immediately before reading. Even with `preserveDrawingBuffer` the
+   * safe moment to read a WebGL canvas is straight after a draw, and forcing
+   * one here means the caller does not have to reason about where in the frame
+   * loop it happens to be standing.
+   */
+  snapshot(): string | null {
+    if (!SHOT_MODE) return null;
+    this.present();
+    return this.renderer.domElement.toDataURL('image/png');
   }
 
   setTheme(id: string): void {
@@ -1283,6 +1320,17 @@ export class ArenaRenderer {
     this.shockwaves.update(dt);
     this.updateCamera(beys, dt);
 
+    this.present();
+  }
+
+  /**
+   * Draw the scene once, through whichever path this theme uses.
+   *
+   * Extracted from `update` so `snapshot` can force a frame without
+   * duplicating the dispatch. Splitting it is also what makes the invariant
+   * below checkable in one place rather than trusted at two call sites.
+   */
+  private present(): void {
     // Exactly one render path per frame, and toon wins the tie by construction.
     // OutlineEffect and EffectComposer must never both run: the outline pass
     // renders the scene TWICE straight to the canvas, so following it with a

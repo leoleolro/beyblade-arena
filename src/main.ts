@@ -69,3 +69,28 @@ window.addEventListener('keydown', (e) => {
 
 // Expose for debugging in the console.
 Object.assign(window as unknown as Record<string, unknown>, { game, ui });
+
+/**
+ * Save the current frame, for `docs/design-targets/`.
+ *
+ * Only works when the page was loaded with `?shot` — see the renderer
+ * construction in arena.ts for why keeping a readable back buffer is not
+ * something to switch on for every player. Without the flag this says so
+ * rather than silently handing back a blank PNG, which is what a plain
+ * `toDataURL()` on a live WebGL canvas does and is a genuinely confusing
+ * half-hour to debug.
+ */
+Object.assign(window as unknown as Record<string, unknown>, {
+  __shot(name = 'shot'): string | null {
+    const url = game.renderer.snapshot();
+    if (!url) {
+      console.warn('[shot] reload with ?shot in the URL first.');
+      return null;
+    }
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${name}.png`;
+    a.click();
+    return url;
+  },
+});

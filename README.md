@@ -1121,13 +1121,19 @@ another, check what units its parameter is actually in before tuning it.
   exported and parked rather than called. Delete it and its helpers once the
   metal decision has survived a few matches in every theme; keeping a second
   renderer nobody exercises is the worse end state.
-- **The garage preview mis-frames imported models.** The camera distance comes
-  from `mesh.userData.partY`, which describes the procedural layer/disc/driver
-  stack, so an imported top — which replaces all three — sits small,
-  off-centre and at whatever pitch the file was authored at.
-- **Picker chips still draw the procedural silhouette.** The thumbnails are
-  Canvas2D and sample a `Shape`; an imported model has no shape to sample, so
-  the chip for a modelled bey shows the old artwork.
+- ~~The garage preview mis-frames imported models.~~ **Fixed.** Two traps on the
+  way, both of which looked like framing bugs and were not: `Box3.setFromObject`
+  walks the graph without consulting `visible`, so the hidden disc and driver
+  were still inflating the box; and it returns a WORLD-space box, so measuring
+  while the root still held the previous layout's offset made the new centre
+  inherit the old one's error.
+- ~~Picker chips draw the procedural silhouette for modelled beys.~~ **Fixed** —
+  one shared offscreen renderer draws each model once to a cached image. The
+  render is composited over the layer's colour, because accurate grey chips were
+  measurably harder to pick out of a colour-coded picker than wrong ones.
+- **Spin blur is toon-only.** The other two themes get the anti-aliasing rate
+  cap in `motion.ts` instead, which stops a top reading as stationary but does
+  not give it the drawn smear the cel theme has.
 - **The X-Rail dish carries chevron arrows** that are absent from the Overdrive
   reference and read as busy under bloom.
 - **Nothing captures an *achieved* screenshot automatically.**

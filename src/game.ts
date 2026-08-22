@@ -126,7 +126,8 @@ export class Game {
   rivalSpinDir: 1 | -1 = -1;
 
   private ai = new AiController(AI_ID, 'blader');
-  private renderer: ArenaRenderer;
+  /** Public so the `?shot` console helper in main.ts can force a snapshot. */
+  readonly renderer: ArenaRenderer;
   private lastTime = 0;
   private meterDir = 1;
   /** Seconds of hitstop freeze remaining. */
