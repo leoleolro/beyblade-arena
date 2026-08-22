@@ -882,7 +882,10 @@ export class ArenaRenderer {
       const model = src.clone(true);
       normaliseToRadius(model, radius);
       seatOnOrigin(model);
-      finishImported(model, this.theme.modelTint, studioEnvironment(this.renderer), entry.finish, this.theme.envIntensity);
+      finishImported(model, this.theme.modelTint, studioEnvironment(this.renderer), entry.finish, this.theme.envIntensity, {
+        colour: this.theme.topRimColour,
+        strength: this.theme.topRimStrength,
+      });
 
       parts.layer.clear();
       parts.layer.add(model);

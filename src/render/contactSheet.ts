@@ -114,6 +114,7 @@ async function buildCell(
         studioEnvironment(gl),
         entry.finish,
         cell.theme.envIntensity,
+        { colour: cell.theme.topRimColour, strength: cell.theme.topRimStrength },
       );
       parts.layer.clear();
       parts.layer.add(model);

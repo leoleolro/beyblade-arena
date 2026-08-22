@@ -138,6 +138,17 @@ export interface Theme {
   modelTint: number;
 
   /**
+   * Silhouette rim on a top's metal: colour, and peak brightness.
+   *
+   * Strength 0 turns it off entirely, shader patch included. See rimMetal.ts —
+   * the short version is that a fresnel term is the only thing that draws an
+   * EDGE, because it depends on the angle to the viewer rather than to a light,
+   * and the arena's rim lights wash a whole face instead.
+   */
+  topRimColour: number;
+  topRimStrength: number;
+
+  /**
    * Cel shading: banded lighting and a hard outline on every silhouette.
    *
    * This is the switch that turns the game from "3D" into "cartoon". It changes
@@ -145,7 +156,21 @@ export interface Theme {
    * materials, so it is the one theme flag that isn't a simple parameter.
    */
   toon: boolean;
-  /** Energy aura sprite around each top, swelling with spin and flaring on hits. */
+  /**
+   * Energy aura sprite around each top, swelling with spin and flaring on hits.
+   *
+   * OFF in Overdrive, which is a deliberate loss. The sprite is camera-facing,
+   * additive, and about three times a top's diameter — a glowing ball centred
+   * on the bey. That is not what this theme's reference looks like: there a top
+   * is a dark body with a tight pool at its tip and no halo at all, and at play
+   * scale a top is only ~50px, so a 150px halo IS the object as far as the eye
+   * is concerned. Compared side by side in a clash filmstrip, turning it off is
+   * the difference between a bright smudge and a readable beyblade.
+   *
+   * What it cost: the aura was a live read on remaining spin. That signal still
+   * exists in the HUD bar, in the wobble (which quickens as spin drains) and in
+   * the drawn spin rate, so it is duplicated rather than gone.
+   */
   aura: boolean;
   /**
    * Aura opacity multiplier. 1 is the value the effect was authored at.
@@ -227,6 +252,11 @@ export const ARENA: Theme = {
   // Bright chrome on a dark dish with no bloom: the case the finish was
   // authored for, and it reads perfectly.
   modelTint: 0xd8dde3,
+
+  // Off. This theme's contract is that it renders as it did before themes
+  // existed, and a rim is a visible addition, not a correction.
+  topRimColour: 0xffffff,
+  topRimStrength: 0,
 
   bodyClass: 'theme-arena',
 };
@@ -329,6 +359,11 @@ export const ANIME: Theme = {
   // Stepped down against a near-white polycarbonate dish. Pale metal on a
   // pale bowl has no contrast left to lose.
   modelTint: 0xb3bcc7,
+
+  // Off: the cel path draws its own rim inside `metalToonMaterial`, and the
+  // ink outline is already describing every silhouette in the frame.
+  topRimColour: 0xffffff,
+  topRimStrength: 0,
 
   bodyClass: 'theme-anime',
 };
@@ -461,7 +496,7 @@ export const OVERDRIVE: Theme = {
   // because Overdrive's entire proposition is *3D with glow* — cel bands and
   // ink outlines would delete the bloom this theme is built around.
   toon: false,
-  aura: true,
+  aura: false,
   speedLines: true,
   impactFlash: true,
 
@@ -473,28 +508,21 @@ export const OVERDRIVE: Theme = {
   // to say.
   envIntensity: 0.3,
 
-  // 0.14 — very nearly off, and the reference capture is the reason.
-  //
-  // The aura is a camera-facing sprite about three times the top's diameter,
-  // additive, with a near-opaque core. That is a GLOWING BALL centred on the
-  // bey, and it is not what this theme's reference looks like: there, a top is
-  // a dark body with a tight bright pool at its tip and no halo around it at
-  // all. Drama comes from a dark object being suddenly lit.
-  //
-  // Which is also why the clash read badly. Filmstripped with momentSheet, the
-  // impact frame was one white wash across half the dish with neither bey
-  // visible inside it — because both tops were ALREADY glowing balls before
-  // they met, so the collision had nothing left to add. An effect can only
-  // mark an event if the state before it was quieter.
-  //
-  // Not zero: at 0.14 it still swells with spin and flares on contact, which
-  // is a real read on how much fight is left. It just stops being the object.
-  auraStrength: 0.14,
+  // Unused — `aura` is false here. Kept at the authored value so that turning
+  // the flag back on gives the effect as designed rather than an invisible one.
+  auraStrength: 1,
 
-  // Dark steel, matching the reference: the body stays dark and the rim and
-  // the pool beneath do the talking. At 0xd8dde3 the whole top sat above the
-  // 0.7 bloom threshold and bloomed into a featureless ball.
-  modelTint: 0x79828f,
+  // Genuinely dark, not merely dimmed. 0x79828f was a compromise made before
+  // there was a rim: dark enough to stop blooming, still bright enough to be a
+  // grey lump. With `topRimStrength` drawing the contour the body no longer has
+  // to describe itself, so it can go where the reference puts it.
+  modelTint: 0x323b4a,
+
+  // The whole point of this theme's look. A cold white-blue edge on a dark
+  // body, matching the reference, where the contour is what describes the top
+  // and the body itself stays out of the way.
+  topRimColour: 0xa8dcff,
+  topRimStrength: 1.15,
 
   bodyClass: 'theme-overdrive',
 };

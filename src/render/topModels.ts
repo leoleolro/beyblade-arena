@@ -5,6 +5,8 @@ import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader.js';
 import { noOutline } from './toon';
 import { applyEnvironment } from './environment';
+import { addFresnelRim } from './rimMetal';
+import type { RimOptions } from './rimMetal';
 import type { ModelFinish } from './topModelIndex';
 
 /**
@@ -217,9 +219,10 @@ export function finishImported(
   env: THREE.Texture | null,
   finish: ModelFinish = 'silver',
   envIntensity = 0.85,
+  rim: RimOptions = {},
 ): void {
-  if (finish === 'own') keepOwnMaterials(obj, env, envIntensity);
-  else finishAsMetal(obj, tint, env, envIntensity);
+  if (finish === 'own') keepOwnMaterials(obj, env, envIntensity, rim);
+  else finishAsMetal(obj, tint, env, envIntensity, rim);
 }
 
 /**
@@ -273,6 +276,7 @@ function keepOwnMaterials(
   obj: THREE.Object3D,
   env: THREE.Texture | null,
   envIntensity: number,
+  rim: RimOptions = {},
 ): void {
   // One converted material per source material, not per mesh: an OBJ splits
   // into a child mesh per `usemtl` group, and Gemstone's six groups share six
@@ -295,6 +299,7 @@ function keepOwnMaterials(
     });
     noOutline(mat);
     if (env) applyEnvironment(mat, env, envIntensity);
+    addFresnelRim(mat, rim);
 
     converted.set(src, mat);
     return mat;
@@ -326,6 +331,7 @@ export function finishAsMetal(
   tint: number,
   env: THREE.Texture | null = null,
   envIntensity = 0.85,
+  rim: RimOptions = {},
 ): void {
   // ONE FINISH, EVERY THEME. This used to branch on `toon` and hand back cel
   // metal for the cartoon theme, which was the wrong axis to vary on: a top is
@@ -365,6 +371,10 @@ export function finishAsMetal(
   // being reflected — see environment.ts, which is where that is explained and
   // where the decision not to light the whole scene with it lives.
   if (env) applyEnvironment(mat, env, envIntensity);
+
+  // The contour. On a dark body this is what says "top" — see rimMetal.ts for
+  // why a fresnel term and not the arena's rim lights.
+  addFresnelRim(mat, rim);
 
   obj.traverse((child) => {
     const mesh = child as THREE.Mesh;

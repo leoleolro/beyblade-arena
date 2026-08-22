@@ -183,6 +183,7 @@ export class GarageView {
           studioEnvironment(this.renderer),
           entry.finish,
           themeById(themeId).envIntensity,
+          { colour: themeById(themeId).topRimColour, strength: themeById(themeId).topRimStrength },
         );
         parts.layer.clear();
         parts.layer.add(model);
