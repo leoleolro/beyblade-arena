@@ -40,11 +40,21 @@ import {
 } from './topModels';
 import { renderInked } from './outlineHull';
 import { setEnvironmentIntensity, studioEnvironment } from './environment';
+import { drawnSpinRate, trailScale } from './motion';
 import { topModelFor } from './topModelIndex';
 
 interface BeyVisual {
   group: THREE.Group;
   trail: TrailLike;
+  /**
+   * The angle the top is DRAWN at, accumulated separately from `state.angle`.
+   *
+   * The sim's angle advances too fast to be sampled at 60fps and aliases — see
+   * `drawnSpinRate`. This is the eye-trackable version of the same rotation,
+   * and it has to be integrated rather than derived because the rate itself
+   * varies with remaining spin.
+   */
+  drawnAngle: number;
   /** Spin-blur disc, toon only: the drawn stand-in for a top too fast to see. */
   blur: SpinBlur | null;
   /** The three part sub-groups, scaled down while the blur dominates. */
@@ -124,6 +134,8 @@ function resetParts(parts: BeyParts): void {
  * keeps the physics stable while still looking like a real spinning top.
  */
 const clampUnit = (n: number): number => (n < 0 ? 0 : n > 1 ? 1 : n);
+
+
 
 /** Shared empty array, so the no-contacts path allocates nothing per frame. */
 const EMPTY_CONTACTS: readonly ContactEvent[] = [];
@@ -759,6 +771,9 @@ export class ArenaRenderer {
       this.visuals.set(b.id, {
         group,
         trail,
+        // Seeded from the sim's angle rather than 0, so the two tops do not
+        // both start facing the camera dead-on at launch.
+        drawnAngle: b.angle,
         blur,
         parts,
         light,
@@ -857,12 +872,17 @@ export class ArenaRenderer {
       }
 
 
-      // Spin about its own axis.
-      v.group.rotation.y = b.angle;
-
       // Lean, precessing slowly around the vertical. A top losing spin leans
       // further and wobbles faster — the visual tell that it's about to die.
       const sn = spinNorm(b);
+
+      // Spin about its own axis, at a rate the eye can actually integrate
+      // rather than at the sim's. See drawnSpinRate for the sampling argument;
+      // the short version is that `b.angle` advances far enough per frame that
+      // a six- or eight-bladed layer aliases and appears to stand still.
+      v.drawnAngle +=
+        drawnSpinRate(sn, b.build.layer.blades) * dt * Math.sign(b.spin || 1);
+      v.group.rotation.y = v.drawnAngle;
       v.wobblePhase += dt * (2.5 + (1 - sn) * 9);
       const lean = b.tilt;
       v.group.rotation.x = Math.sin(v.wobblePhase) * lean;
@@ -887,6 +907,24 @@ export class ArenaRenderer {
       } else {
         v.trail.setVisible(true);
         v.trail.push(p.clone().setY(p.y + 0.05));
+        // THE TRAIL IS THE SPEEDOMETER.
+        //
+        // "the blades shouldn't be travelling at the same speed throughout the
+        // game" — and they are not. Measured over ten AI-played rounds, one
+        // top's own speed varies by 4.3x inside a single round (p10 0.63, p90
+        // 2.99, peak 4.34). The sim was never the problem.
+        //
+        // The problem was that NOTHING on screen read velocity. Exactly one
+        // consumer existed, the full-screen speed lines, and they only start
+        // above 2.0 — past the median — so for most of every round the game
+        // showed a top drifting and a top charging in identically.
+        //
+        // The trail is the right carrier: it is already per-top, already
+        // coloured by whose it is, and a streak that thickens with speed is the
+        // one motion cue that needs no explaining. Scaled against the measured
+        // envelope rather than a guess, and floored rather than faded to zero,
+        // because a top that is barely moving should still be identifiable.
+        v.trail.setOpacity(this.theme.trailOpacity * trailScale(b));
       }
 
       // THE DRAIN.

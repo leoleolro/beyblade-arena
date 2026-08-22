@@ -1,0 +1,120 @@
+import { describe, expect, it } from 'vitest';
+import { drawnSpinRate, SPEED_HI, SPEED_LO, speedK, trailScale } from './motion';
+
+/**
+ * These numbers are a claim about the GAME, not about arithmetic.
+ *
+ * The band exists to make a visual cue track the speeds a round actually
+ * reaches, so the test that matters is: fed the measured distribution, does the
+ * cue land somewhere useful? A ramp that is technically correct but sits at
+ * 0.05 for every ordinary moment is a broken cue, and only a test written
+ * against real percentiles catches that.
+ *
+ * Measured over ten AI-played rounds, sampling every frame (the probe lived in
+ * src/sim and was deleted after; `played.test.ts` is the durable harness):
+ *
+ *   p10 0.63   p50 1.64   p90 2.99   peak 4.34
+ */
+const MEASURED = { p10: 0.63, p50: 1.64, p90: 2.99, peak: 4.34 };
+
+const at = (speed: number): { vel: { x: number; y: number } } => ({
+  vel: { x: speed, y: 0 },
+});
+
+describe('speedK', () => {
+  it('spans most of its range across the measured p10..p90', () => {
+    const lo = speedK(at(MEASURED.p10));
+    const hi = speedK(at(MEASURED.p90));
+    // The whole point: ordinary play must move the cue a lot. If p10 and p90
+    // mapped to 0.30 and 0.45 the effect would be invisible in practice even
+    // though every individual number was "right".
+    expect(hi - lo).toBeGreaterThan(0.6);
+  });
+
+  it('puts the median in the middle, where a curve can move both ways', () => {
+    const mid = speedK(at(MEASURED.p50));
+    expect(mid).toBeGreaterThan(0.3);
+    expect(mid).toBeLessThan(0.6);
+  });
+
+  it('clamps rather than overshooting at the peak the sim can reach', () => {
+    expect(speedK(at(MEASURED.peak))).toBe(1);
+    expect(speedK(at(0))).toBe(0);
+    // A stationary top and a slow one must not read as the same thing purely
+    // because the clamp swallowed them.
+    expect(speedK(at(SPEED_LO + (SPEED_HI - SPEED_LO) * 0.5))).toBeCloseTo(0.5, 5);
+  });
+
+  it('reads the vector, not one axis', () => {
+    // 3-4-5: a top moving diagonally is moving at 5, not 3.
+    expect(speedK({ vel: { x: 3, y: 4 } })).toBe(speedK(at(5)));
+  });
+});
+
+describe('trailScale', () => {
+  it('never fades the trail out entirely', () => {
+    // The trail carries the skin colour and is how you tell whose top is
+    // whose, so a stopped top still needs one.
+    expect(trailScale(at(0))).toBeCloseTo(0.3, 5);
+  });
+
+  it('reaches full strength at the top of the band', () => {
+    expect(trailScale(at(SPEED_HI))).toBeCloseTo(1, 5);
+  });
+
+  it('changes by more than 2x across ordinary play', () => {
+    const slow = trailScale(at(MEASURED.p10));
+    const fast = trailScale(at(MEASURED.p90));
+    expect(fast / slow).toBeGreaterThan(2);
+  });
+});
+
+describe('drawnSpinRate', () => {
+  // The catalogue's real blade counts, which is what has to survive this.
+  const BLADE_COUNTS = [3, 4, 5, 6, 8];
+
+  it('never turns a layer more than half a blade step per frame', () => {
+    // The Nyquist limit. Above it the rotation is indistinguishable from a
+    // slower one in the opposite direction, which is precisely the "spinning
+    // top looks like a stationary rock" bug this exists to kill.
+    for (const blades of BLADE_COUNTS) {
+      const step = (Math.PI * 2) / blades;
+      const perFrame = drawnSpinRate(1, blades) / 60;
+      expect(perFrame / step, `${blades} blades aliases`).toBeLessThan(0.5);
+    }
+  });
+
+  it('improves on the simulated rate exactly where the sim aliases', () => {
+    // What the sim itself advances per frame at SPIN_REF 900: 900 * (1/60) *
+    // 0.05. Six and eight blades are the counts that break under it.
+    const simPerFrame = 900 * (1 / 60) * 0.05;
+    for (const blades of [6, 8]) {
+      const step = (Math.PI * 2) / blades;
+      expect(simPerFrame / step, `${blades} blades should be broken today`).toBeGreaterThan(0.5);
+      expect(drawnSpinRate(1, blades) / 60 / step).toBeLessThan(0.5);
+    }
+  });
+
+  it('turns a busier layer more slowly, because its step is shorter', () => {
+    expect(drawnSpinRate(1, 8)).toBeLessThan(drawnSpinRate(1, 3));
+  });
+
+  it('winds down with remaining spin but never stops early', () => {
+    const full = drawnSpinRate(1, 4);
+    const dying = drawnSpinRate(0, 4);
+    expect(dying).toBeLessThan(full);
+    // A top still in play must still look like it is turning; 0 would read as
+    // dead several seconds before it is.
+    expect(dying).toBeGreaterThan(0);
+    expect(dying / full).toBeCloseTo(0.25, 5);
+  });
+
+  it('is monotonic in spin', () => {
+    let prev = -1;
+    for (const sn of [0, 0.25, 0.5, 0.75, 1]) {
+      const r = drawnSpinRate(sn, 6);
+      expect(r).toBeGreaterThan(prev);
+      prev = r;
+    }
+  });
+});
