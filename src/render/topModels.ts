@@ -1,8 +1,11 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
+import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
+import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader.js';
 import { noOutline } from './toon';
 import { applyEnvironment } from './environment';
+import type { ModelFinish } from './topModelIndex';
 
 /**
  * Imported beyblade models — a whole top per file.
@@ -28,9 +31,14 @@ import { applyEnvironment } from './environment';
  * land entirely outside what we ask of it, and in exchange it removes a
  * conversion step from the loop that decides how often new beys get added.
  *
- * So: `.glb`, `.gltf` and `.stl` all load. Use whichever you have — VERIFIED by
- * converting the first model to STL and running it in the arena, not merely by
- * writing the branch.
+ * So: `.glb`, `.gltf`, `.stl` and `.obj` all load. Use whichever you have —
+ * the STL path was VERIFIED by converting the first model and running it in the
+ * arena, not merely by writing the branch.
+ *
+ * OBJ came later, with Gemstone, and brings the one thing the others do not: a
+ * sidecar `.mtl` naming a material per face group. See `loadObj` for why the
+ * sidecar has to be loaded first, and `topModelIndex.ts` for how a model says
+ * whether it wants those materials kept.
  *
  * The one measured difference, and it is not visual: STL stores three full
  * vertices per triangle with no sharing, so the same mesh is 1.33x larger —
@@ -40,7 +48,7 @@ import { applyEnvironment } from './environment';
  * already have".
  */
 
-export type ModelFormat = 'glb' | 'gltf' | 'stl';
+export type ModelFormat = 'glb' | 'gltf' | 'stl' | 'obj';
 
 /**
  * Finish colour for imported tops.
@@ -53,7 +61,13 @@ export type ModelFormat = 'glb' | 'gltf' | 'stl';
 export const MODEL_TINT = 0xd8dde3;
 
 const formatOf = (url: string): ModelFormat =>
-  url.endsWith('.stl') ? 'stl' : url.endsWith('.gltf') ? 'gltf' : 'glb';
+  url.endsWith('.stl')
+    ? 'stl'
+    : url.endsWith('.obj')
+      ? 'obj'
+      : url.endsWith('.gltf')
+        ? 'gltf'
+        : 'glb';
 
 /**
  * Loaded models, keyed by url.
@@ -66,6 +80,8 @@ const cache = new Map<string, Promise<THREE.Object3D | null>>();
 
 let gltfLoader: GLTFLoader | null = null;
 let stlLoader: STLLoader | null = null;
+let objLoader: OBJLoader | null = null;
+let mtlLoader: MTLLoader | null = null;
 
 /**
  * Load one top. Resolves to null when there is no model, which is the normal
@@ -75,25 +91,73 @@ export function loadTopModel(url: string): Promise<THREE.Object3D | null> {
   const hit = cache.get(url);
   if (hit) return hit;
 
-  const p =
-    formatOf(url) === 'stl'
-      ? (stlLoader ??= new STLLoader())
-          .loadAsync(url)
-          // STL is geometry, not a scene — there is nothing else in the file.
-          .then((geo) => {
-            geo.computeVertexNormals();
-            const g = new THREE.Group();
-            g.add(new THREE.Mesh(geo, new THREE.MeshStandardMaterial()));
-            return g as THREE.Object3D;
-          })
-          .catch(() => null)
-      : (gltfLoader ??= new GLTFLoader())
-          .loadAsync(url)
-          .then((gltf) => gltf.scene as THREE.Object3D)
-          .catch(() => null);
+  let p: Promise<THREE.Object3D | null>;
+  switch (formatOf(url)) {
+    case 'stl':
+      p = (stlLoader ??= new STLLoader())
+        .loadAsync(url)
+        // STL is geometry, not a scene — there is nothing else in the file.
+        .then((geo) => {
+          geo.computeVertexNormals();
+          const g = new THREE.Group();
+          g.add(new THREE.Mesh(geo, new THREE.MeshStandardMaterial()));
+          return g as THREE.Object3D;
+        })
+        .catch(() => null);
+      break;
+
+    case 'obj':
+      p = loadObj(url).catch(() => null);
+      break;
+
+    default:
+      p = (gltfLoader ??= new GLTFLoader())
+        .loadAsync(url)
+        .then((gltf) => gltf.scene as THREE.Object3D)
+        .catch(() => null);
+  }
 
   cache.set(url, p);
   return p;
+}
+
+/**
+ * OBJ, with its sidecar MTL if there is one.
+ *
+ * The MTL is loaded FIRST and handed to the OBJ loader, because that is the
+ * only order that works: `OBJLoader` resolves `usemtl` names against materials
+ * it already holds, and an OBJ parsed without them comes out as a single white
+ * `MeshPhongMaterial` with the material groups silently collapsed. Loading it
+ * afterwards cannot recover the names.
+ *
+ * A MISSING MTL IS NOT AN ERROR. Plenty of OBJs ship alone, and one that does
+ * should still load as geometry and take the silver finish — so the sidecar
+ * failure is caught and discarded rather than failing the model. That is also
+ * what makes `finish: 'silver'` a coherent choice for an OBJ: the materials are
+ * about to be replaced anyway, so a 404 on the MTL costs nothing but a request.
+ *
+ * `setResourcePath` is what makes the sidecar resolve relative to the model
+ * rather than to the page. Without it an OBJ nested two directories deep looks
+ * for its MTL at the site root and quietly gets HTML back.
+ */
+async function loadObj(url: string): Promise<THREE.Object3D> {
+  const slash = url.lastIndexOf('/');
+  const dir = slash === -1 ? '' : url.slice(0, slash + 1);
+
+  const loader = (objLoader ??= new OBJLoader());
+
+  const mtlUrl = url.replace(/\.obj$/, '.mtl');
+  try {
+    const mtl = await (mtlLoader ??= new MTLLoader()).setResourcePath(dir).loadAsync(mtlUrl);
+    mtl.preload();
+    loader.setMaterials(mtl);
+  } catch {
+    // No sidecar, or it failed to parse. Geometry only; the finish step will
+    // give it a material.
+    loader.setMaterials(null as unknown as MTLLoader.MaterialCreator);
+  }
+
+  return (await loader.loadAsync(url)) as THREE.Object3D;
 }
 
 /**
@@ -140,17 +204,86 @@ export function seatOnOrigin(obj: THREE.Object3D): void {
 }
 
 /**
- * Finish an imported top in cel metal.
+ * Finish an imported top, however its entry says to.
  *
- * The first model carried no colour worth keeping — one merged material, a flat
- * grey diffuse, and that behind `KHR_materials_pbrSpecularGlossiness`, an
- * extension three removed years ago, so even the grey does not survive the
- * load. STL carries no colour at all by definition.
+ * The single call site for everything downstream of the load, so the arena, the
+ * garage and the inspector cannot drift apart on what a model looks like —
+ * which they had already done once, with the garage passing a different outline
+ * weight from the other two.
+ */
+export function finishImported(
+  obj: THREE.Object3D,
+  tint: number,
+  env: THREE.Texture | null,
+  finish: ModelFinish = 'silver',
+): void {
+  if (finish === 'own') keepOwnMaterials(obj, env);
+  else finishAsMetal(obj, tint, env);
+}
+
+/**
+ * Keep the modeller's materials, but make them metal.
  *
- * That is fine, because a bare metal finish is what these are for. `tint` is
- * the design's own colour and is applied gently: the banded specular and
- * fresnel rim in `metalToonMaterial` do the work, and a strong tint would turn
- * machined metal back into painted plastic.
+ * For a model that arrived with deliberate per-part colour. The colour and any
+ * map are preserved; everything about how the surface responds to light is
+ * replaced, because what these files carry is almost never a PBR description —
+ * an MTL is Phong, with `Ns`/`Ks` exponents that mean nothing to a standard
+ * material, and three's MTLLoader hands back `MeshPhongMaterial` accordingly.
+ * Left alone it renders as flat plastic next to the silver tops.
+ *
+ * ROUGHNESS IS RAISED, not matched to the silver finish, and metalness lowered.
+ * A model with authored colour is describing painted or anodised parts rather
+ * than bare machined steel: at 0.92/0.28 a black panel goes to a pure mirror
+ * and reads as a hole in the top. 0.7/0.42 keeps it obviously metal while
+ * letting the authored colour survive being reflected at.
+ */
+function keepOwnMaterials(obj: THREE.Object3D, env: THREE.Texture | null): void {
+  // One converted material per source material, not per mesh: an OBJ splits
+  // into a child mesh per `usemtl` group, and Gemstone's six groups share six
+  // materials across far more meshes than that.
+  const converted = new Map<THREE.Material, THREE.MeshStandardMaterial>();
+
+  const convert = (src: THREE.Material): THREE.MeshStandardMaterial => {
+    const hit = converted.get(src);
+    if (hit) return hit;
+
+    const from = src as THREE.MeshPhongMaterial;
+    const mat = new THREE.MeshStandardMaterial({
+      color: from.color ? from.color.clone() : new THREE.Color(0xffffff),
+      map: from.map ?? null,
+      metalness: 0.7,
+      roughness: 0.42,
+      side: from.side,
+      transparent: from.transparent,
+      opacity: from.opacity,
+    });
+    noOutline(mat);
+    if (env) applyEnvironment(mat, env);
+
+    converted.set(src, mat);
+    return mat;
+  };
+
+  obj.traverse((child) => {
+    const mesh = child as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    mesh.material = Array.isArray(mesh.material)
+      ? mesh.material.map(convert)
+      : convert(mesh.material);
+  });
+}
+
+/**
+ * Finish an imported top as one machined metal.
+ *
+ * For a model that carries no colour worth keeping — which is the common case.
+ * The first one arrived with a flat grey diffuse behind
+ * `KHR_materials_pbrSpecularGlossiness`, an extension three removed years ago,
+ * so even the grey did not survive the load; STL carries no colour at all by
+ * definition.
+ *
+ * `tint` is applied gently. A strong one turns machined metal back into painted
+ * plastic, and the reflection is doing the work anyway.
  */
 export function finishAsMetal(
   obj: THREE.Object3D,

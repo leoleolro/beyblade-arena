@@ -33,7 +33,7 @@ import { contactShadow, noOutline } from './toon';
 import { designByLayer } from './beydex';
 import {
   MODEL_TINT,
-  finishAsMetal,
+  finishImported,
   loadTopModel,
   normaliseToRadius,
   seatOnOrigin,
@@ -784,7 +784,7 @@ export class ArenaRenderer {
       const model = src.clone(true);
       normaliseToRadius(model, radius);
       seatOnOrigin(model);
-      finishAsMetal(model, MODEL_TINT, studioEnvironment(this.renderer));
+      finishImported(model, MODEL_TINT, studioEnvironment(this.renderer), entry.finish);
 
       parts.layer.clear();
       parts.layer.add(model);

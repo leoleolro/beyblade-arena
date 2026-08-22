@@ -6,7 +6,7 @@ import { skinById } from './skins';
 import { themeById } from './theme';
 import {
   MODEL_TINT,
-  finishAsMetal,
+  finishImported,
   loadTopModel,
   normaliseToRadius,
   seatOnOrigin,
@@ -166,7 +166,7 @@ export class GarageView {
         const model = src.clone(true);
         normaliseToRadius(model, build.layer.radius);
         seatOnOrigin(model);
-        finishAsMetal(model, MODEL_TINT, studioEnvironment(this.renderer));
+        finishImported(model, MODEL_TINT, studioEnvironment(this.renderer), entry.finish);
         parts.layer.clear();
         parts.layer.add(model);
         parts.disc.visible = false;

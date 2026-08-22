@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {
   MODEL_TINT,
-  finishAsMetal,
+  finishImported,
   loadTopModel,
   normaliseToRadius,
   seatOnOrigin,
@@ -70,7 +70,7 @@ void loadTopModel('models/wonder_valtryek_beyblade/scene.gltf').then((src) => {
   g.add(src.clone(true));
   normaliseToRadius(g, 0.1066);
   seatOnOrigin(g);
-  finishAsMetal(g, MODEL_TINT, studioEnvironment(renderer));
+  finishImported(g, MODEL_TINT, studioEnvironment(renderer), 'silver');
   const box = new THREE.Box3().setFromObject(g);
   const size = new THREE.Vector3();
   box.getSize(size);
