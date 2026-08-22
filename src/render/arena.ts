@@ -39,6 +39,7 @@ import {
 } from './topModels';
 import { renderInked } from './outlineHull';
 import { setEnvironmentIntensity, studioEnvironment } from './environment';
+import { addFresnelRim } from './rimMetal';
 import { drawnSpinRate, trailScale } from './motion';
 import { topModelFor } from './topModelIndex';
 
@@ -724,6 +725,36 @@ export class ArenaRenderer {
     for (const b of beys) {
       const skin: Skin = skinById(skins[b.id] ?? 'frost');
       const group = buildBeyMesh(b.build, skin, this.theme.toon);
+
+      // THE SAME CONTOUR ON THE PROCEDURAL TOPS, not just the imported ones.
+      //
+      // The reference has BOTH beys reading as dark bodies with luminous edges,
+      // and the imported models were only half the roster. A rim ADDS light at
+      // the silhouette without touching the base colour, so a bey keeps the
+      // palette that identifies it — Fafnir stays gold — and gains the edge that
+      // makes it read as an object against a dark dish.
+      //
+      // Applied here rather than inside `buildClassicBey` because it is a theme
+      // decision, and beyMesh has no business knowing which theme asked. Runs
+      // before `applyTopModel`, so an imported top is untouched by it and gets
+      // its rim through `finishImported` instead — patched once, never twice.
+      if (this.theme.topRimStrength > 0) {
+        const rim = {
+          colour: this.theme.topRimColour,
+          strength: this.theme.topRimStrength,
+        };
+        group.traverse((child) => {
+          const mesh = child as THREE.Mesh;
+          if (!mesh.isMesh) return;
+          const list = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+          for (const m of list) {
+            // Standard materials only. The cel path has its own rim and a
+            // MeshToonMaterial has no `outgoingLight` line to patch.
+            if ((m as THREE.MeshStandardMaterial).isMeshStandardMaterial) addFresnelRim(m, rim);
+          }
+        });
+      }
+
       // An imported top, if this bey has one, swapped in when it resolves.
       // Deliberately after the procedural build rather than instead of it: the
       // round starts on the frame it starts, and a model that is slow or

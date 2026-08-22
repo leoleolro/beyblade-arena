@@ -73,6 +73,24 @@ export function addFresnelRim<T extends THREE.Material>(mat: T, opts: RimOptions
   const strength = opts.strength ?? 0;
   if (strength <= 0) return mat;
 
+  // IDEMPOTENT, because callers cannot reasonably guarantee they only ask once.
+  // A bey group shares one material across several meshes, so the obvious
+  // `traverse` that rims every mesh reaches the same material repeatedly — and
+  // the naive version chained a second patch onto the first, which then could
+  // not find the anchor line the first one had already consumed and threw. The
+  // symptom was an empty arena and a stack of `onBeforeCompile` calling itself.
+  //
+  // Re-asking now just retunes the live uniforms, which is also what a theme
+  // switch wants.
+  const existing = mat.userData.rim as
+    | { rimColour: { value: THREE.Color }; rimShape: { value: THREE.Vector2 } }
+    | undefined;
+  if (existing) {
+    existing.rimColour.value.set(opts.colour ?? 0xdfefff);
+    existing.rimShape.value.set(opts.power ?? 2.6, strength);
+    return mat;
+  }
+
   // Built out here rather than inside the callback: `onBeforeCompile` does not
   // run until the material's first frame, and three copies the uniform set per
   // material, so these have to be per-material objects to stay live handles.
