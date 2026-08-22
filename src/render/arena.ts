@@ -400,7 +400,10 @@ export class ArenaRenderer {
     for (const v of this.visuals.values()) {
       v.trail.setOpacity(t.trailOpacity);
       v.light.intensity = t.beyLightIntensity;
-      if (v.aura) v.aura.sprite.visible = t.aura;
+      if (v.aura) {
+        v.aura.sprite.visible = t.aura;
+        v.aura.setStrength(t.auraStrength);
+      }
       // Imported tops are built with the exposure of whatever theme was active
       // at the time, and the two themes that differ most here are both non-toon
       // — so the rebuild above does not cover the switch that matters. See
@@ -753,6 +756,7 @@ export class ArenaRenderer {
       // Parented to the top so it tracks for free. Built regardless of theme
       // and simply hidden, so a mid-match theme switch needs no rebuild.
       const aura = buildAura(skin.primary);
+      aura.setStrength(this.theme.auraStrength);
       aura.sprite.position.y = 0.12;
       aura.sprite.visible = this.theme.aura;
       group.add(aura.sprite);

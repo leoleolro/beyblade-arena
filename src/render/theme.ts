@@ -132,6 +132,14 @@ export interface Theme {
   toon: boolean;
   /** Energy aura sprite around each top, swelling with spin and flaring on hits. */
   aura: boolean;
+  /**
+   * Aura opacity multiplier. 1 is the value the effect was authored at.
+   *
+   * Below 1 only where a bloom pass is already supplying the glow — see
+   * `Aura.setStrength` for why an additive sprite that "frames" the top in one
+   * theme swallows it whole in another.
+   */
+  auraStrength: number;
   /** Radial speed lines over the whole screen when the action is fast. */
   speedLines: boolean;
   /** Full-screen white pulse on a heavy clash. */
@@ -197,6 +205,9 @@ export const ARENA: Theme = {
   // The reference case. A dark blue dish and no bloom, so a chrome top has
   // both the contrast and the headroom to be fully reflective.
   envIntensity: 0.85,
+
+  // Unused: this theme has no aura at all.
+  auraStrength: 1,
 
   bodyClass: 'theme-arena',
 };
@@ -291,6 +302,10 @@ export const ANIME: Theme = {
   // almost the same value and the top dissolves into the floor — visible in a
   // match, not a theoretical worry. Darker metal is the whole fix.
   envIntensity: 0.45,
+
+  // Full strength. No bloom here, so the aura is exactly as drawn — and it is
+  // the single strongest anime signal the theme has.
+  auraStrength: 1,
 
   bodyClass: 'theme-anime',
 };
@@ -434,6 +449,11 @@ export const OVERDRIVE: Theme = {
   // posts and the rail — something already at full brightness has nothing left
   // to say.
   envIntensity: 0.3,
+
+  // 0.45. The bloom pass amplifies this sprite far past what it was tuned for:
+  // at full strength the hot core cleared the threshold and bloomed into a blob
+  // with the top invisible inside it.
+  auraStrength: 0.45,
 
   bodyClass: 'theme-overdrive',
 };

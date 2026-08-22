@@ -51,6 +51,20 @@ export interface Aura {
   sprite: THREE.Sprite;
   /** Drive from spin and hit flash each frame. */
   update(spinNorm: number, hitFlash: number, radius: number, boost: number): void;
+  /**
+   * Overall opacity multiplier, set from the theme.
+   *
+   * Exists because "frames the top, never replaces it" was true only in a
+   * theme with no bloom behind it. This sprite is additive, about three times
+   * the top's diameter, and has a hot near-opaque core; run that through
+   * Overdrive's bloom pass and the core clears the threshold, blooms outward,
+   * and swallows the top it was drawn around — reported as a glowing blob you
+   * could not see the beyblade inside.
+   *
+   * Same lesson as the posts, the rail and the metal exposure: in the theme
+   * that already glows, the individual glowing things have to give ground.
+   */
+  setStrength(strength: number): void;
 }
 
 export function buildAura(colour: number): Aura {
@@ -64,6 +78,8 @@ export function buildAura(colour: number): Aura {
     // Otherwise the aura is clipped by the dish it is sitting on.
     depthTest: false,
   });
+
+  let strength = 1;
 
   const sprite = new THREE.Sprite(material);
   // Draw BEFORE the tops, not after. With depthTest off (needed so the dish
@@ -81,7 +97,10 @@ export function buildAura(colour: number): Aura {
       const scale = radius * (2.2 + spinNorm * 0.7 + hitFlash * 1.6 + boost * 0.9);
       sprite.scale.set(scale, scale, 1);
       // Capped well below opaque: the aura frames the top, it never replaces it.
-      material.opacity = Math.min(0.5, energy * 0.34);
+      material.opacity = Math.min(0.5, energy * 0.34) * strength;
+    },
+    setStrength(s: number): void {
+      strength = s;
     },
   };
 }
