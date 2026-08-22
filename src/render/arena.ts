@@ -32,7 +32,6 @@ import type { Aura } from './aura';
 import { contactShadow, noOutline } from './toon';
 import { designByLayer } from './beydex';
 import {
-  MODEL_INK,
   MODEL_TINT,
   finishAsMetal,
   loadTopModel,
@@ -40,6 +39,7 @@ import {
   seatOnOrigin,
 } from './topModels';
 import { renderInked } from './outlineHull';
+import { studioEnvironment } from './environment';
 import { topModelFor } from './topModelIndex';
 
 interface BeyVisual {
@@ -784,7 +784,7 @@ export class ArenaRenderer {
       const model = src.clone(true);
       normaliseToRadius(model, radius);
       seatOnOrigin(model);
-      finishAsMetal(model, MODEL_TINT, MODEL_INK, this.theme.toon);
+      finishAsMetal(model, MODEL_TINT, studioEnvironment(this.renderer));
 
       parts.layer.clear();
       parts.layer.add(model);

@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import {
-  MODEL_INK,
   MODEL_TINT,
   finishAsMetal,
   loadTopModel,
@@ -8,6 +7,7 @@ import {
   seatOnOrigin,
 } from './render/topModels';
 import { renderInked } from './render/outlineHull';
+import { studioEnvironment } from './render/environment';
 import { OutlineEffect } from 'three/examples/jsm/effects/OutlineEffect.js';
 import { buildBeyMesh } from './render/beyMesh';
 import { BEY_PRESETS } from './render/beydex';
@@ -70,7 +70,7 @@ void loadTopModel('models/wonder_valtryek_beyblade/scene.gltf').then((src) => {
   g.add(src.clone(true));
   normaliseToRadius(g, 0.1066);
   seatOnOrigin(g);
-  finishAsMetal(g, MODEL_TINT, MODEL_INK, true);
+  finishAsMetal(g, MODEL_TINT, studioEnvironment(renderer));
   const box = new THREE.Box3().setFromObject(g);
   const size = new THREE.Vector3();
   box.getSize(size);

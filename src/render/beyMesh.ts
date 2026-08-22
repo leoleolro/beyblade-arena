@@ -3,7 +3,6 @@ import type { BeyBuild } from '../sim/types';
 import { skinMaterial } from './skins';
 import type { Skin } from './skins';
 import { metalToonMaterial, noOutline, setOutline, toonMaterial } from './toon';
-import { weldInkNormals } from './outlineHull';
 import type { MetalToonOptions } from './toon';
 import { beastEmblem, designByLayer } from './beydex';
 import type { BeyDesign, BladeStyle } from './beydex';
@@ -77,24 +76,30 @@ export interface BeyParts {
  * userData.parts / partY / ring / layerMat, and the tip at local origin.
  */
 export function buildBeyMesh(build: BeyBuild, skin: Skin, toon = false): THREE.Group {
-  if (!toon) return buildClassicBey(build, skin);
-
-  const group = buildToonBey(build, skin);
-
-  // WELD THE INK NORMALS ONCE THE WHOLE TOP EXISTS, because the outline hull is
-  // the one thing here that cares about a vertex's neighbours rather than about
-  // the vertex. Every part of a toon top is an extrusion or a lathe with hard
-  // bevels, which means a shared position holding two normals at ninety degrees
-  // at every one of those bevels — and three's inverted hull pushes each of
-  // those two vertices its own way, so the shell splits open along every edge
-  // and the black backfaces show through. That is the comb of shards around the
-  // rim that has been reported repeatedly and survived two thickness fixes.
+  // A TOP IS METAL IN EVERY THEME, and `toon` no longer reaches it.
   //
-  // The averaged set is used by the outline pass and by nothing else, so the
-  // hard normals that give these parts their faceted, moulded read are exactly
-  // as hard as they were. See outlineHull.ts.
-  weldInkNormals(group);
-  return group;
+  // The owner's framing, which settles a question this file had been answering
+  // the other way: "i am ok with beyblades being 3d and shiny metallic looking,
+  // the anime is just an arena and battlefield effect." A theme dresses the
+  // world the fight happens in — dish, rail, lighting, impact frames, speed
+  // lines — and the hardware stays hardware. That is also how the source
+  // material reads: the beys are rendered objects sitting in a stylised scene,
+  // not drawings.
+  //
+  // What this deletes, stated plainly so nobody has to rediscover it: the cel
+  // path put ink outlines on tops, and inverted-hull ink on a hard-edged mesh
+  // tears open at every bevel and sprays black shards across the model. That
+  // was reported repeatedly, survived two thickness fixes, and was eventually
+  // fixed properly with welded ink normals (`outlineHull.ts`). Deciding that
+  // tops are never inked removes the entire class of problem rather than
+  // managing it — the fix stays in the tree for the stadium, which still draws
+  // linework, but no top asks for a hull any more.
+  //
+  // `toon` is kept in the signature. Callers pass the theme flag and the
+  // parameter is the honest place to reintroduce a difference if tops ever want
+  // one again; dropping it would churn four call sites to say the same thing.
+  void toon;
+  return buildClassicBey(build, skin);
 }
 
 // ---------------------------------------------------------------------------
@@ -381,7 +386,25 @@ const TOON = {
   layerDepth: 0.3,
 } as const;
 
-function buildToonBey(build: BeyBuild, skin: Skin): THREE.Group {
+/**
+ * The cel construction. **Currently unreached** — `buildBeyMesh` always builds
+ * the metal top now, on the decision that a theme dresses the arena and not the
+ * hardware.
+ *
+ * Exported rather than deleted, and that is a judgement with an expiry date.
+ * This is several hundred lines of anime layer construction — tiered bevels,
+ * moulded wave caps, sticker faces, per-design blade grammar — built over many
+ * passes against specific feedback, and the decision that retired it is a taste
+ * call made in one sentence that the owner may well reverse on seeing a match.
+ * Deleting working art code to satisfy a linter, hours after the decision, is
+ * the kind of tidiness that costs a week if the wind changes.
+ *
+ * The expiry date is real though: if metal tops are still the answer once the
+ * owner has played a few matches in every theme, delete this and its helpers
+ * rather than leaving a second renderer nobody exercises. It is in the README's
+ * Known gaps as exactly that.
+ */
+export function buildToonBey(build: BeyBuild, skin: Skin): THREE.Group {
   const group = new THREE.Group();
   const driverGroup = new THREE.Group();
   const discGroup = new THREE.Group();

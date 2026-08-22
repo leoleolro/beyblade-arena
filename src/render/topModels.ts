@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
-import { metalToonMaterial, setOutline } from './toon';
-import { weldInkNormals } from './outlineHull';
+import { noOutline } from './toon';
+import { applyEnvironment } from './environment';
 
 /**
  * Imported beyblade models — a whole top per file.
@@ -47,20 +47,10 @@ export type ModelFormat = 'glb' | 'gltf' | 'stl';
  *
  * Near-white rather than a design colour, on the owner's read of the first
  * model: bare machined metal is the look, and tinting it toward a bey's palette
- * turns it back into painted plastic. The banded specular and fresnel rim in
- * `metalToonMaterial` supply all the colour it needs.
+ * turns it back into painted plastic. The arena's own lighting supplies all
+ * the colour it needs.
  */
 export const MODEL_TINT = 0xd8dde3;
-
-/**
- * Imported tops carry the silhouette ink weight, being one solid object.
- *
- * Lives here rather than at a call site because there are three of them — the
- * arena, the garage preview and the inspector — and they had drifted: the
- * garage was passing 0, which is a top with no line on it standing next to
- * procedural tops that have one. One number, one meaning, three callers.
- */
-export const MODEL_INK = Number(new URLSearchParams(location.search).get('ink') ?? 0.02);
 
 const formatOf = (url: string): ModelFormat =>
   url.endsWith('.stl') ? 'stl' : url.endsWith('.gltf') ? 'gltf' : 'glb';
@@ -165,52 +155,49 @@ export function seatOnOrigin(obj: THREE.Object3D): void {
 export function finishAsMetal(
   obj: THREE.Object3D,
   tint: number,
-  outline: number,
-  toon: boolean,
+  env: THREE.Texture | null = null,
 ): void {
-  // MATCH THE THEME'S SHADING MODEL, which is not optional dressing.
+  // ONE FINISH, EVERY THEME. This used to branch on `toon` and hand back cel
+  // metal for the cartoon theme, which was the wrong axis to vary on: a top is
+  // hardware in all three themes, and the theme dresses the arena around it.
   //
-  // Applying cel metal everywhere was the first attempt and it looked wrong in
-  // both directions at once: in the lit themes a MeshToonMaterial renders in
-  // flat bands with no real specular, so machined metal came out as a pale
-  // paper cut-out; and in Overdrive the emissive lift that makes cel metal
-  // glow, plus bloom, plus the per-top point light, drove the whole model to a
-  // solid white blob with no readable geometry at all.
+  // The cel branch also never worked in either direction. `MeshToonMaterial`
+  // renders in flat bands with no real specular, so machined metal came out as
+  // a pale paper cut-out; and the emissive lift that makes cel metal glow, plus
+  // bloom, drove the whole model to a white blob with no readable geometry.
   //
-  // So: cel metal where the world is cel-shaded, and a genuinely reflective
-  // MeshStandardMaterial where the world is lit — which is where a real
-  // specular highlight is available and is exactly what sells "shiny".
-  //
-  // Emissive is ZERO either way. An imported top is lit by the arena like
-  // everything else; a self-lit one cannot be shaded, and under bloom it stops
-  // being an object.
-  const mat = toon
-    ? metalToonMaterial(tint, { gloss: 46, specular: 0.4, rim: 0.3 })
-    : new THREE.MeshStandardMaterial({
-        color: tint,
-        metalness: 0.92,
-        roughness: 0.28,
-      });
+  // Emissive is ZERO. An imported top is lit by the arena like everything else;
+  // a self-lit one cannot be shaded, and under bloom it stops being an object.
+  const mat = new THREE.MeshStandardMaterial({
+    color: tint,
+    metalness: 0.92,
+    roughness: 0.28,
+  });
 
-  // AN IMPORTED TOP IS INKED LIKE EVERYTHING ELSE, and getting back to that
-  // took the fix in outlineHull.ts. It was un-inked for a while — the whole
-  // model came out plastered in black shards, one per hard edge, because
-  // three's inverted hull pushes every vertex along its OWN normal and this
-  // mesh has 98.1% of its positions carrying more than one. Turning the ink off
-  // removed the shards by removing the line, which left the imported top as the
-  // one object in a fully cel-shaded scene with no outline on it.
+  // NO INK, and this is now a decision rather than a workaround.
   //
-  // Welded ink normals fix the cause instead, so the ink can come back at the
-  // silhouette weight the procedural tops use. See `weldInkNormals` below and
-  // the block comment in outlineHull.ts.
-  setOutline(mat, { thickness: outline });
+  // The history is worth keeping because it was expensive. Inking an imported
+  // top plastered it in black shards — three's inverted hull pushes every
+  // vertex along its OWN normal, and this mesh has 98.1% of its positions
+  // carrying more than one, so the hull tears open at every edge. That got
+  // fixed properly with welded ink normals, and the fix works. Then the ink
+  // came back at silhouette weight and the top read as a black blob in a live
+  // match, because outline thickness is SCREEN-space: 0.02 is a fine line
+  // around a top filling the inspector and a solid mass around one 60px wide.
+  //
+  // Owner's verdict on seeing both: "it looked much nicer without the outlines".
+  // So imported tops are not inked at any weight, and the shard fix stays in
+  // the tree for geometry that still draws linework.
+  noOutline(mat);
+
+  // Without this the material is a black rock. A metal's colour IS its
+  // reflection, so at metalness 0.92 there is nothing to see until something is
+  // being reflected — see environment.ts, which is where that is explained and
+  // where the decision not to light the whole scene with it lives.
+  if (env) applyEnvironment(mat, env);
+
   obj.traverse((child) => {
     const mesh = child as THREE.Mesh;
     if (mesh.isMesh) mesh.material = mat;
   });
-
-  // Only the cel themes draw a hull at all, and the welded set costs a
-  // Float32Array per geometry plus a GPU buffer nothing binds. No reason to
-  // build it for a theme that will never ask for it.
-  if (toon) weldInkNormals(obj);
 }

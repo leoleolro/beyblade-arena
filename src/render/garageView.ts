@@ -5,7 +5,6 @@ import type { BeyParts } from './beyMesh';
 import { skinById } from './skins';
 import { themeById } from './theme';
 import {
-  MODEL_INK,
   MODEL_TINT,
   finishAsMetal,
   loadTopModel,
@@ -13,6 +12,7 @@ import {
   seatOnOrigin,
 } from './topModels';
 import { renderInked } from './outlineHull';
+import { studioEnvironment } from './environment';
 import { topModelFor } from './topModelIndex';
 import type { BeyBuild } from '../sim/types';
 
@@ -166,7 +166,7 @@ export class GarageView {
         const model = src.clone(true);
         normaliseToRadius(model, build.layer.radius);
         seatOnOrigin(model);
-        finishAsMetal(model, MODEL_TINT, MODEL_INK, this.toon);
+        finishAsMetal(model, MODEL_TINT, studioEnvironment(this.renderer));
         parts.layer.clear();
         parts.layer.add(model);
         parts.disc.visible = false;
