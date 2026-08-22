@@ -64,6 +64,14 @@ export class GarageView {
    * flight at once and the slower one must not win.
    */
   private modelToken = 0;
+
+  /**
+   * Whether an imported model is currently standing in for the whole build.
+   *
+   * Drives `layout`: a model is one object, so it is neither exploded into
+   * three parts nor framed from the procedural part heights.
+   */
+  private modelled = false;
   private readonly hemi: THREE.HemisphereLight;
   private readonly key: THREE.DirectionalLight;
   private readonly fill: THREE.PointLight;
@@ -144,6 +152,10 @@ export class GarageView {
 
     const skin = skinById(skinId);
     this.toon = themeById(themeId).toon;
+    // Cleared on every rebuild: the previous bey may have had a model and
+    // this one may not, and a stale true would un-explode a procedural stack.
+    this.modelled = false;
+
     const mesh = buildBeyMesh(build, skin, this.toon);
     this.mesh = mesh;
     this.parts = mesh.userData.parts as BeyParts;
@@ -177,6 +189,7 @@ export class GarageView {
         parts.layer.add(model);
         parts.disc.visible = false;
         parts.driver.visible = false;
+        this.modelled = true;
         this.layout();
       });
     }
@@ -219,6 +232,55 @@ export class GarageView {
    */
   private layout(): void {
     if (!this.parts || !this.mesh) return;
+
+    // AN IMPORTED TOP IS NOT AN EXPLODED VIEW, so it must not be laid out like
+    // one. This preview pulls the three parts apart to show a build as a stack,
+    // and frames the camera from `userData.partY` — the authored heights of the
+    // procedural layer, disc and driver.
+    //
+    // A model replaces all three with one object, and both halves of that then
+    // go wrong at once: the layer group is still shifted up by SEPARATION even
+    // though there is nothing below it to separate from, so the top floats
+    // above centre; and the camera distance is still derived from part heights
+    // that are no longer on screen, so it sits at whatever size an unrelated
+    // stack would have needed. The result is a small, off-centre top, which is
+    // exactly how it looked.
+    //
+    // So when a model is showing, the parts are not exploded and the frame is
+    // measured from the object actually being drawn.
+    if (this.modelled) {
+      this.parts.driver.position.y = 0;
+      this.parts.disc.position.y = 0;
+      this.parts.layer.position.y = 0;
+
+      // MEASURED FROM THE LAYER GROUP, not from the whole mesh, because
+      // `Box3.setFromObject` walks the graph without consulting `visible`. The
+      // disc and driver are hidden rather than removed when a model takes over,
+      // so measuring the mesh silently includes two invisible parts — which
+      // inflated the box and pushed the centre off.
+      //
+      // AND MEASURED FROM A ZEROED ROOT, because `setFromObject` returns a
+      // WORLD-space box: with the root still carrying the offset the previous
+      // layout computed, the measurement came back displaced by it and the new
+      // centre inherited the old one's error. Zero first, refresh the matrices,
+      // then measure — the render loop puts the offset back.
+      this.root.position.y = 0;
+      this.root.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(this.parts.layer);
+      if (box.isEmpty()) return;
+      const size = box.getSize(new THREE.Vector3());
+      this.centreY = (box.min.y + box.max.y) / 2;
+
+      // Fit the WIDER of the two axes the camera can run out of. A top is much
+      // wider than it is tall, so framing on height alone would push a wide
+      // layer straight off the sides.
+      const fovY = (this.camera.fov * Math.PI) / 180;
+      const need = Math.max(size.y, size.x / this.camera.aspect) * 1.6;
+      this.camera.position.set(0, 0, need / 2 / Math.tan(fovY / 2));
+      this.camera.lookAt(0, 0, 0);
+      return;
+    }
+
     this.parts.driver.position.y = -SEPARATION;
     this.parts.disc.position.y = 0;
     this.parts.layer.position.y = SEPARATION;
