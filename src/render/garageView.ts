@@ -5,7 +5,6 @@ import type { BeyParts } from './beyMesh';
 import { skinById } from './skins';
 import { themeById } from './theme';
 import {
-  MODEL_TINT,
   finishImported,
   loadTopModel,
   normaliseToRadius,
@@ -180,7 +179,7 @@ export class GarageView {
         seatOnOrigin(model);
         finishImported(
           model,
-          MODEL_TINT,
+          themeById(themeId).modelTint,
           studioEnvironment(this.renderer),
           entry.finish,
           themeById(themeId).envIntensity,

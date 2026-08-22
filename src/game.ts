@@ -125,7 +125,8 @@ export class Game {
   /** The rival's spin for this match, shown in the HUD. */
   rivalSpinDir: 1 | -1 = -1;
 
-  private ai = new AiController(AI_ID, 'blader');
+  /** Public so dev tools can step a round by hand. See momentSheet.ts. */
+  readonly ai = new AiController(AI_ID, 'blader');
   /** Public so the `?shot` console helper in main.ts can force a snapshot. */
   readonly renderer: ArenaRenderer;
   private lastTime = 0;
@@ -445,6 +446,18 @@ export class Game {
     requestAnimationFrame(this.tick);
   }
 
+  /**
+   * Stop driving frames. `start()` resumes.
+   *
+   * `running` guarded nothing but a double-`start()` before this existed; the
+   * loop re-scheduled itself unconditionally. The flag now means what it says,
+   * which is what lets a tool step the sim by hand without the live loop
+   * interleaving its own frames — see momentSheet.ts.
+   */
+  stop(): void {
+    this.running = false;
+  }
+
   private tick = (now: number): void => {
     const dt = Math.min((now - this.lastTime) / 1000, 0.1);
     this.lastTime = now;
@@ -544,7 +557,7 @@ export class Game {
     const contacts = this.screen === 'battle' ? this.battle.contacts : EMPTY_HITS;
     this.renderer.update(this.battle.beys, hits, renderDt, contacts);
     this.events.onFrame();
-    requestAnimationFrame(this.tick);
+    if (this.running) requestAnimationFrame(this.tick);
   };
 }
 

@@ -123,6 +123,21 @@ export interface Theme {
   envIntensity: number;
 
   /**
+   * Base colour for an imported top's metal in this theme.
+   *
+   * A second dial alongside `envIntensity` because they fix different halves of
+   * the same problem. Exposure decides how hard the environment reflects;
+   * this decides how bright the metal is before anything reflects off it at
+   * all, and near-white metal clips under a bloom pass no matter how little it
+   * is reflecting.
+   *
+   * The reference capture for Overdrive is unambiguous: a top there is a DARK
+   * body with bright rims and a pool beneath. Ours was a pale chrome object
+   * with a point light at point-blank range, which is a ball of light.
+   */
+  modelTint: number;
+
+  /**
    * Cel shading: banded lighting and a hard outline on every silhouette.
    *
    * This is the switch that turns the game from "3D" into "cartoon". It changes
@@ -208,6 +223,10 @@ export const ARENA: Theme = {
 
   // Unused: this theme has no aura at all.
   auraStrength: 1,
+
+  // Bright chrome on a dark dish with no bloom: the case the finish was
+  // authored for, and it reads perfectly.
+  modelTint: 0xd8dde3,
 
   bodyClass: 'theme-arena',
 };
@@ -306,6 +325,10 @@ export const ANIME: Theme = {
   // Full strength. No bloom here, so the aura is exactly as drawn — and it is
   // the single strongest anime signal the theme has.
   auraStrength: 1,
+
+  // Stepped down against a near-white polycarbonate dish. Pale metal on a
+  // pale bowl has no contrast left to lose.
+  modelTint: 0xb3bcc7,
 
   bodyClass: 'theme-anime',
 };
@@ -450,10 +473,28 @@ export const OVERDRIVE: Theme = {
   // to say.
   envIntensity: 0.3,
 
-  // 0.45. The bloom pass amplifies this sprite far past what it was tuned for:
-  // at full strength the hot core cleared the threshold and bloomed into a blob
-  // with the top invisible inside it.
-  auraStrength: 0.45,
+  // 0.14 — very nearly off, and the reference capture is the reason.
+  //
+  // The aura is a camera-facing sprite about three times the top's diameter,
+  // additive, with a near-opaque core. That is a GLOWING BALL centred on the
+  // bey, and it is not what this theme's reference looks like: there, a top is
+  // a dark body with a tight bright pool at its tip and no halo around it at
+  // all. Drama comes from a dark object being suddenly lit.
+  //
+  // Which is also why the clash read badly. Filmstripped with momentSheet, the
+  // impact frame was one white wash across half the dish with neither bey
+  // visible inside it — because both tops were ALREADY glowing balls before
+  // they met, so the collision had nothing left to add. An effect can only
+  // mark an event if the state before it was quieter.
+  //
+  // Not zero: at 0.14 it still swells with spin and flares on contact, which
+  // is a real read on how much fight is left. It just stops being the object.
+  auraStrength: 0.14,
+
+  // Dark steel, matching the reference: the body stays dark and the rim and
+  // the pool beneath do the talking. At 0xd8dde3 the whole top sat above the
+  // 0.7 bloom threshold and bloomed into a featureless ball.
+  modelTint: 0x79828f,
 
   bodyClass: 'theme-overdrive',
 };

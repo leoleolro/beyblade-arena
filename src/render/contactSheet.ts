@@ -9,7 +9,7 @@ import { THEMES } from './theme';
 import type { Theme } from './theme';
 import { renderInked } from './outlineHull';
 import { studioEnvironment } from './environment';
-import { finishImported, loadTopModel, MODEL_TINT, normaliseToRadius, seatOnOrigin } from './topModels';
+import { finishImported, loadTopModel, normaliseToRadius, seatOnOrigin } from './topModels';
 import { topModelFor } from './topModelIndex';
 import { LAYERS, makeBuild } from '../sim/parts';
 
@@ -110,7 +110,7 @@ async function buildCell(
       seatOnOrigin(model);
       finishImported(
         model,
-        MODEL_TINT,
+        cell.theme.modelTint,
         studioEnvironment(gl),
         entry.finish,
         cell.theme.envIntensity,
@@ -235,5 +235,5 @@ export async function showContactSheet(layerIds?: string[]): Promise<void> {
   img.src = url;
   img.style.cssText = 'display:block;width:100%;height:auto';
   document.body.appendChild(img);
-  await img.decode();
+  // Not awaited: a backgrounded tab never decodes, and the sheet is already up.
 }

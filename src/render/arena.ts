@@ -32,7 +32,6 @@ import type { Aura } from './aura';
 import { contactShadow, noOutline } from './toon';
 import { designByLayer } from './beydex';
 import {
-  MODEL_TINT,
   finishImported,
   loadTopModel,
   normaliseToRadius,
@@ -794,7 +793,25 @@ export class ArenaRenderer {
       // top staying dark above it. That is a light sitting just off the floor,
       // raking up. y = 0.03 puts it there, and the same intensity now spends
       // itself on the dish rather than on the top's own interior.
-      const light = new THREE.PointLight(skin.primary, this.theme.beyLightIntensity, 1.6);
+      // FALLOFF 0.34, NOT 1.6, and this one number was the glowing-ball bug.
+      //
+      // 1.6 world units is larger than the dish, so what the comment called a
+      // per-top light was in practice a floodlight: it lit its own top from
+      // point-blank range, the opponent, and the whole floor. Two of them
+      // turned both beys into balls of light, and a clash then had nothing to
+      // add — filmstripped with momentSheet, the impact frame was one white
+      // wash with neither bey visible inside it.
+      //
+      // Proved by isolation rather than argued: zeroing ONLY these lights, with
+      // the aura, the bloom, the metal and everything else untouched, turned
+      // both tops back into readable objects immediately.
+      //
+      // Zero is still wrong — the reference has a distinct bright pool under
+      // each top, and that pool is this light. What it needs is a radius near
+      // the top's own, so it lights the floor it stands on and rakes the body
+      // from beneath, and reaches nothing else. 0.34 is about three times a
+      // top's radius.
+      const light = new THREE.PointLight(skin.primary, this.theme.beyLightIntensity, 0.34);
       light.position.y = 0.03;
       group.add(light);
 
@@ -865,7 +882,7 @@ export class ArenaRenderer {
       const model = src.clone(true);
       normaliseToRadius(model, radius);
       seatOnOrigin(model);
-      finishImported(model, MODEL_TINT, studioEnvironment(this.renderer), entry.finish, this.theme.envIntensity);
+      finishImported(model, this.theme.modelTint, studioEnvironment(this.renderer), entry.finish, this.theme.envIntensity);
 
       parts.layer.clear();
       parts.layer.add(model);

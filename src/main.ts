@@ -3,6 +3,8 @@ import { Game } from './game';
 import { Ui } from './ui';
 import { applyUnlockAll, unlockMode } from './devUnlock';
 import { showContactSheet } from './render/contactSheet';
+import { showMoment } from './momentSheet';
+import type { Moment } from './momentSheet';
 import type { MoveKind } from './sim/types';
 
 const canvas = document.getElementById('arena') as HTMLCanvasElement;
@@ -90,6 +92,11 @@ Object.assign(window as unknown as Record<string, unknown>, { game, ui });
  */
 Object.assign(window as unknown as Record<string, unknown>, {
   __sweep: (ids?: string[]): Promise<void> => showContactSheet(ids),
+  /**
+   * A filmstrip of a clash or a launch, stepped by hand out of the current
+   * round. Needs `?shot` and a round in progress. See momentSheet.ts.
+   */
+  __moment: (which: Moment = 'clash'): Promise<void> => showMoment(game, which),
 });
 
 Object.assign(window as unknown as Record<string, unknown>, {
