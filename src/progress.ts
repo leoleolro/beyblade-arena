@@ -67,6 +67,21 @@ const fresh = (): ProgressData => ({
 export class Progress {
   data: ProgressData;
 
+  /**
+   * Suppress every write, for the session-only dev unlock.
+   *
+   * It lives here rather than at the call site because "just don't call save()"
+   * is not something the caller can promise. Granting everything and skipping
+   * the save looked airtight and was not: the shop rolls its offer lazily on
+   * first read and saves it, so simply opening the garage wrote the granted
+   * roster to disk, and reloading without the flag showed a career with all
+   * eleven layers and the ladder cleared. Verified by doing exactly that.
+   *
+   * One flag on the object that owns the storage is the only version of this
+   * that cannot be defeated by a save path nobody remembered.
+   */
+  ephemeral = false;
+
   constructor() {
     this.data = Progress.load();
   }
@@ -101,6 +116,7 @@ export class Progress {
   }
 
   save(): void {
+    if (this.ephemeral) return;
     try {
       localStorage.setItem(KEY, JSON.stringify(this.data));
     } catch {

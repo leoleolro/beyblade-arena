@@ -467,6 +467,24 @@ kbd {
   font-size: 13px;
 }
 
+/* A developer door, deliberately quiet: findable when you are looking for it,
+   not competing with Play when you are not. */
+.home-tools {
+  margin: 10px 0 0;
+  font-size: 12px;
+  opacity: 0.55;
+}
+
+.home-tools a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.home-tools:hover {
+  opacity: 0.9;
+}
+
 .slot {
   margin-bottom: 18px;
 }

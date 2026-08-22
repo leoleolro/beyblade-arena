@@ -752,6 +752,21 @@ export class Ui {
       'New here? How to play takes about a minute and covers the one thing that decides most battles.';
     panel.appendChild(hint);
 
+    // The bey inspector, which until now was a page you had to know the
+    // filename of. It is a real part of the build and the fastest way to judge
+    // whether a top actually looks right — every model change gets checked
+    // there — so hiding it behind "remember it is called inspect.html" was
+    // costing time on every single visual pass.
+    //
+    // A plain link rather than a button: it navigates to another page, and a
+    // link is the control that says so, including to middle-click and to
+    // screen readers.
+    const tools = document.createElement('p');
+    tools.className = 'sub home-tools';
+    tools.innerHTML =
+      `<a href="inspect.html">Bey inspector</a> — every top, up close, on a turntable`;
+    panel.appendChild(tools);
+
     overlay.appendChild(panel);
     return overlay;
   }

@@ -1,6 +1,7 @@
 import './style.css';
 import { Game } from './game';
 import { Ui } from './ui';
+import { applyUnlockAll, unlockMode } from './devUnlock';
 import type { MoveKind } from './sim/types';
 
 const canvas = document.getElementById('arena') as HTMLCanvasElement;
@@ -15,6 +16,17 @@ const game = new Game(canvas, {
   onImpactFlash: (strength) => ui.impactFlash(strength),
   onPerfectLaunch: () => ui.showPerfectLaunch(),
 });
+
+// Before the first render, so the garage is built against the granted roster
+// rather than rebuilt after it. See devUnlock.ts for why the default form of
+// this deliberately never touches the saved career.
+const mode = unlockMode();
+if (applyUnlockAll(game.progress, mode)) {
+  console.info(
+    `[dev] unlock=${mode} — every part, skin and rung granted.` +
+      (mode === 'session' ? ' Not saved; reload without ?unlock to get your career back.' : ' SAVED.'),
+  );
+}
 
 ui = new Ui(uiRoot, game);
 ui.render();
