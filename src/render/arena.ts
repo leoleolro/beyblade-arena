@@ -210,7 +210,15 @@ export class ArenaRenderer {
   readonly camera: THREE.PerspectiveCamera;
   private readonly renderer: THREE.WebGLRenderer;
   private readonly sparks = new SparkBurst();
-  private readonly impactFrame = new ImpactFrame();
+  /**
+   * The manga cut.
+   *
+   * Public so a dev tool can trigger one directly. It is a DOM overlay, so the
+   * canvas filmstrip cannot capture it, and it is deliberately the rarest thing
+   * the game draws — only a crit or a perfect block earns one — which together
+   * mean the only way to look at it was to play until one happened by luck.
+   */
+  readonly impactFrame = new ImpactFrame();
   /** Scratch for projecting hit points to the screen; no per-hit allocation. */
   private readonly projected = new THREE.Vector3();
   /** Scratch for the drain stream's direction; no per-frame allocation. */

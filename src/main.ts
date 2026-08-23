@@ -93,10 +93,30 @@ Object.assign(window as unknown as Record<string, unknown>, { game, ui });
 Object.assign(window as unknown as Record<string, unknown>, {
   __sweep: (ids?: string[]): Promise<void> => showContactSheet(ids),
   /**
-   * A filmstrip of a clash or a launch, stepped by hand out of the current
-   * round. Needs `?shot` and a round in progress. See momentSheet.ts.
+   * A filmstrip of a clash, launch or defeat, stepped by hand out of the
+   * current round. Needs `?shot` and a round in progress. See momentSheet.ts.
    */
   __moment: (which: Moment = 'clash'): Promise<void> => showMoment(game, which),
+
+  /**
+   * Fire a manga impact frame on demand, so it can be looked at.
+   *
+   * It is a DOM overlay rather than canvas, so `__moment` cannot film it, and
+   * only a crit or a perfect block earns one in play — well under one a round
+   * by design. Between those two facts the effect was unreviewable without
+   * grinding matches and hoping. Call it and take an ordinary screenshot.
+   *
+   * `crit` picks from the heavier compositions; the position is where on
+   * screen the clash was, in percent.
+   */
+  __manga(crit = true, x = 50, y = 48): void {
+    game.renderer.impactFrame.trigger(x, y, {
+      strength: crit ? 3.1 : 2.0,
+      crit,
+      colourA: '#4d8dff',
+      colourB: '#ffb020',
+    });
+  },
 });
 
 Object.assign(window as unknown as Record<string, unknown>, {

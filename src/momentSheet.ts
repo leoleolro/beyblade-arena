@@ -19,6 +19,13 @@ import * as C from './sim/constants';
  * before/after comparison is a real comparison.
  *
  * Requires `?shot` in the URL — see `ArenaRenderer.snapshot`.
+ *
+ * WHAT IT CANNOT FILM, so nobody adds it and wonders why the strip is empty:
+ * anything drawn outside the WebGL canvas. `snapshot` reads the canvas, and the
+ * manga impact frame, the finisher title card, the speed lines and the whole
+ * HUD are DOM overlays — they would come back missing rather than wrong, which
+ * is the worse failure. Those need `__manga()` and an ordinary screenshot; see
+ * main.ts.
  */
 
 const STEP = 1 / 60;

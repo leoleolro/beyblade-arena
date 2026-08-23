@@ -44,7 +44,13 @@ mobile GPUs. Then, in the console:
 | `__moment('clash')` | A filmstrip of a heavy hit, stepped out of the running round frame by frame. Deterministic, so before/after is a real comparison. |
 | `__moment('launch')` | The same for the entry drop. It starts the round itself, because the drop is over 21 frames in and cannot be waited for. |
 | `__moment('burst')` / `__moment('ringout')` | The two defeat animations. How a round ends is not something you can ask for, so these replay rounds until they get the one they want. |
+| `__manga()` | Fires a manga impact frame on demand. It is a DOM overlay so the filmstrip cannot capture it, and only a crit or a perfect block earns one in play — so it was unreviewable without grinding matches and hoping. |
 | `__shot('name')` | Downloads the current frame, for `docs/design-targets/`. |
+
+`__moment` reads the WebGL canvas, so it cannot film anything drawn outside it
+— the manga cut, the finisher card, the speed lines and the HUD are all DOM.
+Those come back *missing* rather than wrong, which is the worse failure, so use
+`__manga()` and an ordinary screenshot instead.
 
 `__sweep` found a bug nobody had reported within a minute of existing, and
 `__moment` is what identified a per-top light with a falloff wider than the
