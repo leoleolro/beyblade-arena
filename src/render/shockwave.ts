@@ -84,6 +84,7 @@ export class Shockwave {
   private readonly delay: number[] = [];
   private readonly peak: number[] = [];
   private cursor = 0;
+  private ink = false;
 
   constructor() {
     const geo = new THREE.PlaneGeometry(1, 1);
@@ -121,6 +122,41 @@ export class Shockwave {
    * is a finisher; one is available but reads as a bubble and is only right for
    * something that genuinely is a single pulse.
    */
+  /**
+   * Glow or ink.
+   *
+   * ADDITIVE IS ONLY RIGHT ON A DARK FLOOR. These rings are drawn additively
+   * and spawned near-white, which is invisible on the Anime theme's near-white
+   * polycarbonate dish — filmstripped, a heavy clash there produced a few
+   * specks and no ring at all, in the one theme whose whole identity is impact
+   * drama. Additive light cannot darken, so no colour choice fixes it while the
+   * blending stays.
+   *
+   * In ink mode the ring blends normally and takes a dark colour, which is how
+   * a drawn medium shows a shockwave in the first place: a line, not a glow.
+   */
+  setInk(ink: boolean): void {
+    this.ink = ink;
+    for (const mesh of this.rings) {
+      const mat = mesh.material as THREE.MeshBasicMaterial;
+      mat.blending = ink ? THREE.NormalBlending : THREE.AdditiveBlending;
+      mat.needsUpdate = true;
+    }
+  }
+
+  /**
+   * Opacity multiplier, because ink and glow do not read at the same alpha.
+   *
+   * The peaks every caller passes were chosen against ADDITIVE blending, where
+   * 0.26 of near-white on a dark floor is a clearly visible front. The same
+   * 0.26 of dark navy blended normally over a near-white dish is a pale grey
+   * smudge — technically present, not actually an effect. 2.1x lands it at
+   * roughly the same perceived contrast against its own background.
+   */
+  private inkGain(): number {
+    return this.ink ? 2.1 : 1;
+  }
+
   spawn(at: THREE.Vector3, colour: number, scale: number, fronts = 2, peak = 0.5): void {
     for (let f = 0; f < fronts; f++) {
       const i = this.cursor;
@@ -170,7 +206,7 @@ export class Shockwave {
       mesh.scale.setScalar(r);
       // Peaks IN FLIGHT. sin(pi*t) is zero at both ends, so a front is never
       // visible at its smallest and never lingers at its largest.
-      mat.opacity = Math.sin(Math.PI * t) * this.peak[i];
+      mat.opacity = Math.min(1, Math.sin(Math.PI * t) * this.peak[i] * this.inkGain());
     }
   }
 }

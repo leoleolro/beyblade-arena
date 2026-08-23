@@ -434,6 +434,7 @@ export class ArenaRenderer {
     this.rimB.intensity = t.rimBIntensity;
 
     this.sparks.setStyle(t.sparkColour, t.sparkSize);
+    this.shockwaves.setInk(t.shockwaveInk !== null);
     for (const v of this.visuals.values()) {
       v.trail.setOpacity(t.trailOpacity);
       v.light.intensity = t.beyLightIntensity;
@@ -1122,7 +1123,9 @@ export class ArenaRenderer {
         // most visible thing in the restored theme and it was not an effect
         // anyone would recognise as a touchdown. Landing is a small, sharp
         // event; the ring should sit under the top, not cross the arena.
-        if (this.theme.shockwave) this.shockwaves.spawn(at, 0xffffff, 0.55, 1, 0.22);
+        if (this.theme.shockwave) {
+          this.shockwaves.spawn(at, this.theme.shockwaveInk ?? 0xffffff, 0.55, 1, 0.22);
+        }
         this.sparks.spawn(at, 3.0, 40);
       }
       this.shake = Math.max(this.shake, 0.05);
@@ -1235,7 +1238,14 @@ export class ArenaRenderer {
         // sim has computed perfectBlock since the move triangle landed and
         // nothing has ever drawn it: the one exchange that rewards reading the
         // opponent looked exactly like a lucky bump.
-        const colour = h.perfectBlock ? 0x7dd3fc : h.crit ? 0xfff0a0 : 0xffffff;
+        // In an ink theme the ring is a DRAWN line and takes one colour; the
+        // white/pale palette below only makes sense as additive light on a dark
+        // floor, and on a near-white dish it is invisible whatever the hit was.
+        // The perfect-block and crit distinctions survive in the second ring
+        // and the size, which read on any background.
+        const colour =
+          this.theme.shockwaveInk ??
+          (h.perfectBlock ? 0x7dd3fc : h.crit ? 0xfff0a0 : 0xffffff);
         // Two fronts on an ordinary clash, three on a crit. One expanding
         // circle reads as a bubble; a train reads as waves radiating out.
         // 0.26 peak, not 0.6. Additive white on a bloomed scene saturates almost
@@ -1592,7 +1602,7 @@ export class ArenaRenderer {
         // empty air, which is why it is a hair over rather than double. TWO rings a beat apart carry the extra
         // weight instead of one huge one.
         if (this.theme.shockwave) {
-          this.shockwaves.spawn(at, 0xffffff, 1.05, 3, 0.34);
+          this.shockwaves.spawn(at, this.theme.shockwaveInk ?? 0xffffff, 1.05, 3, 0.34);
         }
         this.sparks.spawn(at, 4.5, 64);
         // Only in themes that already light the arena from the tops. ARENA

@@ -91,6 +91,14 @@ export interface Theme {
   beyLightFlash: number;
   /** Expanding ground ring on a heavy clash. */
   shockwave: boolean;
+  /**
+   * Ink colour for that ring, or null to draw it as additive light.
+   *
+   * A theme with a dark floor wants glow; a theme with a near-white one needs a
+   * drawn line, because additive light cannot darken and a white ring on a
+   * white dish is nothing at all. See `Shockwave.setInk`.
+   */
+  shockwaveInk: number | null;
   /** Crush ambient light for a moment on the decisive blow. */
   finisherBlackout: boolean;
   /** Route through EffectComposer + UnrealBloomPass. Costs a render target. */
@@ -258,6 +266,9 @@ export const ARENA: Theme = {
   topRimColour: 0xffffff,
   topRimStrength: 0,
 
+  // No ring at all in this theme; the value is inert.
+  shockwaveInk: null,
+
   bodyClass: 'theme-arena',
 };
 
@@ -364,6 +375,10 @@ export const ANIME: Theme = {
   // ink outline is already describing every silhouette in the frame.
   topRimColour: 0xffffff,
   topRimStrength: 0,
+
+  // Deep ink, drawn rather than glowed. The dish here is near-white, so the
+  // additive white ring every other theme uses was literally invisible.
+  shockwaveInk: 0x1e2f57,
 
   bodyClass: 'theme-anime',
 };
@@ -523,6 +538,9 @@ export const OVERDRIVE: Theme = {
   // and the body itself stays out of the way.
   topRimColour: 0xa8dcff,
   topRimStrength: 1.15,
+
+  // Dark floor: glow is correct here and the ring reads as pressure.
+  shockwaveInk: null,
 
   bodyClass: 'theme-overdrive',
 };
