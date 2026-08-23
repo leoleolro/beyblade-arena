@@ -28,11 +28,17 @@ const STEP = 1 / 60;
  * THREE, not five. The strip is read by looking at it, and five frames laid
  * across a 1280px window are 160px each — wide enough to see that something
  * happened and far too small to judge whether it looks right, which is the only
- * question being asked. Impact, peak and dissipation is the whole shape of the
- * event; the frames in between were confirming what the ones either side of
- * them already said.
+ * question being asked.
+ *
+ * Per moment, because the two events have very different lengths. A clash is
+ * over in a fifth of a second; the entry drop is ENTRY_TIME = 0.35s of fall
+ * plus a rebound, so sampling it on a clash's schedule photographs the same
+ * instant three times.
  */
-const OFFSETS = [0, 4, 12];
+const OFFSETS: Record<Moment, number[]> = {
+  clash: [0, 4, 12],
+  launch: [0, 10, 22],
+};
 
 /**
  * Give up looking for the event after this many frames.
@@ -61,10 +67,18 @@ interface Frame {
  * effects — which decay on real elapsed seconds — age at the rate they would in
  * a real match rather than at whatever rate the stepping loop happens to run.
  */
-function capture(game: Game, ready: (game: Game) => boolean): Frame[] {
+function capture(game: Game, moment: Moment): Frame[] {
   const shots: Frame[] = [];
-  const battle = game.battle;
+  const spec = MOMENTS[moment];
+  const offsets = OFFSETS[moment];
 
+  // Some moments cannot be waited for, only caused. The entry drop is over
+  // 21 frames after the round starts, so by the time anything is stepping the
+  // sim it has already happened — the only way to film it is to start the
+  // round from in here.
+  spec.prime?.(game);
+
+  const battle = game.battle;
   let found = -1;
   for (let f = 0; f < PATIENCE; f++) {
     if (found < 0) {
@@ -78,15 +92,15 @@ function capture(game: Game, ready: (game: Game) => boolean): Frame[] {
       found < 0 ? battle.contacts : [],
     );
 
-    if (found < 0 && ready(game)) found = f;
+    if (found < 0 && spec.ready(game)) found = f;
 
     if (found >= 0) {
       const since = f - found;
-      if (OFFSETS.includes(since)) {
+      if (offsets.includes(since)) {
         const url = game.renderer.snapshot();
         if (!url) return [];
         shots.push({ label: `+${since}f (${(since * STEP * 1000) | 0}ms)`, url });
-        if (since === OFFSETS[OFFSETS.length - 1]) break;
+        if (since === offsets[offsets.length - 1]) break;
       }
       // Past the event the sim keeps running; only the first frame of the
       // event itself is special.
@@ -99,13 +113,38 @@ function capture(game: Game, ready: (game: Game) => boolean): Frame[] {
   return shots;
 }
 
-const READY: Record<Moment, (game: Game) => boolean> = {
+interface MomentSpec {
+  /** Put the game into the state where the event is about to happen. */
+  prime?: (game: Game) => void;
+  /** True on the frame the event lands. */
+  ready: (game: Game) => boolean;
+}
+
+const MOMENTS: Record<Moment, MomentSpec> = {
   // The frame a genuinely heavy hit lands. HITSTOP_THRESHOLD is the same gate
   // the shockwave and the screen shake use, so this is the moment the game
   // itself considers worth reacting to.
-  clash: (game) => game.battle.hits.some((h) => h.strength >= C.HITSTOP_THRESHOLD),
-  // The first frame after the drop, when both tops have touched down.
-  launch: (game) => game.battle.beys.every((b) => b.age > 0) && game.battle.roundTime > 0.05,
+  clash: {
+    ready: (game) => game.battle.hits.some((h) => h.strength >= C.HITSTOP_THRESHOLD),
+  },
+
+  // The entry drop, filmed from the frame the round starts.
+  //
+  // This one has to CAUSE the event rather than wait for it. An earlier version
+  // waited for `roundTime > 0.05`, which is true a single frame in — so it
+  // filmed three near-identical pictures of two tops already sitting on the
+  // dish, and the drop the strip was supposed to show had finished before the
+  // first frame was taken.
+  //
+  // `game.launch()` is exactly what the space bar calls, so what gets filmed is
+  // the real entry and not a reconstruction of one. Its entry angle comes from
+  // Math.random, so unlike the clash this strip is NOT frame-identical between
+  // runs; the tops arrive from a different bearing each time. Composition and
+  // timing are what it is for, and those do not move.
+  launch: {
+    prime: (game) => game.launch(),
+    ready: (game) => game.battle.roundTime > 0,
+  },
 };
 
 /** Compose the captured frames into one labelled strip. */
@@ -156,7 +195,7 @@ async function strip(frames: Frame[], title: string): Promise<string> {
  */
 export async function showMoment(game: Game, moment: Moment = 'clash'): Promise<void> {
   game.stop();
-  const frames = capture(game, READY[moment]);
+  const frames = capture(game, moment);
   if (!frames.length) {
     document.body.innerHTML =
       '<pre style="color:#e66;font:14px ui-monospace;padding:24px">' +
