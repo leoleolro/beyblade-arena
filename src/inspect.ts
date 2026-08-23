@@ -1,153 +1,468 @@
 import * as THREE from 'three';
+import { OutlineEffect } from 'three/examples/jsm/effects/OutlineEffect.js';
+import { buildBeyMesh } from './render/beyMesh';
+import type { BeyParts } from './render/beyMesh';
+import { renderInked } from './render/outlineHull';
+import { studioEnvironment } from './render/environment';
+import { addFresnelRim } from './render/rimMetal';
 import {
-  MODEL_TINT,
   finishImported,
   loadTopModel,
   normaliseToRadius,
   seatOnOrigin,
 } from './render/topModels';
-import { renderInked } from './render/outlineHull';
-import { studioEnvironment } from './render/environment';
-import { OutlineEffect } from 'three/examples/jsm/effects/OutlineEffect.js';
-import { buildBeyMesh } from './render/beyMesh';
-import { BEY_PRESETS } from './render/beydex';
+import { topModelFor } from './render/topModelIndex';
 import { skinById } from './render/skins';
-import { makeBuild } from './sim/parts';
+import { THEMES, themeById } from './render/theme';
+import type { Theme } from './render/theme';
+import { BEY_PRESETS } from './render/beydex';
+import { DISCS, DRIVERS, LAYERS, deriveStats, makeBuild } from './sim/parts';
+import type { BeyBuild } from './sim/types';
 
 /**
- * A dev-only bench for looking at every bey side by side.
+ * The bey inspector: every top in the game, up close, in every theme.
  *
- * The garage canvas is small and shows one top at a time, and the arena is
- * moving — neither is any use for judging a silhouette. This renders the whole
- * roster at once with a pitch control, because the questions that keep coming
- * up about these meshes ("is the side profile flat?", "do these two read as
- * different?") are only answerable by looking at them together, held still,
- * from a chosen angle.
+ * WHY IT IS A PAGE AND NOT A DEV HARNESS. What stood here was a debug strip —
+ * four fixed camera pitches, a hardcoded IMPORTED button and a console.log —
+ * and, more to the point, it was **not in the production build at all**. Vite
+ * builds `index.html` and nothing else unless the inputs are named, so a page
+ * that worked perfectly in `vite dev` and was linked from the title screen
+ * simply 404'd for every player. See vite.config.ts.
  *
- * Reached at /inspect.html in dev. Not linked from the game.
+ * The beyblade designs are the part of this game that took longest and matter
+ * most, and until now there was nowhere to actually LOOK at one. Judging a top
+ * meant starting a match and squinting at a 50px object mid-fight.
+ *
+ * WHAT IT SHOWS, and why each of those:
+ *
+ *  - **Every bey, always.** No unlock gate. A tool for judging artwork that
+ *    hides most of the artwork behind ladder progress is not a tool.
+ *  - **All three themes.** A top is built differently per theme — cel
+ *    construction under Anime, metal under the other two — so "does this look
+ *    right" has three different answers and the page has to be able to ask all
+ *    of them.
+ *  - **Exploded, on demand.** Top, middle and bottom are separately designed
+ *    parts. Assembled hides two thirds of that work.
+ *  - **Real orbit.** Fixed pitches answer whatever question they were chosen
+ *    for and no others; a silhouette problem tends to live at the angle nobody
+ *    picked.
+ *
+ * It shares the game's construction path exactly — `buildBeyMesh`, the imported
+ * model swap, the theme's own outline pass — so a top that is broken here is
+ * broken in a match, and vice versa.
  */
 
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x0b1322);
+/* -------------------------------------------------------------------- dom */
 
-const camera = new THREE.PerspectiveCamera(30, 1, 0.05, 40);
+const canvas = document.getElementById('view') as HTMLCanvasElement;
+const stage = document.getElementById('stage') as HTMLElement;
+const rosterEl = document.getElementById('roster') as HTMLElement;
+const themesEl = document.getElementById('themes') as HTMLElement;
+const detailEl = document.getElementById('detail') as HTMLElement;
+const explodeBtn = document.getElementById('explode') as HTMLButtonElement;
+const spinBtn = document.getElementById('spin') as HTMLButtonElement;
 
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+/* ------------------------------------------------------------ three setup */
+
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-document.body.appendChild(renderer.domElement);
 
-const outline = new OutlineEffect(renderer, {
-  defaultThickness: 0.008,
-  defaultColor: [0.02, 0.02, 0.05],
-  defaultAlpha: 1,
-});
-
-// The anime theme's rig, so what shows here is what shows in a match.
-scene.add(new THREE.HemisphereLight(0xffffff, 0x51648c, 1.5));
-const key = new THREE.DirectionalLight(0xffffff, 2.2);
-key.position.set(2.2, 4.2, 1.8);
-scene.add(key);
-
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(32, 1, 0.02, 40);
 const root = new THREE.Group();
 scene.add(root);
 
-// One at a time, filling the frame. A grid was unreadable at the scale that
-// matters: judging whether a side profile is a flat slab or a tiered moulding
-// needs the model big, not ten models small.
-const tops: THREE.Group[] = BEY_PRESETS.map((p) => {
-  const build = makeBuild(p.layerId, p.discId, p.driverId);
-  const mesh = buildBeyMesh(build, skinById(p.skinId), true);
-  mesh.visible = false;
-  root.add(mesh);
-  return mesh;
-});
+const hemi = new THREE.HemisphereLight(0xffffff, 0x202838, 1.2);
+scene.add(hemi);
+const key = new THREE.DirectionalLight(0xffffff, 2.2);
+key.position.set(1.4, 2.4, 1.7);
+scene.add(key);
+const rimA = new THREE.DirectionalLight(0xffffff, 1.1);
+rimA.position.set(-1.7, 0.7, -1.2);
+scene.add(rimA);
+const rimB = new THREE.DirectionalLight(0xffffff, 0.8);
+rimB.position.set(1.5, 0.4, -1.5);
+scene.add(rimB);
 
-// The imported top, appended to the roster so it can be compared with the
-// procedural version of the same bey at the same size, held still.
-void loadTopModel('models/wonder_valtryek_beyblade/scene.gltf').then((src) => {
-  if (!src) return;
-  const g = new THREE.Group();
-  g.add(src.clone(true));
-  normaliseToRadius(g, 0.1066);
-  seatOnOrigin(g);
-  finishImported(g, MODEL_TINT, studioEnvironment(renderer), 'silver');
-  const box = new THREE.Box3().setFromObject(g);
-  const size = new THREE.Vector3();
-  box.getSize(size);
-  console.log(
-    `[import] after normalise: ${size.x.toFixed(3)} x ${size.y.toFixed(3)} x ${size.z.toFixed(3)}` +
-      `  (a procedural layer is ~0.213 wide and ~0.24 tall)`,
-  );
-  g.visible = false;
-  root.add(g);
-  tops.push(g);
-  const btn = document.createElement('button');
-  btn.textContent = 'IMPORTED';
-  btn.addEventListener('click', () => {
-    current = tops.length - 1;
-    for (const b of picker?.children ?? []) b.classList.remove('on');
-    btn.classList.add('on');
-  });
-  picker?.appendChild(btn);
-});
+// Built lazily on the first cel theme, like the arena does — an OutlineEffect
+// constructed for a theme that never draws ink is a wasted program.
+let outline: OutlineEffect | null = null;
 
-let current = 0;
-const picker = document.getElementById('picker');
-BEY_PRESETS.forEach((p, i) => {
-  const btn = document.createElement('button');
-  btn.textContent = p.name;
-  btn.className = i === 0 ? 'on' : '';
-  btn.addEventListener('click', () => {
-    current = i;
-    for (const b of picker?.children ?? []) b.classList.remove('on');
-    btn.classList.add('on');
-  });
-  picker?.appendChild(btn);
-});
+/* ----------------------------------------------------------------- state */
 
-let pitch = 0.62;
+let theme: Theme = THEMES[0];
+let build: BeyBuild = makeBuild(BEY_PRESETS[0].layerId, 'gravity', 'atomic');
+let mesh: THREE.Group | null = null;
+let parts: BeyParts | null = null;
+let exploded = false;
 let spinning = true;
 
+/** Guards a slow model landing on a bey the viewer has since changed away from. */
+let modelToken = 0;
+
+/** Orbit, in the same yaw/pitch/distance terms the garage preview uses. */
+let yaw = 0.7;
+let pitch = 0.5;
+let dist = 0.62;
+/** Eased multiplier on `dist`, so exploding pulls back smoothly. */
+let zoom = 1;
+
+/** How far apart the three parts sit when exploded, in mesh units. */
+const SEPARATION = 0.09;
+
+/* ------------------------------------------------------------------ build */
+
+function disposeTree(obj: THREE.Object3D): void {
+  obj.traverse((child) => {
+    const m = child as THREE.Mesh;
+    if (!m.isMesh) return;
+    // Imported geometry is shared with the loader cache and outlives this view.
+    if (!m.userData.imported) m.geometry?.dispose();
+    const list = Array.isArray(m.material) ? m.material : [m.material];
+    for (const mat of list) mat?.dispose();
+  });
+}
+
+function rebuild(): void {
+  if (mesh) {
+    root.remove(mesh);
+    disposeTree(mesh);
+  }
+
+  mesh = buildBeyMesh(build, skinById('frost'), theme.toon);
+  parts = mesh.userData.parts as BeyParts;
+  root.add(mesh);
+
+  // Same rim the arena gives procedural tops, so a bey looks here exactly as it
+  // does in a match rather than subtly better.
+  if (theme.topRimStrength > 0) {
+    const rim = { colour: theme.topRimColour, strength: theme.topRimStrength };
+    mesh.traverse((child) => {
+      const m = child as THREE.Mesh;
+      if (!m.isMesh) return;
+      const list = Array.isArray(m.material) ? m.material : [m.material];
+      for (const mat of list) {
+        if ((mat as THREE.MeshStandardMaterial).isMeshStandardMaterial) addFresnelRim(mat, rim);
+      }
+    });
+  }
+
+  const entry = topModelFor(build.layer.id);
+  if (entry) {
+    const token = ++modelToken;
+    const held = parts;
+    void loadTopModel(entry.url).then((src) => {
+      if (!src || token !== modelToken || !held) return;
+      const model = src.clone(true);
+      normaliseToRadius(model, build.layer.radius);
+      seatOnOrigin(model);
+      finishImported(
+        model,
+        theme.modelTint,
+        studioEnvironment(renderer),
+        entry.finish,
+        theme.envIntensity,
+        { colour: theme.topRimColour, strength: theme.topRimStrength },
+      );
+      model.traverse((c) => {
+        c.userData.imported = true;
+      });
+      held.layer.clear();
+      held.layer.add(model);
+      // An imported model replaces the WHOLE top, so there is no middle or
+      // bottom left to explode. Saying so is better than showing a stack that
+      // is not what the player gets — see topModels.ts.
+      held.disc.visible = false;
+      held.driver.visible = false;
+      layout();
+      renderDetail();
+    });
+  }
+
+  applyTheme();
+  layout();
+  renderDetail();
+}
+
+/** True while an imported model is standing in for the whole top. */
+const modelled = (): boolean => topModelFor(build.layer.id) !== undefined;
+
+function layout(): void {
+  if (!parts) return;
+  const gap = exploded && !modelled() ? SEPARATION : 0;
+  parts.driver.position.y = -gap;
+  parts.disc.position.y = 0;
+  parts.layer.position.y = gap;
+}
+
+function applyTheme(): void {
+  scene.background = new THREE.Color(theme.background);
+  // The theme's own light colours, but at inspector intensities: this is a
+  // catalogue, so a top must be legible even in the theme whose arena is
+  // deliberately almost black.
+  hemi.color.setHex(theme.hemiSky);
+  hemi.groundColor.setHex(theme.hemiGround);
+  hemi.intensity = theme.toon ? 1.6 : 1.15;
+  key.intensity = theme.toon ? 2.2 : 2.4;
+  rimA.color.setHex(theme.rimAColour);
+  rimB.color.setHex(theme.rimBColour);
+}
+
+/* ----------------------------------------------------------------- detail */
+
+function renderDetail(): void {
+  const stats = deriveStats(build);
+  const rows: string[] = [];
+
+  const part = (
+    label: string,
+    name: string,
+    note: string,
+    hidden = false,
+  ): string =>
+    `<div class="part"><h3>${label} — ${escapeHtml(name)}${
+      hidden ? ' <span style="color:#8698b8">(hidden)</span>' : ''
+    }</h3><p>${escapeHtml(note)}</p></div>`;
+
+  const hide = modelled();
+  rows.push(
+    part(
+      'TOP',
+      build.layer.name,
+      `${build.layer.archetype} · ${build.layer.blades} blades · atk ${build.layer.attack} · def ${build.layer.defense}`,
+    ),
+  );
+  rows.push(
+    part(
+      'MIDDLE',
+      build.disc.name,
+      `${build.disc.mass}kg · stability ${build.disc.stability}`,
+      hide,
+    ),
+  );
+  rows.push(
+    part(
+      'BOTTOM',
+      build.driver.name,
+      `${build.driver.archetype} · spin ${build.driver.spinRetention} · aggro ${build.driver.wander}`,
+      hide,
+    ),
+  );
+
+  if (hide) {
+    rows.push(
+      `<p style="color:#8698b8;font-size:11px;margin-top:8px">An imported model replaces the whole top, so the middle and bottom still decide how it flies but are not drawn.</p>`,
+    );
+  }
+
+  rows.push('<h2 style="margin-top:14px">DERIVED</h2>');
+  const show: [string, number][] = [
+    ['mass', stats.mass],
+    ['radius', stats.radius],
+    ['attack', stats.attack],
+    ['defense', stats.defense],
+    ['burst resist', stats.burstResist],
+    ['spin steal', stats.spinSteal],
+    ['friction', stats.friction],
+    ['stability', stats.stability],
+  ];
+  for (const [k, v] of show) {
+    rows.push(`<div class="row"><span>${k}</span><b>${v.toFixed(2)}</b></div>`);
+  }
+
+  detailEl.innerHTML = rows.join('');
+}
+
+const escapeHtml = (s: string): string =>
+  s.replace(
+    /[&<>"']/g,
+    (c) =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] ?? c,
+  );
+
+/* ------------------------------------------------------------------- menus */
+
+function buildRoster(): void {
+  // Named presets first — those are the beys as designed — then the raw layer
+  // list for anything the preset table does not cover.
+  const seen = new Set<string>();
+  const add = (id: string, name: string): void => {
+    if (seen.has(id)) return;
+    seen.add(id);
+    const b = document.createElement('button');
+    b.textContent = name;
+    b.dataset.layer = id;
+    b.addEventListener('click', () => {
+      build = makeBuild(id, build.disc.id, build.driver.id);
+      for (const el of rosterEl.children) el.classList.remove('on');
+      b.classList.add('on');
+      rebuild();
+    });
+    rosterEl.appendChild(b);
+  };
+
+  for (const p of BEY_PRESETS) add(p.layerId, p.name);
+  for (const l of LAYERS) add(l.id, l.name);
+  rosterEl.firstElementChild?.classList.add('on');
+}
+
+function buildThemeButtons(): void {
+  for (const t of THEMES) {
+    const b = document.createElement('button');
+    b.textContent = t.name;
+    b.className = t.id === theme.id ? 'on' : '';
+    b.addEventListener('click', () => {
+      theme = themeById(t.id);
+      for (const el of themesEl.children) el.classList.remove('on');
+      b.classList.add('on');
+      rebuild();
+    });
+    themesEl.appendChild(b);
+  }
+}
+
+/**
+ * Part pickers for the middle and bottom.
+ *
+ * The roster changes the TOP, which is what carries a bey's identity. These let
+ * the other two be swapped without leaving the page, because "top middle
+ * bottom" is the build and judging one slot in isolation is judging a third of
+ * the object.
+ */
+function buildSlotPickers(): void {
+  const mk = (title: string, items: { id: string; name: string }[], slot: 'disc' | 'driver'): void => {
+    const heading = document.createElement('h2');
+    heading.textContent = title;
+    rosterEl.appendChild(heading);
+    for (const it of items) {
+      const b = document.createElement('button');
+      b.textContent = it.name;
+      b.dataset.slot = slot;
+      b.className = build[slot].id === it.id ? 'on' : '';
+      b.addEventListener('click', () => {
+        build =
+          slot === 'disc'
+            ? makeBuild(build.layer.id, it.id, build.driver.id)
+            : makeBuild(build.layer.id, build.disc.id, it.id);
+        for (const el of rosterEl.querySelectorAll(`[data-slot="${slot}"]`)) {
+          el.classList.remove('on');
+        }
+        b.classList.add('on');
+        rebuild();
+      });
+      rosterEl.appendChild(b);
+    }
+  };
+
+  mk('MIDDLE', DISCS, 'disc');
+  mk('BOTTOM', DRIVERS, 'driver');
+}
+
+/* -------------------------------------------------------------- interaction */
+
+function bindOrbit(): void {
+  let dragging = false;
+  let lastX = 0;
+  let lastY = 0;
+
+  canvas.addEventListener('pointerdown', (e) => {
+    dragging = true;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    canvas.setPointerCapture(e.pointerId);
+  });
+  canvas.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    yaw += (e.clientX - lastX) * 0.01;
+    // Clamped short of vertical: past it the model flips and reads as a bug.
+    pitch = Math.max(-0.4, Math.min(1.45, pitch + (e.clientY - lastY) * 0.006));
+    lastX = e.clientX;
+    lastY = e.clientY;
+  });
+  const up = (e: PointerEvent): void => {
+    dragging = false;
+    if (canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId);
+  };
+  canvas.addEventListener('pointerup', up);
+  canvas.addEventListener('pointercancel', up);
+
+  canvas.addEventListener(
+    'wheel',
+    (e) => {
+      e.preventDefault();
+      dist = Math.max(0.26, Math.min(1.6, dist * (1 + Math.sign(e.deltaY) * 0.12)));
+    },
+    { passive: false },
+  );
+}
+
+explodeBtn.addEventListener('click', () => {
+  exploded = !exploded;
+  explodeBtn.classList.toggle('on', exploded);
+  layout();
+});
+
+spinBtn.addEventListener('click', () => {
+  spinning = !spinning;
+  spinBtn.classList.toggle('on', spinning);
+});
+
+/* ------------------------------------------------------------------- frame */
+
 function resize(): void {
-  const w = window.innerWidth;
-  const h = window.innerHeight;
-  // updateStyle left on: the canvas has no CSS size of its own here, so
-  // without it the element displays at its intrinsic size and the render
-  // occupies one corner of the page.
-  renderer.setSize(w, h);
+  const w = stage.clientWidth || 640;
+  const h = stage.clientHeight || 480;
+  renderer.setSize(w, h, false);
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
 }
 window.addEventListener('resize', resize);
-resize();
-
-for (const btn of document.querySelectorAll<HTMLButtonElement>('[data-pitch]')) {
-  btn.addEventListener('click', () => {
-    pitch = Number(btn.dataset.pitch);
-    for (const b of document.querySelectorAll('[data-pitch]')) b.classList.remove('on');
-    btn.classList.add('on');
-  });
-}
-document.getElementById('spin')?.addEventListener('click', (e) => {
-  spinning = !spinning;
-  (e.target as HTMLElement).classList.toggle('on', spinning);
-});
 
 let last = performance.now();
 function tick(now: number): void {
   const dt = Math.min((now - last) / 1000, 0.05);
   last = now;
 
-  for (let i = 0; i < tops.length; i++) {
-    tops[i].visible = i === current;
-    if (spinning && i === current) tops[i].rotation.y += dt * 0.9;
+  if (spinning && parts) {
+    // Opposed rates, as the garage does: parts turning in unison read as a
+    // turntable, opposed ones read as a mechanism.
+    parts.layer.rotation.y += dt * 0.55;
+    parts.disc.rotation.y -= dt * 0.34;
+    parts.driver.rotation.y += dt * 1.1;
   }
 
-  const dist = 0.62;
-  camera.position.set(0, Math.sin(pitch) * dist, Math.cos(pitch) * dist);
-  camera.lookAt(0, 0.11, 0);
+  // Pull back while exploded, and ease rather than jump. The stack is roughly
+  // 2 x SEPARATION taller than the assembled top, so at the assembled distance
+  // the driver falls off the bottom of the frame — which reads as the view
+  // being broken rather than as parts being far apart.
+  const wantZoom = exploded && !modelled() ? 1.5 : 1;
+  zoom += (wantZoom - zoom) * Math.min(1, dt * 8);
+  const d = dist * zoom;
 
-  renderInked(renderer, outline, scene, camera);
+  const cx = Math.sin(yaw) * Math.cos(pitch) * d;
+  const cy = Math.sin(pitch) * d;
+  const cz = Math.cos(yaw) * Math.cos(pitch) * d;
+  camera.position.set(cx, cy, cz);
+  camera.lookAt(0, 0.1, 0);
+
+  if (theme.toon) {
+    outline ??= new OutlineEffect(renderer, {
+      defaultThickness: 0.014,
+      defaultColor: [0.02, 0.02, 0.05],
+      defaultAlpha: 1,
+    });
+    renderInked(renderer, outline, scene, camera);
+  } else {
+    renderer.render(scene, camera);
+  }
+
   requestAnimationFrame(tick);
 }
+
+buildThemeButtons();
+buildRoster();
+buildSlotPickers();
+bindOrbit();
+resize();
+rebuild();
 requestAnimationFrame(tick);

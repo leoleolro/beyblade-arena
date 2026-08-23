@@ -1,3 +1,4 @@
+import { resolve } from 'node:path';
 import { defineConfig } from 'vite';
 
 /**
@@ -18,6 +19,20 @@ export default defineConfig(({ command }) => ({
   base: command === 'build' ? (process.env.BASE ?? '/beyblade-arena/') : '/',
   build: {
     rollupOptions: {
+      /**
+       * Every page in the site, listed.
+       *
+       * Vite builds `index.html` and nothing else unless the inputs are named,
+       * so `inspect.html` existed, worked perfectly in `vite dev`, was linked
+       * from the title screen — and was simply absent from `dist/`. The link
+       * 404'd for every player while looking correct to everyone developing.
+       * The same class of failure as `base`, and the same lesson: what the dev
+       * server serves is not what gets published.
+       */
+      input: {
+        main: resolve(__dirname, 'index.html'),
+        inspect: resolve(__dirname, 'inspect.html'),
+      },
       output: {
         /**
          * Split three into its own chunk.
