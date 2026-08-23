@@ -1453,7 +1453,22 @@ export class ArenaRenderer {
   private updateCamera(beys: BeyState[], dt: number): void {
     this.cameraAngle += dt * 0.09;
 
-    const alive = beys.filter((b) => b.alive);
+    // FRAME WHAT IS STILL ON SCREEN, not what is still in play.
+    //
+    // This filtered on `b.alive`, so the instant a top was knocked out the
+    // framing set dropped to the survivor alone: the focus snapped to it, and
+    // `spread` collapsed to 0 which pushed the camera IN. The knockout — a top
+    // arcing over the rim, which is the most dramatic thing that happens in a
+    // round — played out at the edge of the frame and partly outside it.
+    // Filmstripped with `__moment('ringout')` and it is unmistakable: three
+    // frames of the winner glowing while the loser leaves off-camera.
+    //
+    // A defeated top's visual stays visible for the length of its exit (0.34s
+    // of burst scatter, or an arc that ends when it drops below y = -1.2), and
+    // `group.visible` is the renderer's own record of that. Framing on it means
+    // the camera holds both tops for exactly as long as there are two to hold,
+    // with no new timer to keep in sync with the animations.
+    const alive = beys.filter((b) => b.alive || this.visuals.get(b.id)?.group.visible);
 
     // ---------------------------------------------------------- framing ----
     // Damped to 0.55 of the way out to the midpoint rather than tracking it
