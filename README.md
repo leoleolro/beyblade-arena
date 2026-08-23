@@ -20,6 +20,35 @@ npm run build
 npx vitest run
 ```
 
+### Looking at it
+
+Rendering bugs do not fail a build, and checking a visual change by hand means
+driving the game into one state, screenshotting, and repeating — so in practice
+one or two states get checked and the other thirty ship unseen. Three tools
+exist so that stops being the deal.
+
+All of them need the dev flags in the URL:
+
+```bash
+open "http://localhost:5180/?unlock=all&shot"
+```
+
+`?unlock=all` grants every part and skin for the session without touching the
+saved career (`?unlock=persist` writes it down). `?shot` lets the renderer keep
+a readable copy of each frame — off by default because it costs bandwidth on
+mobile GPUs. Then, in the console:
+
+| Call | What it shows |
+| --- | --- |
+| `__sweep()` | Every bey in every theme, one grid. Uses the real construction path — mesh builder, imported-model swap, outline pass — so a bug that only appears in one theme still appears here. Pass an array of layer ids for a smaller, larger-celled sheet. |
+| `__moment('clash')` | A filmstrip of a heavy hit, stepped out of the running round frame by frame. Deterministic, so before/after is a real comparison. |
+| `__moment('launch')` | The same for the entry drop. It starts the round itself, because the drop is over 21 frames in and cannot be waited for. |
+| `__shot('name')` | Downloads the current frame, for `docs/design-targets/`. |
+
+`__sweep` found a bug nobody had reported within a minute of existing, and
+`__moment` is what identified a per-top light with a falloff wider than the
+dish. Both replace the page when they run; reload to play again.
+
 ### Publishing it
 
 The game is a static site with no server and no accounts, which is what makes

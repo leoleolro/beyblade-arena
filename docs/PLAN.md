@@ -1,7 +1,8 @@
 # Working plan
 
-> **Status, 22 Aug.** A, B and C are done and committed. D and E are open.
-> Decisions taken since this was written are recorded inline below.
+> **Status.** A, B, C and D are done. E (arena concepts) is the only original
+> section still open. A second round of visual work followed the owner's
+> "still looks off", and is summarised at the bottom.
 
 Ordered by what unblocks what. Everything here is either verified in the
 browser today or marked as an assumption.
@@ -89,7 +90,7 @@ so an idle arena sits dark and a clash lights it.
 at `h.strength >= HITSTOP_THRESHOLD` (1.6), so ordinary contacts draw nothing.
 Lower or re-shape the gate and check against `overdrive-target-clash.png`.
 
-## D. Motion — speed should be visible — **OPEN, next**
+## D. Motion — speed should be visible — **DONE** (`5666f16`)
 
 `speedKick` already exists (Charge 1.15, Dodge 1.6), so the sim does change
 speed; it does not *read* as changing. Two parts, and the first is a
@@ -149,3 +150,42 @@ colour values never drifted; a diff of `theme.ts` against the commit that
 introduced them is empty. The washout lived in the product of emissive strength
 and bloom radius, which no diff shows. Screenshots of approved states are the
 only thing that would have caught it early.
+
+
+---
+
+## Round two: "still looks off"
+
+Everything above was shipped, and the game still looked wrong. What that
+second pass found, in the order it was found:
+
+**Tops were not visibly spinning in two of the three themes.** The sim advances
+angle 0.75 rad per frame; against a six- or eight-bladed layer that aliases past
+Nyquist and reads as stationary. `spinBlur.ts` had worked this out and solved it
+for the cel theme only. `motion.ts` now caps the DRAWN rate below the aliasing
+limit per blade count.
+
+**Nothing on screen read velocity.** Measured: one top's own speed varies 4.32x
+inside a single round. The only consumer was the full-screen speed lines, which
+start above the median. The trail now carries it.
+
+**Four separate elements were each "already at full brightness"** before
+Overdrive's bloom pass — posts, rail, imported metal, and the aura. Each was
+individually reasonable and authored against a scene with nothing else glowing.
+An effect that arrives at a bloom pass saturated stops carrying information.
+
+**A per-top light had a falloff wider than the dish.** What the code called a
+per-top light was a floodlight; two of them made both beys balls of light, and a
+clash had nothing left to add.
+
+**Tops needed a contour, not more light.** Darkening a metal body just makes a
+dark blob, and the arena's rim lights are directional — they wash a face rather
+than draw an edge. `rimMetal.ts` adds a view-dependent fresnel term.
+
+**The Anime theme's shockwave was invisible.** Additive white on a near-white
+dish. It draws as ink there now.
+
+**And the process gap that let all of it ship.** `contactSheet.ts` and
+`momentSheet.ts` exist so a rendering change is checked against every bey, every
+theme and the events that only last four frames — see the README. The contact
+sheet found an unreported bug on its first run.
