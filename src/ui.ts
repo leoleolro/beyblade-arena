@@ -3,6 +3,7 @@ import { DISCS, DRIVERS, LAYERS, deriveStats, makeBuild } from './sim/parts';
 import { BEY_PRESETS } from './render/beydex';
 import { beyThumb } from './render/beyThumb';
 import { modelThumb } from './render/modelThumb';
+import { setUnlockPreference, unlockPreference } from './devUnlock';
 import { shopSection } from './render/shopSection';
 import { topModelFor } from './render/topModelIndex';
 import * as C from './sim/constants';
@@ -1326,6 +1327,37 @@ export class Ui {
       setFrame();
     });
     fxChips.appendChild(frameChip);
+
+    // ALL BEYBLADES, as a remembered toggle rather than a URL parameter.
+    //
+    // The owner tests this game by playing it, and the roster is behind ladder
+    // progress — so judging a design on Nosferu meant winning six matches or
+    // retyping `?unlock=all` after every reload. That is the tax the switch was
+    // written to remove, reimposed by where it lived.
+    //
+    // It grants in memory only and never rewrites the career on disk, so
+    // turning it off hands the real save back untouched. That is what makes it
+    // safe to leave on indefinitely, and why it sits beside the other taste
+    // switches instead of behind a warning.
+    const unlockChip = document.createElement('button');
+    const setUnlock = (): void => {
+      const on = unlockPreference();
+      unlockChip.className = 'chip' + (on ? ' on' : '');
+      unlockChip.innerHTML = `<span>All beyblades<br><small>${
+        on ? 'every part available — career untouched' : 'follow the ladder'
+      }</small></span>`;
+    };
+    setUnlock();
+    unlockChip.addEventListener('click', () => {
+      setUnlockPreference(!unlockPreference());
+      setUnlock();
+      // A reload is the honest way to apply it: the grant happens at startup,
+      // before the garage is built, and faking it live would leave the shop and
+      // the ladder disagreeing with the roster.
+      location.reload();
+    });
+    fxChips.appendChild(unlockChip);
+
     fxRow.appendChild(fxChips);
     panel.appendChild(fxRow);
 

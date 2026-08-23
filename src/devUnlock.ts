@@ -27,9 +27,12 @@ import type { Progress } from './progress';
  * the object that owns the storage, because that is the only place a save path
  * nobody remembered cannot get around it.
  *
- * Neither form is reachable from the UI. A URL parameter is discoverable enough
- * for the person who needs it and invisible to everyone else, which is the
- * right amount of exposure for a cheat.
+ * AND IT IS NOW REACHABLE FROM THE UI, which reverses an earlier call here that
+ * a URL parameter was "the right amount of exposure". It is not, for the person
+ * this exists for: the owner is testing the game by playing it, and telling
+ * them to retype a query string every reload is making the tool the tax it was
+ * written to remove. `sessionPreference` is a remembered toggle; the URL forms
+ * still work and still win, for a one-off session that must not be remembered.
  */
 
 export type UnlockMode = 'off' | 'session' | 'persist';
@@ -37,9 +40,39 @@ export type UnlockMode = 'off' | 'session' | 'persist';
 /** Coins granted alongside the parts, so the crate and shelf paths are testable too. */
 const DEV_COINS = 99_999;
 
+/** Where the remembered toggle lives. */
+const KEY = 'beyblade-arena.unlockAll';
+
+/**
+ * The remembered "all beyblades" preference.
+ *
+ * Deliberately SESSION-scoped in effect even though the preference persists:
+ * `applyUnlockAll` is called with `'session'`, so the roster is granted in
+ * memory on every load and the career on disk is never rewritten. Turning the
+ * toggle off gives the real save back intact, which is the property that makes
+ * it safe to leave on for weeks.
+ */
+export function unlockPreference(): boolean {
+  try {
+    return localStorage.getItem(KEY) === 'on';
+  } catch {
+    return false;
+  }
+}
+
+export function setUnlockPreference(on: boolean): void {
+  try {
+    localStorage.setItem(KEY, on ? 'on' : 'off');
+  } catch {
+    // Storage unavailable; the choice applies until reload.
+  }
+}
+
 export function unlockMode(search: string = location.search): UnlockMode {
   const value = new URLSearchParams(search).get('unlock');
-  if (value === null) return 'off';
+  // The URL wins when present — a one-off that must not be remembered — and
+  // the toggle answers for every ordinary load.
+  if (value === null) return unlockPreference() ? 'session' : 'off';
   // Bare `?unlock` and `?unlock=all` mean the same thing: the common case
   // should not require remembering which spelling is the real one.
   if (value === '' || value === 'all' || value === '1') return 'session';
