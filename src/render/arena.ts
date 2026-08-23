@@ -431,7 +431,7 @@ export class ArenaRenderer {
 
     applyStadiumTheme(this.stadium, t);
     // After the repaint, never before — see markFinishPocket.
-    markFinishPocket(this.stadium, this.finishPocket);
+    markFinishPocket(this.stadium, this.finishPocket, this.theme);
     // The rail carries emissive metal in the lit themes and banded cel metal in
     // the anime one; a hot emissive with no bloom behind it just clips white.
     this.rail?.setToon(t.toon);
@@ -514,7 +514,7 @@ export class ArenaRenderer {
     // repaints every post, so the marking has to be re-stated after it rather
     // than set once here.
     this.finishPocket = arena.finishPocket ?? null;
-    markFinishPocket(this.stadium, this.finishPocket);
+    markFinishPocket(this.stadium, this.finishPocket, this.theme);
 
     if (arena.rail && !this.rail) {
       this.rail = buildRail(arena.rail.radius);
@@ -1355,15 +1355,19 @@ export class ArenaRenderer {
           this.sparks.spawn(at, 1.8, 14, this.railStream, 0.28);
         }
       }
-      // 1.4, down from 2.6, and the reason is how OFTEN this is on rather than
-      // how bright it is. 94% of rounds engage the rail inside the first
+      // 1.05 now the resting value is 0.78 rather than 0.4 — see rail.ts, where
+      // the base had to come back up for the teeth to fuse into a band. The
+      // ridden total stays where it was, a little under 1.9.
+      //
+      // The original was 2.6, and the reason it came down is how OFTEN this is
+      // on rather than how bright it is. 94% of rounds engage the rail inside the first
       // quarter-second and X-Rail keeps a top locked on for long stretches, so
       // "riding" is close to the resting state of that arena — a flare tuned
       // as a rare event was in practice the arena's normal brightness, and at
       // 0.4 + 2.6 that normal was a solid wall of fire with the teeth blown
       // out. 0.4 -> 1.8 still reads clearly as the rail catching someone,
       // while leaving the band gold instead of white.
-      const flare = riders.length > 0 ? 1.4 : 0;
+      const flare = riders.length > 0 ? 1.05 : 0;
       const mat = this.rail.material;
       mat.emissiveIntensity +=
         (this.rail.baseEmissive + flare - mat.emissiveIntensity) *

@@ -78,16 +78,31 @@ const FINISH_POST = 0x4dffa0;
 /**
  * Mark one pocket as the Xtreme Finish, or clear the marking with null.
  *
- * Called AFTER `applyStadiumTheme`, which repaints every post from the theme —
- * marking first and theming second silently erases it, and the mechanic would
- * then be invisible in exactly the way that makes a graded pocket pointless.
+ * REPAINTS EVERY POST FIRST, which the first version did not, and that was a
+ * real bug rather than a tidiness point. It returned early on null, so it could
+ * only ever ADD a marking. Switching from the X-Rail stadium to the plain dish
+ * left two green posts standing on an arena that has no graded pocket —
+ * advertising a scoring rule that cannot fire there. Caught by switching arenas
+ * and looking, not by any test.
+ *
+ * `theme` is taken rather than assumed so the clear restores the colour this
+ * theme actually uses; the posts are magenta in Overdrive, red in Anime and
+ * orange in Arena.
  *
  * Posts are built two per pocket in pocket order, so pocket `i` owns `2i` and
  * `2i + 1`. Bounds-checked rather than trusted: an index past the end is a
  * misconfigured arena, and a silent no-op there would look identical to the
  * feature being switched off.
  */
-export function markFinishPocket(h: StadiumHandles, index: number | null): void {
+export function markFinishPocket(
+  h: StadiumHandles,
+  index: number | null,
+  theme: Theme,
+): void {
+  for (const p of h.posts) {
+    p.color.setHex(theme.postColour);
+    p.emissive.setHex(theme.postColour);
+  }
   if (index === null) return;
   for (const side of [0, 1]) {
     const post = h.posts[index * 2 + side];

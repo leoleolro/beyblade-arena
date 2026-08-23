@@ -53,20 +53,25 @@ export function buildRail(radius: number): RailHandles {
   // Warm and hot: the rail is the one aggressive object on the dish and should
   // not share the stadium's blues.
   //
-  // 0.4 at rest, not 1.4. There is a flare path in arena.ts that adds 2.6 while
-  // a top is locked onto the rail, and at a 1.4 baseline that range was 1.4 to
-  // 4.0 — both ends well past the bloom threshold, so the rail was a solid band
-  // of fire whether or not anybody was riding it and the flare had nowhere to
-  // go. An effect that is already at full brightness cannot mark an event.
+  // 0.78 at rest, bounded on both sides by things that are visible.
   //
-  // At 0.4 the rail is warm metal you can see the teeth on, and the same flare
-  // now takes it to 3.0 — a real dark-to-hot swing that reads as the rail
-  // catching a top and slinging it. Same principle as the posts: the arena
-  // should be dark until something happens in it.
+  // It started at 1.4, where the flare took it to 4.0 and both ends sat well
+  // past the bloom threshold: a solid wall of fire whether or not anyone was
+  // riding, with the flare unable to mark anything. 0.4 fixed that and went too
+  // far the other way — the rail became a dim ring you had to look for, on the
+  // one arena named after it.
+  //
+  // A CORRECTION TO WHAT I FIRST WROTE HERE, kept because the wrong reason is
+  // worth knowing. I raised this expecting bloom to fuse the 48 teeth into the
+  // single smooth gold band the reference capture shows. It does not: at 0.78
+  // the teeth are brighter and still plainly separate. Whatever makes that band
+  // smooth, it is not this value, so the reference is not yet matched here —
+  // see docs/design-targets. What 0.78 does buy is presence, which is a real
+  // and separate thing worth having.
   const railMat = new THREE.MeshStandardMaterial({
     color: 0xffb020,
     emissive: 0xff7a00,
-    emissiveIntensity: 0.4,
+    emissiveIntensity: 0.78,
     metalness: 0.7,
     roughness: 0.3,
   });
