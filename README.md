@@ -43,6 +43,7 @@ mobile GPUs. Then, in the console:
 | `__sweep()` | Every bey in every theme, one grid. Uses the real construction path — mesh builder, imported-model swap, outline pass — so a bug that only appears in one theme still appears here. Pass an array of layer ids for a smaller, larger-celled sheet. |
 | `__moment('clash')` | A filmstrip of a heavy hit, stepped out of the running round frame by frame. Deterministic, so before/after is a real comparison. |
 | `__moment('launch')` | The same for the entry drop. It starts the round itself, because the drop is over 21 frames in and cannot be waited for. |
+| `__moment('burst')` / `__moment('ringout')` | The two defeat animations. How a round ends is not something you can ask for, so these replay rounds until they get the one they want. |
 | `__shot('name')` | Downloads the current frame, for `docs/design-targets/`. |
 
 `__sweep` found a bug nobody had reported within a minute of existing, and

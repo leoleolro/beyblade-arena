@@ -1601,8 +1601,20 @@ export class ArenaRenderer {
         // and it still has to die near the skirt rather than sail off into
         // empty air, which is why it is a hair over rather than double. TWO rings a beat apart carry the extra
         // weight instead of one huge one.
+        //
+        // PEAK 0.22, NOT 0.34, and the span is deliberately left alone. Three
+        // fronts at 0.34 of additive white overlap near the centre at better
+        // than 1.0 and saturate, which a bloom pass then spreads — filmstripped
+        // with `__moment('burst')`, frame zero was a white rectangle with no
+        // arena visible in it at all. The reference for this theme keeps the
+        // dish readable through its burst.
+        //
+        // Lowering the SPAN would have been the wrong fix twice over: it is
+        // load-bearing for the invariant above, and the ring travelling far is
+        // what makes a burst feel bigger than a clash. Three fronts that do not
+        // stack to white carry the same weight and leave the arena visible.
         if (this.theme.shockwave) {
-          this.shockwaves.spawn(at, this.theme.shockwaveInk ?? 0xffffff, 1.05, 3, 0.34);
+          this.shockwaves.spawn(at, this.theme.shockwaveInk ?? 0xffffff, 1.05, 3, 0.22);
         }
         this.sparks.spawn(at, 4.5, 64);
         // Only in themes that already light the arena from the tops. ARENA

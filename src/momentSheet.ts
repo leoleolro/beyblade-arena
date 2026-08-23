@@ -1,4 +1,5 @@
 import type { Game } from './game';
+import { AI_ID, PLAYER_ID } from './game';
 import * as C from './sim/constants';
 
 /**
@@ -38,6 +39,11 @@ const STEP = 1 / 60;
 const OFFSETS: Record<Moment, number[]> = {
   clash: [0, 4, 12],
   launch: [0, 10, 22],
+  // A defeat animation is the longest thing here: burst scatter runs 0.34s and
+  // a ring-out arc 0.4s, both followed by a hold. Sampled across that whole
+  // span rather than bunched at the front.
+  burst: [0, 8, 20],
+  ringout: [0, 8, 20],
 };
 
 /**
@@ -50,9 +56,17 @@ const OFFSETS: Record<Moment, number[]> = {
  * overwhelming majority of rounds (played.test.ts: 3.28 of them per round, p50
  * round length 7.4s), and a run that finds nothing is cheap to repeat.
  */
-const PATIENCE = 60 * 8;
+const PATIENCE: Record<Moment, number> = {
+  clash: 60 * 8,
+  launch: 60 * 2,
+  // A round ends at p50 7.4s and p90 19.4s (played.test.ts), so a defeat needs
+  // real patience where a clash does not. Still bounded: a run that finds
+  // nothing is cheap to repeat, and a run that never returns is not.
+  burst: 60 * 22,
+  ringout: 60 * 22,
+};
 
-export type Moment = 'clash' | 'launch';
+export type Moment = 'clash' | 'launch' | 'burst' | 'ringout';
 
 interface Frame {
   label: string;
@@ -67,8 +81,12 @@ interface Frame {
  * effects — which decay on real elapsed seconds — age at the rate they would in
  * a real match rather than at whatever rate the stepping loop happens to run.
  */
+/** Why a capture came back empty, for a message that is worth reading. */
+let lastMiss = '';
+
 function capture(game: Game, moment: Moment): Frame[] {
   const shots: Frame[] = [];
+  lastMiss = `${moment} did not happen within ${(PATIENCE[moment] / 60).toFixed(0)}s of sim`;
   const spec = MOMENTS[moment];
   const offsets = OFFSETS[moment];
 
@@ -80,7 +98,7 @@ function capture(game: Game, moment: Moment): Frame[] {
 
   const battle = game.battle;
   let found = -1;
-  for (let f = 0; f < PATIENCE; f++) {
+  for (let f = 0; f < PATIENCE[moment]; f++) {
     if (found < 0) {
       game.ai.update(battle, STEP);
       battle.update(STEP);
@@ -93,6 +111,18 @@ function capture(game: Game, moment: Moment): Frame[] {
     );
 
     if (found < 0 && spec.ready(game)) found = f;
+
+    // A round that has ENDED will never produce the event, and stepping a
+    // finished battle is just burning wall clock — 22 seconds of it, on the
+    // first run of the burst capture, to discover the round had ring-outed
+    // four seconds in. Bail and say so: "did not happen" and "could not have
+    // happened" are different answers and only one of them means try again.
+    if (found < 0 && battle.phase !== 'battle') {
+      lastMiss =
+        `round ended by ${battle.lastRound?.reason ?? 'unknown'} before any ${moment}` +
+        ' — run it again, or pick a matchup that ends the way you want to film';
+      break;
+    }
 
     if (found >= 0) {
       const since = f - found;
@@ -118,6 +148,15 @@ interface MomentSpec {
   prime?: (game: Game) => void;
   /** True on the frame the event lands. */
   ready: (game: Game) => boolean;
+  /**
+   * Whether a round that ends the wrong way should be replayed.
+   *
+   * Only the defeat moments want this. How a round ends is not something the
+   * caller chooses — three consecutive attempts at filming a burst produced a
+   * burst, a ring-out and a spin-finish — so without a retry the tool is a
+   * lottery, and a tool you have to run five times is one nobody runs.
+   */
+  retry?: boolean;
 }
 
 const MOMENTS: Record<Moment, MomentSpec> = {
@@ -145,7 +184,41 @@ const MOMENTS: Record<Moment, MomentSpec> = {
     prime: (game) => game.launch(),
     ready: (game) => game.battle.roundTime > 0,
   },
+
+  // The two ways a round ends badly. Both are pure presentation — the sim has
+  // already decided — and both had never been looked at frame by frame.
+  burst: {
+    ready: (game) => game.battle.beys.some((b) => b.defeat === 'burst'),
+    retry: true,
+  },
+  ringout: {
+    ready: (game) => game.battle.beys.some((b) => b.defeat === 'knockout'),
+    retry: true,
+  },
 };
+
+/** How many rounds to burn looking for a defeat that ends the right way. */
+const ROUND_ATTEMPTS = 12;
+
+/**
+ * Start a fresh round without going through the launch screen.
+ *
+ * `Game.launch` is the real entry point and is used where it can be, but it
+ * only works from the launch screen — and after a round ends the game is on
+ * round-over. This is the same call `launch` makes underneath, with both sides
+ * chosen by the AI, so the round it starts is an ordinary one.
+ */
+function restartRound(game: Game): void {
+  const angle = Math.random() * Math.PI * 2;
+  const player = game.battle.fighters.find((f) => f.id === PLAYER_ID);
+  const ai = game.battle.fighters.find((f) => f.id === AI_ID);
+  if (!player || !ai) return;
+  game.battle.startRound({
+    [PLAYER_ID]: game.ai.chooseLaunch(player.build, angle),
+    [AI_ID]: game.ai.chooseLaunch(ai.build, angle),
+  });
+  game.renderer.start(angle);
+}
 
 /** Compose the captured frames into one labelled strip. */
 async function strip(frames: Frame[], title: string): Promise<string> {
@@ -195,11 +268,18 @@ async function strip(frames: Frame[], title: string): Promise<string> {
  */
 export async function showMoment(game: Game, moment: Moment = 'clash'): Promise<void> {
   game.stop();
-  const frames = capture(game, moment);
+
+  let frames = capture(game, moment);
+  if (!frames.length && MOMENTS[moment].retry) {
+    for (let attempt = 1; attempt < ROUND_ATTEMPTS && !frames.length; attempt++) {
+      restartRound(game);
+      frames = capture(game, moment);
+    }
+  }
   if (!frames.length) {
     document.body.innerHTML =
       '<pre style="color:#e66;font:14px ui-monospace;padding:24px">' +
-      `no ${moment} found — reload with ?shot in the URL, and start a round first` +
+      `no ${moment}: ${lastMiss}` +
       '</pre>';
     return;
   }
