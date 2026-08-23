@@ -175,6 +175,15 @@ export interface RoundResult {
   /** 'draw' means every top went out on the same step; 'timeout' is the clock. */
   reason: Defeat | 'timeout' | 'draw';
   points: number;
+  /**
+   * Whether the knockout went through the arena's graded pocket.
+   *
+   * Carried separately from `points` because the UI needs to NAME it — a
+   * player who is handed 3 points instead of 2 and told nothing has learned
+   * that the arena is random, which is the opposite of what a contested
+   * location is for.
+   */
+  xtremeFinish?: boolean;
 }
 
 export type Phase = 'launch' | 'battle' | 'round-over' | 'match-over';

@@ -1,7 +1,7 @@
 import * as C from './constants';
 import { clamp, len, makeRng, vec } from './math';
 import { deriveStats } from './parts';
-import { step } from './physics';
+import { pocketIndexAt, step } from './physics';
 import type { ContactEvent, HitEvent } from './physics';
 import { STANDARD } from './arena';
 import type { ArenaSpec } from './arena';
@@ -375,7 +375,15 @@ export class Battle {
       // Last top standing. When several fell at once the most decisive finish
       // is the one that gets scored.
       const reason = pickReason(falling.map((f) => f.reason));
-      this.endRound(alive[0].id, reason, falling[0]?.bey.id ?? null);
+      // An Xtreme Finish is a KNOCKOUT through this arena's graded pocket, so
+      // it is decided by where the loser left rather than by the reason alone.
+      // Read off the top that actually went out with that reason — with two
+      // simultaneous defeats, `falling[0]` is not necessarily the knocked-out
+      // one.
+      const out = falling.find((f) => f.reason === reason)?.bey ?? falling[0]?.bey ?? null;
+      const xtreme =
+        reason === 'knockout' && out !== null && isFinishPocket(this.arena, out);
+      this.endRound(alive[0].id, reason, out?.id ?? null, xtreme);
     } else {
       // Every top went out on the same step and none could be separated.
       this.endRound(null, 'draw');
@@ -386,10 +394,13 @@ export class Battle {
     winnerId: string | null,
     reason: RoundResult['reason'],
     loserId: string | null = null,
+    xtremeFinish = false,
   ): void {
     const points =
       reason === 'knockout'
-        ? C.POINTS_KNOCKOUT
+        ? xtremeFinish
+          ? C.POINTS_XTREME_FINISH
+          : C.POINTS_KNOCKOUT
         : reason === 'burst'
           ? C.POINTS_BURST
           : reason === 'spin-finish'
@@ -397,7 +408,7 @@ export class Battle {
             : 0;
 
     if (winnerId) this.scores[winnerId] += points;
-    this.lastRound = { winnerId, loserId, reason, points };
+    this.lastRound = { winnerId, loserId, reason, points, xtremeFinish };
 
     const leader = Object.entries(this.scores).find(
       ([, s]) => s >= this.pointsToWin,
@@ -429,6 +440,20 @@ const SEVERITY: Record<Defeat, number> = {
   burst: 2,
   'spin-finish': 1,
 };
+
+/**
+ * Whether this top left through the arena's graded pocket.
+ *
+ * Bearing is taken from the top's FINAL position, which is already past
+ * EXIT_RADIUS — the exit bearing and the position bearing are the same thing
+ * once it is outside, and reading it here avoids threading an exit record
+ * through the physics for one arena's scoring rule.
+ */
+function isFinishPocket(arena: ArenaSpec, b: BeyState): boolean {
+  const want = arena.finishPocket;
+  if (want === undefined || want === null) return false;
+  return pocketIndexAt(Math.atan2(b.pos.y, b.pos.x)) === want;
+}
 
 /** Why this top is out, or null if it is still in the game. */
 function defeatReason(b: BeyState): Defeat | null {

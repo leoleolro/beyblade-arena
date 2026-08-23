@@ -156,6 +156,18 @@ export const BURST_RECOVERY = 0.055;
 export const POINTS_KNOCKOUT = 2;
 export const POINTS_BURST = 2;
 export const POINTS_SPIN_FINISH = 1;
+/**
+ * A knockout through the arena's designated pocket, where it has one.
+ *
+ * Taken from the real Xtreme Stadium, which scores a 3-point "Xtreme Finish"
+ * through one central pocket and 2 through the corner ones. The point of the
+ * grade is not the extra point — it is that it gives the floor a DIRECTION.
+ * Four identical exits mean every way you can shove an opponent is worth the
+ * same, so position never matters; one exit worth more is a side of the dish
+ * you want them on, which every control tool in the game already exists to
+ * arrange.
+ */
+export const POINTS_XTREME_FINISH = 3;
 /** First to this many points wins the match. */
 export const POINTS_TO_WIN = 4;
 /** A round is declared a draw after this many seconds. */

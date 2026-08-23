@@ -425,6 +425,30 @@ export function inPocket(angle: number): boolean {
 }
 
 /**
+ * Which pocket this bearing left through, or -1 if it did not line up with one.
+ *
+ * A top can cross EXIT_RADIUS slightly off a pocket centre — the wall only
+ * bounces it back when it is OUTSIDE the pocket arc, and the arc is
+ * POCKET_HALF_WIDTH wide — so this answers with the nearest pocket within that
+ * arc rather than the nearest pocket full stop. Returning the nearest
+ * regardless would score an Xtreme Finish for a top that left through the
+ * opposite side of the dish.
+ */
+export function pocketIndexAt(angle: number): number {
+  const angles = pocketAngles();
+  let best = -1;
+  let bestDelta = C.POCKET_HALF_WIDTH;
+  for (let i = 0; i < angles.length; i++) {
+    const d = angleDelta(angle, angles[i]);
+    if (d < bestDelta) {
+      bestDelta = d;
+      best = i;
+    }
+  }
+  return best;
+}
+
+/**
  * Handle the rim. A top that reaches the wall bounces off it — unless it is
  * lined up with an exit pocket and carrying enough outward speed, in which case
  * it sails through and gets ringed out.

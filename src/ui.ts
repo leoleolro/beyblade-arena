@@ -20,6 +20,10 @@ const pct = (n: number): string => `${Math.round(Math.max(0, Math.min(1, n)) * 1
 /** Short, loud version of the finish reason for the title card. */
 const FINISHER_WORD: Record<string, string> = {
   knockout: 'RING OUT',
+  // Not a `Defeat` — the sim only knows 'knockout'. `game.ts` substitutes this
+  // when the exit went through the arena's graded pocket, so the card can name
+  // the rule that just paid out.
+  xtreme: 'XTREME FINISH',
   burst: 'BURST FINISH',
   'spin-finish': 'SPIN FINISH',
   timeout: 'TIME UP',
@@ -535,7 +539,11 @@ export class Ui {
 
     panel.innerHTML = `
       <p class="result-title ${cls}">${title}</p>
-      <p class="result-reason">${escapeHtml(REASON_TEXT[r?.reason ?? 'timeout'] ?? '')}</p>
+      <p class="result-reason">${escapeHtml(
+        r?.xtremeFinish
+          ? `Xtreme Finish! +${r.points}`
+          : REASON_TEXT[r?.reason ?? 'timeout'] ?? '',
+      )}</p>
       <p class="sub">You ${g.playerScore} — ${g.rivalScore} ${escapeHtml(g.aiName)}</p>
       ${breakdown}
       ${matchOver ? this.unlockHtml() : ''}

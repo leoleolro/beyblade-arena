@@ -458,6 +458,26 @@ Two things the tuning taught, both preserved in `rail.test.ts`:
   circle. The test asserts the rail arena's own bounds rather than pretending it
   should behave like a different arena.
 
+### The Xtreme Finish
+
+Not every exit is worth the same in the X-Rail Stadium. One pocket — marked by
+a pair of green posts — scores **3** instead of 2.
+
+Taken from the real BX-10 Xtreme Stadium, which grades its pockets exactly this
+way, and adopted because it fixes something this section already argued for.
+The rail is good design because it creates a contested location; four identical
+exits were the opposite, an entire ring of places where the outcome is the same,
+so there was never a reason to prefer shoving an opponent one way over another.
+One graded exit gives the floor a direction, and every control tool in the game
+— Charge's speed kick, the rail's slingshot bearing, the launch entry angle —
+suddenly has somewhere to aim.
+
+Measured over 220 AI-played rounds: it decides about **one round in six** on
+that arena, and never fires on the plain dish. Four evenly spaced pockets would
+catch 25% of knockouts by chance; this one catches 33%, because the rail slings
+on a bearing the rider does not fully choose. See `docs/ARENA-IDEAS.md` for the
+rest of the research and the ideas that were *not* taken.
+
 ## Visual themes
 
 Three looks, switchable in the garage and persisted:

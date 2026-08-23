@@ -76,6 +76,21 @@ export interface ArenaSpec {
   suggestedTheme: string;
   rail: RailSpec | null;
   pit?: PitSpec | null;
+  /**
+   * Index of the pocket that scores an Xtreme Finish, or null for none.
+   *
+   * Indexes `pocketAngles()`, so 0 is the pocket at POCKET_OFFSET and the rest
+   * run anticlockwise from it. An index rather than an angle because the two
+   * must not be able to drift apart: a bearing written here that fell between
+   * two pockets would be a scoring rule that can never fire, and nothing would
+   * report it.
+   *
+   * This is the one piece of geography the dish did not have. `sim/arena.ts`
+   * argues that the rail is good design because it creates a contested
+   * location; four identical exits are the opposite, an entire ring of places
+   * where the outcome is the same. See docs/ARENA-IDEAS.md.
+   */
+  finishPocket?: number | null;
 }
 
 export const STANDARD: ArenaSpec = {
@@ -103,6 +118,10 @@ export const XRAIL: ArenaSpec = {
     cooldown: 1.6,
     releaseInward: 0.85,
   },
+  // The rail already throws tops across the dish on a bearing the rider does
+  // not fully choose, so a graded exit gives that slingshot something to aim
+  // at. Pocket 0 sits at POCKET_OFFSET = 45 degrees.
+  finishPocket: 0,
 };
 
 export const SPIKE_PIT: ArenaSpec = {

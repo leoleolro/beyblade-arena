@@ -525,9 +525,14 @@ export class Game {
         this.finishHold = C.FINISH_HOLD_TIME;
         this.audio.roundEnd(this.battle.lastRound?.winnerId === PLAYER_ID);
         this.renderer.finish();
+        // An Xtreme Finish is a knockout, but it must not be ANNOUNCED as one:
+        // being handed 3 points and told "ring out" teaches the player that the
+        // arena is arbitrary, which is the opposite of what a graded pocket is
+        // for. The card is the only place the rule is ever explained.
+        const last = this.battle.lastRound;
         this.events.onFinish(
-          this.battle.lastRound?.reason ?? 'timeout',
-          this.battle.lastRound?.winnerId === PLAYER_ID,
+          last?.xtremeFinish ? 'xtreme' : (last?.reason ?? 'timeout'),
+          last?.winnerId === PLAYER_ID,
         );
 
         // Record the match exactly once, the moment it is decided.

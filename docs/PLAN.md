@@ -99,7 +99,7 @@ than damping it out within a few frames. Then make it legible — trail length
 and brightness scaled by speed, spin-blur rate following it, and a short camera
 push on a burst.
 
-## E. Arena concepts — **OPEN**
+## E. Arena concepts — **DONE** — see docs/ARENA-IDEAS.md
 
 Research the real X-Accelerator rail stadium and produce concrete proposals for
 arena mechanics and layout. Design output, not code.

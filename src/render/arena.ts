@@ -16,7 +16,7 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
-import { applyStadiumTheme, beyWorldPosition, buildStadium } from './stadium';
+import { applyStadiumTheme, beyWorldPosition, buildStadium, markFinishPocket } from './stadium';
 import type { StadiumHandles } from './stadium';
 import { ARENA, THEMES, loadImpactFrames, themeById } from './theme';
 import type { Theme } from './theme';
@@ -295,6 +295,8 @@ export class ArenaRenderer {
    * allocated costs nothing when unused.
    */
   private outline: OutlineEffect | null = null;
+  /** Which pocket scores an Xtreme Finish in the current arena, if any. */
+  private finishPocket: number | null = null;
   /** Skins of the current round, so a toon switch can rebuild the meshes. */
   private lastSkins: Record<string, string> = {};
   private lastBeys: BeyState[] = [];
@@ -428,6 +430,8 @@ export class ArenaRenderer {
     }
 
     applyStadiumTheme(this.stadium, t);
+    // After the repaint, never before — see markFinishPocket.
+    markFinishPocket(this.stadium, this.finishPocket);
     // The rail carries emissive metal in the lit themes and banded cel metal in
     // the anime one; a hot emissive with no bloom behind it just clips white.
     this.rail?.setToon(t.toon);
@@ -506,6 +510,12 @@ export class ArenaRenderer {
    * a round can start in either arena and rebuilding each time would leak.
    */
   setArena(arena: ArenaSpec): void {
+    // Remembered so a later theme switch can re-apply it: `applyStadiumTheme`
+    // repaints every post, so the marking has to be re-stated after it rather
+    // than set once here.
+    this.finishPocket = arena.finishPocket ?? null;
+    markFinishPocket(this.stadium, this.finishPocket);
+
     if (arena.rail && !this.rail) {
       this.rail = buildRail(arena.rail.radius);
       this.scene.add(this.rail.group);
