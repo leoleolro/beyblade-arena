@@ -98,8 +98,16 @@ async function buildCell(
   if (cell.theme.toon && !entry) {
     const blur = buildSpinBlur(designByLayer(cell.layerId), radius, parts.layer, build.layer.blades);
     group.add(blur.mesh);
-    // Drive it to the state a fast top is in, which is when it dominates.
-    blur.update(1, 1 / 60);
+    // BELOW the blur's engagement threshold (BLUR_FROM = 0.55), deliberately.
+    //
+    // This drove it at 1 — the state a top at full spin is in, when the blur is
+    // the whole read — and that was the wrong choice for what this sheet is
+    // FOR. At full blur the layer shrinks under a smear and every design comes
+    // out as a soft coloured disc, so the one sheet built to answer "do the
+    // beyblades look right" was hiding the answer. The blur is still built and
+    // still parented, so a blur that is misplaced or misaligned — the bug this
+    // sheet was written to catch — still shows up in the frame.
+    blur.update(0.3, 1 / 60);
   }
 
   if (entry) {
