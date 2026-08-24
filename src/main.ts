@@ -91,6 +91,16 @@ Object.assign(window as unknown as Record<string, unknown>, { game, ui });
  * contactSheet.ts.
  */
 Object.assign(window as unknown as Record<string, unknown>, {
+  /**
+   * The live Game, for poking at from the console.
+   *
+   * Added after a visual bug cost twenty minutes purely because there was no
+   * way to ask the running renderer a question — the filmstrip could show that
+   * an effect was missing but not whether it had ever been spawned, and every
+   * other route meant editing source and reloading. The other helpers here are
+   * unconditional for the same reason; nothing reads this in normal play.
+   */
+  __game: game,
   __sweep: (ids?: string[]): Promise<void> => showContactSheet(ids),
   /**
    * A filmstrip of a clash, launch or defeat, stepped by hand out of the

@@ -116,3 +116,47 @@ export function drawnSpinRate(spinNorm: number, blades: number): number {
   const k = 0.25 + 0.75 * (spinNorm < 0 ? 0 : spinNorm > 1 ? 1 : spinNorm);
   return maxRate * k;
 }
+
+/* ------------------------------------------------------- the clash pool */
+
+/**
+ * The two curves that make the white pool under a clash a FLASH and not a WAVE.
+ *
+ * They live here rather than in clashPool.ts for the reason this whole module
+ * exists: everything in this file is pure and imports nothing from three, so it
+ * can be tested. The distinction these encode is a design decision that was got
+ * wrong once already — the effect shipped as a thin expanding ring and was
+ * reported as "just a small wave like a water drop" — and a silent regression
+ * back toward ring behaviour would look like a tuning drift rather than a bug.
+ */
+
+/** How much of its life the pool spends reaching full brightness. */
+const POOL_ATTACK = 0.12;
+
+/**
+ * Size over life, as a fraction of final width.
+ *
+ * BORN NEARLY FULL SIZE. A front that expands a long way reads as something
+ * LEAVING; a flash already at full size when you notice it reads as something
+ * HAPPENING. `Shockwave` deliberately does the opposite — it is born at 22% of
+ * its travel — and that difference is the whole distinction between the two.
+ */
+export function poolScale(t: number): number {
+  const c = t < 0 ? 0 : t > 1 ? 1 : t;
+  const eased = 1 - (1 - c) * (1 - c);
+  return 0.82 + 0.18 * eased;
+}
+
+/**
+ * Brightness over life: hard attack, long decay.
+ *
+ * NOT the ring's `sin(pi*t)`. That curve is symmetric, so it spends as long
+ * arriving as it does leaving — right for a wave passing through, wrong for an
+ * impact, which is instantaneous and then fades. At 60fps and a 0.26s life this
+ * peaks on frame two and is still half-lit eight frames later.
+ */
+export function poolBrightness(t: number): number {
+  const c = t < 0 ? 0 : t > 1 ? 1 : t;
+  if (c < POOL_ATTACK) return c / POOL_ATTACK;
+  return Math.pow(1 - (c - POOL_ATTACK) / (1 - POOL_ATTACK), 1.7);
+}

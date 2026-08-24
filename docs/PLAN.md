@@ -110,6 +110,42 @@ arena mechanics and layout. Design output, not code.
 
 ---
 
+## G. The white disk under a clash — **DONE**
+
+Reported three times, and the third time as "the white disk at bottom needs to
+look exactly the same as before, bigger, more impactful. not just a small wave
+like a water drop. im still not satisfied".
+
+**It was the wrong OBJECT, not the wrong size.** Every previous attempt tuned
+`Shockwave` — span, peak, front count — and `Shockwave` draws an annulus: its
+texture is fully transparent until 87% of its radius, and it is born at 22% of
+its travel and expands outward. That is a ripple by construction. No value of
+"bigger" turns a thin expanding circle into a flash, which is why three rounds
+of tuning all landed back on "a small wave like a water drop".
+
+The reference frame — `docs/design-targets/overdrive-target-clash.png`, which
+was sitting in the repo the whole time — shows a broad blown-out white mass
+lying ON the dish floor beneath the tops. Filled, not annular. Already at full
+size when it appears. Gone in a quarter second.
+
+So `clashPool.ts` is a second, separate effect rather than a fourth attempt at
+the first one. The ring is the pressure front leaving the impact; the pool is
+the impact. Both fire on a heavy hit.
+
+The two curves that make it a flash rather than a wave live in `motion.ts`,
+which is three-free, and are pinned by tests: born at ≥80% of final size,
+peaking inside the first fifth of its life, monotone decay after. Those are the
+properties that were wrong before, and they are invisible in a diff.
+
+**Measured, because "light pollution" is the standing risk in this theme:** over
+a full Overdrive round the pool is lit on **9.5% of frames**, mean alpha 0.042.
+It is off nine frames in ten. Light pollution is glow with no event attached;
+this is glow that is the event.
+
+Checked against the burst invariant too — `playDefeat` gets the biggest pool in
+the game and the dish stays readable through all three sampled frames, which is
+the thing a previous burst effect broke.
+
 ## Backlog — not now
 
 - The chevron arrows on the X-Rail dish. Busy, and absent from the reference.
@@ -138,8 +174,6 @@ arena mechanics and layout. Design output, not code.
   accelerates — "five times under three seconds, small bumps then big bumps".
   Research first, in the shape of `docs/ARENA-IDEAS.md`: what the real thing
   does, what this sim can support, what each idea would cost.
-- **The white shockwave disk under a clash.** Still not big or heavy enough.
-  See "Round two" below for what has been tried.
 - **The thickening outlines on Epic beys.** Diagnosed, not fixed — it is a
   concavity failure in the inverted-hull pass, not an over-thick line, so
   tuning cannot reach it. Full measurements in `docs/BLACK-SHARDS.md` part two.

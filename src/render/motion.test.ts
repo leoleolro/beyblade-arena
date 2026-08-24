@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { drawnSpinRate, SPEED_HI, SPEED_LO, speedK, trailScale } from './motion';
+import {
+  drawnSpinRate,
+  poolBrightness,
+  poolScale,
+  SPEED_HI,
+  SPEED_LO,
+  speedK,
+  trailScale,
+} from './motion';
 
 /**
  * These numbers are a claim about the GAME, not about arithmetic.
@@ -115,6 +123,81 @@ describe('drawnSpinRate', () => {
       const r = drawnSpinRate(sn, 6);
       expect(r).toBeGreaterThan(prev);
       prev = r;
+    }
+  });
+});
+
+/**
+ * The clash pool's curves.
+ *
+ * Pinned because the effect has already been wrong once in exactly the way
+ * these prevent. It shipped as a thin ring born small and expanding far, and
+ * was reported as "not just a small wave like a water drop" — the complaint was
+ * about SHAPE OVER TIME, not size or brightness, and neither of those is
+ * visible in a diff or caught by anything else in this suite.
+ */
+describe('the clash pool reads as a flash, not a wave', () => {
+  it('is born nearly full size', () => {
+    // The one property that separates it from `Shockwave`, which is born at 22%
+    // of its travel on purpose. A pool that grows like a ring is a ring.
+    expect(poolScale(0)).toBeGreaterThan(0.8);
+    expect(poolScale(1)).toBeCloseTo(1, 5);
+  });
+
+  it('never shrinks over its life', () => {
+    let prev = -Infinity;
+    for (let t = 0; t <= 1.0001; t += 0.05) {
+      const s = poolScale(t);
+      expect(s).toBeGreaterThanOrEqual(prev);
+      prev = s;
+    }
+  });
+
+  it('peaks in the first fifth of its life and then only falls', () => {
+    // Asymmetry is the point. `sin(pi*t)` — the ring's curve — peaks dead
+    // centre, which reads as a wave passing through rather than an impact.
+    let peakAt = 0;
+    let peak = -Infinity;
+    for (let t = 0; t <= 1.0001; t += 0.01) {
+      const b = poolBrightness(t);
+      if (b > peak) {
+        peak = b;
+        peakAt = t;
+      }
+    }
+    expect(peak).toBeCloseTo(1, 3);
+    expect(peakAt).toBeLessThan(0.2);
+
+    // Monotone decay after the peak — no second flare.
+    let prev = Infinity;
+    for (let t = 0.2; t <= 1.0001; t += 0.05) {
+      const b = poolBrightness(t);
+      expect(b).toBeLessThanOrEqual(prev + 1e-9);
+      prev = b;
+    }
+  });
+
+  it('starts and ends dark', () => {
+    // Zero at birth, so a pool is never caught at full brightness on the frame
+    // it appears; zero at death, so it fades rather than being cut.
+    expect(poolBrightness(0)).toBeCloseTo(0, 6);
+    expect(poolBrightness(1)).toBeCloseTo(0, 6);
+  });
+
+  it('is still clearly lit a third of the way through', () => {
+    // The long decay is what makes it readable at 60fps. A curve that dropped
+    // to nothing by t=0.3 would be a two-frame blink.
+    expect(poolBrightness(0.33)).toBeGreaterThan(0.5);
+  });
+
+  it('clamps outside its life rather than going negative or exploding', () => {
+    for (const t of [-1, -0.01, 1.01, 5]) {
+      const b = poolBrightness(t);
+      const s = poolScale(t);
+      expect(b).toBeGreaterThanOrEqual(0);
+      expect(b).toBeLessThanOrEqual(1);
+      expect(s).toBeGreaterThanOrEqual(0.8);
+      expect(s).toBeLessThanOrEqual(1);
     }
   });
 });

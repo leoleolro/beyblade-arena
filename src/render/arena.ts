@@ -21,6 +21,7 @@ import type { StadiumHandles } from './stadium';
 import { ARENA, THEMES, loadImpactFrames, themeById } from './theme';
 import type { Theme } from './theme';
 import { Shockwave } from './shockwave';
+import { ClashPool } from './clashPool';
 import type { ArenaSpec } from '../sim/arena';
 import { buildRail } from './rail';
 import type { RailHandles } from './rail';
@@ -288,6 +289,7 @@ export class ArenaRenderer {
   private rimA!: THREE.PointLight;
   private rimB!: THREE.PointLight;
   private readonly shockwaves = new Shockwave();
+  private readonly clashPools = new ClashPool();
   private composer: EffectComposer | null = null;
   /**
    * Inverted-hull outline pass. Created lazily on first toon use and then kept:
@@ -354,6 +356,7 @@ export class ArenaRenderer {
     // Sparks draw over the ribbons (1) and blur discs (2) in every theme.
     this.sparks.points.renderOrder = 3;
     this.scene.add(this.shockwaves.group);
+    this.scene.add(this.clashPools.group);
     this.addLights();
     this.resize();
 
@@ -447,6 +450,7 @@ export class ArenaRenderer {
 
     this.sparks.setStyle(t.sparkColour, t.sparkSize);
     this.shockwaves.setInk(t.shockwaveInk !== null);
+    this.clashPools.setInk(t.shockwaveInk !== null);
     for (const v of this.visuals.values()) {
       v.trail.setOpacity(t.trailOpacity);
       v.light.intensity = t.beyLightIntensity;
@@ -1143,6 +1147,11 @@ export class ArenaRenderer {
         // event; the ring should sit under the top, not cross the arena.
         if (this.theme.shockwave) {
           this.shockwaves.spawn(at, this.theme.shockwaveInk ?? 0xffffff, 0.55, 1, 0.22);
+          // Small and dim next to a clash. A landing is two tops touching down
+          // on the same frame at the start of EVERY round; at clash weight the
+          // pair would white out the opening beat of the match, which is the
+          // one moment the reference keeps darkest.
+          this.clashPools.spawn(at, this.theme.shockwaveInk ?? 0xffffff, 0.9, 0.5);
         }
         this.sparks.spawn(at, 3.0, 40);
       }
@@ -1272,6 +1281,20 @@ export class ArenaRenderer {
         // has to come down to pay for it.
         this.shockwaves.spawn(at, colour, span, h.crit ? 3 : 2, 0.26);
         if (h.perfectBlock) this.shockwaves.spawn(at, colour, span * 0.62, 2, 0.24);
+        // The white disk under the tops — the thing the reference frame is
+        // actually of, and the thing the ring above is not. See clashPool.ts.
+        //
+        // Sized in the SAME currency as the ring but roughly double it, because
+        // a pool and a front of equal width read as very different sizes: the
+        // ring's texture puts its light at 96% of its radius, the pool's puts
+        // the bright core inside 30%. Matching their spans would have produced
+        // a flash a third the width of the wave that left it.
+        //
+        // 1.5 at the hitstop bar, 1.9 at the impact-frame bar, 2.2 at the cap.
+        // The dish clips it, so the number that matters is how far the spill
+        // reaches across the basin, not the plane's width.
+        const poolSpan = Math.min(2.2, 0.95 + h.strength * 0.34) + (h.crit ? 0.25 : 0);
+        this.clashPools.spawn(at, colour, poolSpan, h.crit ? 1 : 0.86);
       }
       // The manga cut, centred on where the clash actually happened. Same
       // threshold as hitstop: the sim freezes for a beat and this is the frame
@@ -1409,6 +1432,7 @@ export class ArenaRenderer {
 
     this.sparks.update(dt);
     this.shockwaves.update(dt);
+    this.clashPools.update(dt);
     this.updateCamera(beys, dt);
 
     this.present();
@@ -1652,6 +1676,12 @@ export class ArenaRenderer {
         // stack to white carry the same weight and leave the arena visible.
         if (this.theme.shockwave) {
           this.shockwaves.spawn(at, this.theme.shockwaveInk ?? 0xffffff, 1.05, 3, 0.22);
+          // The biggest pool in the game, and the only one allowed to be. A
+          // burst ends the round, so there is no following frame for it to
+          // wash out — the invariant the ring has to protect (keep the dish
+          // readable through a burst) is about the SUSTAINED bands, not a
+          // quarter-second flash.
+          this.clashPools.spawn(at, this.theme.shockwaveInk ?? 0xffffff, 2.6, 1);
         }
         this.sparks.spawn(at, 4.5, 64);
         // Only in themes that already light the arena from the tops. ARENA
