@@ -108,6 +108,23 @@ arena mechanics and layout. Design output, not code.
 
 `docs/design-targets/` — done. Screenshot approved states as they happen.
 
+**A screenshot of an animated page can be a photograph of the past.**
+`requestAnimationFrame` does not fire while the browser pane is hidden, so the
+inspector, the garage preview and the game loop all freeze — and a screenshot
+still returns the last frame drawn, with nothing to say it is stale. Two
+screenshots taken either side of a code change can be the same frame. This cost
+most of one session and produced both a false positive and a false negative
+before it was spotted.
+
+Check it in one line before trusting any visual comparison:
+
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+If that hangs, use a synchronous render path instead — `__sweep()`,
+`__moment(...)`, or `__game.renderer.update(...)` followed by
+`__game.renderer.present()`. None of them depend on rAF. See
+docs/BLACK-SHARDS.md part three.
+
 ---
 
 ## G. The white disk under a clash — **DONE**

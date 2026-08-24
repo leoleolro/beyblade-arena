@@ -215,3 +215,90 @@ concavity and to lean, which is precisely the property missing here.
 Recorded rather than attempted: it replaces the cel theme's whole outline path
 and coexists awkwardly with the bloom composer, so it is a deliberate piece of
 work rather than a tuning pass.
+
+
+---
+
+# Part three: an attempt at the fix that did not earn its place
+
+Recorded because the analysis is worth keeping and the outcome is worth being
+honest about: **the thickening ink could not be reproduced in the current
+build**, and a change built to fix it was reverted rather than shipped on
+reasoning alone.
+
+## The candidate fix, and why it looked right
+
+`OutlineEffect`'s offset line is:
+
+```glsl
+vec4 norm = normalize( pos - pos2 );
+return pos + norm * thickness * pos.w * ratio;
+```
+
+`norm` is a normalised **vec4**, not a direction in the screen plane. The offset
+therefore carries `z` and `w` terms, so every hull vertex is moved through
+DEPTH as well as across the screen. That is a real property of the shader and it
+is exactly the mechanism you would expect to produce concavity artefacts: a hull
+fragment inside a recess can be nudged toward the camera and win the depth test
+against the surface in front of it.
+
+The proposed fix was to keep the lateral components and drop the rest:
+
+```glsl
+return pos + vec4( norm.xy, 0.0, 0.0 ) * thickness * pos.w * ratio;
+```
+
+reached by patching the material through `Object3D.onBeforeRender` (the effect's
+materials live in a closure and are never handed out) and `onBeforeCompile`.
+
+## Why it was reverted
+
+Posed at `tilt = 0.40` — above the sim's own 0.42 cap, so worse than anything a
+round produces — with the patch on and off, on the same bey, the same camera and
+the same lean: **the outline looks the same either way, and neither shows the
+reported black mass.** The welded ink normals from part one appear to have
+already dealt with the cases that were visible.
+
+A rendering change that cannot be shown to change the rendering does not go in,
+however good the reasoning behind it. It would also have been a liability: the
+patch asserts on three's shader text and throws if a version bump rewords it,
+which is a real cost to carry for a benefit nobody has seen.
+
+## The method error that wasted most of the time, and how not to repeat it
+
+**`requestAnimationFrame` does not fire while the Browser pane is hidden.** The
+inspector, the garage preview and the game loop are all rAF-driven, so when the
+pane is hidden they are frozen — and a screenshot still returns the last frame
+that was drawn. It looks like a working screenshot of a live page. It is a
+photograph of the past.
+
+Several comparisons made this way were worthless without announcing themselves:
+two screenshots taken minutes and one code change apart were the same stale
+frame, which read first as "the fix works" and then as "the fix does nothing",
+and neither reading was evidence of anything.
+
+The tell is cheap and should be the first thing checked whenever a visual result
+is surprising:
+
+```js
+await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+```
+
+If that hangs, every screenshot of an animated page in that session is stale.
+
+**Use a synchronous render path instead.** These do not depend on rAF and are
+correct while the pane is hidden:
+
+- `__sweep()` — the contact sheet, every bey in every theme
+- `__moment('clash' | 'launch' | 'burst' | 'ringout')` — the filmstrip
+- `__game.renderer.update(beys, [], dt, [])` followed by
+  `__game.renderer.present()` — drives one arena frame by hand, which is how the
+  posed-tilt comparison above was finally made. `__game` is exposed on `window`
+  for exactly this.
+
+## Where this leaves the bug
+
+Still open, and still believed, but it needs a reproduction before it needs a
+fix. What would pin it down: the bey, the theme and roughly how far into a round
+it appears — or a screenshot. The analysis above is the head start for whoever
+picks it up.
