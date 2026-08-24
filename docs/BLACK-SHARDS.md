@@ -150,3 +150,68 @@ MTL** with four textures and six materials (21,908 triangles). The loader
 currently handles `.glb` / `.gltf` / `.stl` only, so this one does not load at
 all yet. It also has real authored colour, which the metal-finish override in
 `finishAsMetal()` would currently throw away.
+
+
+---
+
+# Part two: the ink thickens as a round goes on
+
+Reported later, and separately: *"the epic beyblades, in a battle, after each
+contact, the black outlines get thicker and thicker. even though at launch they
+all appear normal and fine."*
+
+That description is exactly right, and the cause is **not** thickness.
+
+## What was measured
+
+Stepping a round by hand and sampling `userData.outlineParameters.thickness` on
+the player's layer after every hit:
+
+    t=0.0  hits 0   ink [0.02, 0.014]
+    t=0.3  hits 1   ink [0.02, 0.014]
+    t=1.1  hits 2   ink [0.02, 0.014]
+
+**The ink values never change.** Nothing writes them per hit; `spinBlur` only
+ever thins them, and only while the blur is engaged.
+
+What *does* change is the top's **lean**. `b.tilt` is
+`speed * 0.06 + (1 - spinNorm) * 0.22`, so as contacts drain spin the top tilts
+further — measured 0 at launch, 0.27 rad (about 16°) after two hits, and the
+renderer applies that as a real rotation with a wobble on top.
+
+## Isolating it
+
+Four frames of the same tilted top, one variable each:
+
+| | result |
+| --- | --- |
+| as shipped | thick black mass over the upper rim |
+| spin blur hidden | unchanged |
+| contact shadow hidden | unchanged |
+| **layer ink off** | **black gone entirely** |
+
+So it is the layer's own inverted hull, and neither the blur nor the shadow.
+
+## Why thickness is not the lever
+
+Sweeping the layer's ink at 0.02 / 0.012 / 0.008 / 0.005 on the same tilted
+pose: the mass shrinks slightly and **survives at every value**. Disabling each
+of the layer's two inked materials in turn leaves a mass from the other.
+
+That is the signature of the concavity failure this document already describes,
+not of an over-thick line. A tiered layer is concave — tiers, recesses, an
+under-ring — and a leaning top turns more of that concave geometry toward the
+camera, where back-faces pushed outward win the depth test and fill in as solid
+black. Welded normals fixed the *tearing* at hard edges; they do nothing about
+a back-face inside a recess, which is a different failure with the same colour.
+
+## So the fix is route 2
+
+The ranked options at the top of this document still stand, and this narrows
+which one is needed. Smoothed hull normals are already in place and are not
+enough. A post-process edge detector over depth and normals is indifferent to
+concavity and to lean, which is precisely the property missing here.
+
+Recorded rather than attempted: it replaces the cel theme's whole outline path
+and coexists awkwardly with the bloom composer, so it is a deliberate piece of
+work rather than a tuning pass.

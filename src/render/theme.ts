@@ -357,19 +357,25 @@ export const ANIME: Theme = {
   // that says a feature is on while the code guarantees it is off.
   impactFlash: false,
 
-  // 0.45, because the dish here is near-white polycarbonate and the top has to
-  // read AGAINST it. At 0.85 an imported silver top and a pale bowl sit at
-  // almost the same value and the top dissolves into the floor — visible in a
-  // match, not a theoretical worry. Darker metal is the whole fix.
-  envIntensity: 0.45,
+  // 0.62, up from 0.45. The dish here is near-white polycarbonate so the top
+  // still has to read against it, but 0.45 plus the darkened tint took the
+  // reflection down far enough that the metal stopped looking like metal. This
+  // is the dial that should carry that trade rather than the tint: it changes
+  // how hard the studio reflects without flattening the highlight.
+  envIntensity: 0.62,
 
   // Full strength. No bloom here, so the aura is exactly as drawn — and it is
   // the single strongest anime signal the theme has.
   auraStrength: 1,
 
-  // Stepped down against a near-white polycarbonate dish. Pale metal on a
-  // pale bowl has no contrast left to lose.
-  modelTint: 0xb3bcc7,
+  // 0xd2d9e2, back up from 0xb3bcc7. The step down was for contrast against a
+  // near-white dish and it overshot: the owner's report is that the imported
+  // Valtryek lost "the glossy finish when we first imported in", and a mid-grey
+  // metal is exactly what a chrome top looks like once you take the highlight
+  // off it. Contrast against the bowl is bought back with `envIntensity`
+  // instead, which darkens the BODY while leaving the specular alone — the
+  // highlight is what reads as gloss, not the base tone.
+  modelTint: 0xd2d9e2,
 
   // Off: the cel path draws its own rim inside `metalToonMaterial`, and the
   // ink outline is already describing every silhouette in the frame.

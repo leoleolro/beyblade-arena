@@ -16,6 +16,7 @@ import { skinById } from './render/skins';
 import { THEMES, themeById } from './render/theme';
 import type { Theme } from './render/theme';
 import { BEY_PRESETS } from './render/beydex';
+import { groupByClass } from './render/beyClass';
 import { DISCS, DRIVERS, LAYERS, deriveStats, makeBuild } from './sim/parts';
 import type { BeyBuild } from './sim/types';
 
@@ -286,24 +287,49 @@ function buildRoster(): void {
   // Named presets first — those are the beys as designed — then the raw layer
   // list for anything the preset table does not cover.
   const seen = new Set<string>();
-  const add = (id: string, name: string): void => {
+  const all: { id: string; name: string }[] = [];
+  const collect = (id: string, name: string): void => {
     if (seen.has(id)) return;
     seen.add(id);
-    const b = document.createElement('button');
-    b.textContent = name;
-    b.dataset.layer = id;
-    b.addEventListener('click', () => {
-      build = makeBuild(id, build.disc.id, build.driver.id);
-      for (const el of rosterEl.children) el.classList.remove('on');
-      b.classList.add('on');
-      rebuild();
-    });
-    rosterEl.appendChild(b);
+    all.push({ id, name });
   };
+  for (const p of BEY_PRESETS) collect(p.layerId, p.name);
+  for (const l of LAYERS) collect(l.id, l.name);
 
-  for (const p of BEY_PRESETS) add(p.layerId, p.name);
-  for (const l of LAYERS) add(l.id, l.name);
-  rosterEl.firstElementChild?.classList.add('on');
+  // GROUPED BY CLASS: Legendary (imported) and Epic (designed here). A flat
+  // list of eleven names says nothing about which of them are the ones somebody
+  // modelled in a 3D tool and which were built part by part in this repo, and
+  // that distinction is the first thing an inspector should make visible.
+  let first: HTMLButtonElement | null = null;
+  for (const group of groupByClass(all, (b) => b.id)) {
+    const h = document.createElement('h2');
+    h.textContent = group.info.label;
+    h.style.color = `#${group.info.colour.toString(16).padStart(6, '0')}`;
+    rosterEl.appendChild(h);
+
+    const sub = document.createElement('div');
+    sub.textContent = group.info.blurb;
+    sub.style.cssText = 'color:#8698b8;font-size:10px;margin:-4px 4px 6px';
+    rosterEl.appendChild(sub);
+
+    for (const item of group.items) {
+      const b = document.createElement('button');
+      b.textContent = item.name;
+      b.dataset.layer = item.id;
+      b.addEventListener('click', () => {
+        build = makeBuild(item.id, build.disc.id, build.driver.id);
+        for (const el of rosterEl.querySelectorAll('[data-layer]')) el.classList.remove('on');
+        b.classList.add('on');
+        rebuild();
+      });
+      rosterEl.appendChild(b);
+      first ??= b;
+    }
+  }
+  first?.classList.add('on');
+  // Start on whatever the first group offers, so the opening view matches the
+  // highlighted entry rather than defaulting to a bey further down the list.
+  if (first?.dataset.layer) build = makeBuild(first.dataset.layer, build.disc.id, build.driver.id);
 }
 
 function buildThemeButtons(): void {
