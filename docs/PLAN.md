@@ -127,6 +127,24 @@ docs/BLACK-SHARDS.md part three.
 
 ---
 
+## H. The thickening outlines — **DONE**
+
+`spinBlur.ts` thinned the layer's ink and scaled the thinning by blur dominance,
+which is a pure function of remaining spin. At launch the outline drew at 0.45x
+its authored thickness; as contacts drained the spin it grew to 1.0x. A 2.2x
+change in line weight over a round, keyed to the one quantity that only ever
+falls — which is exactly "thicker and thicker after each contact, even though at
+launch they all appear normal and fine".
+
+Now constant at the launch value. Pinned by `spinBlur.test.ts`, which drives the
+real `SpinBlur.update()` at both ends of the spin range; both tests fail against
+the old formula.
+
+Two earlier diagnoses blamed the inverted hull and were wrong. See
+`docs/BLACK-SHARDS.md` part four for how, which is the more useful half.
+
+---
+
 ## G. The white disk under a clash — **DONE**
 
 Reported three times, and the third time as "the white disk at bottom needs to
@@ -191,9 +209,6 @@ the thing a previous burst effect broke.
   accelerates — "five times under three seconds, small bumps then big bumps".
   Research first, in the shape of `docs/ARENA-IDEAS.md`: what the real thing
   does, what this sim can support, what each idea would cost.
-- **The thickening outlines on Epic beys.** Diagnosed, not fixed — it is a
-  concavity failure in the inverted-hull pass, not an over-thick line, so
-  tuning cannot reach it. Full measurements in `docs/BLACK-SHARDS.md` part two.
 - **A second look for Beyblade Arena mode.** See `docs/UX-FLOW.md`, "Known gap".
 
 

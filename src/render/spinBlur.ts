@@ -60,11 +60,42 @@ const GHOSTS = 3;
 const GLINT_RATE = 3.4;
 
 /**
- * Ink left on the layer at full blur, as a fraction of its authored thickness.
- * Not zero: the silhouette still needs a line against a near-white dish. Low
- * enough that the individual blade walls stop reading as separate lines.
+ * Ink on the layer while it is in a battle, as a fraction of its authored
+ * thickness. Constant — and the fact that it is constant is the whole point.
+ *
+ * WHAT THIS USED TO BE, AND THE BUG IT CAUSED. This was `INK_AT_FULL_BLUR` and
+ * it was one end of a ramp:
+ *
+ *     thickness = base * (1 - (1 - 0.45) * k)      // k = blur dominance
+ *
+ * `k` is `clamp01((spinNorm - BLUR_FROM) / BLUR_SPAN)` — a pure function of
+ * remaining spin. So a top launched at full spin drew its outline at 0.45x, and
+ * as contacts drained the spin the SAME outline grew, hitting 1.0x by the end
+ * of the round. A 2.2x change in line weight over a round, keyed to the one
+ * quantity that only ever falls.
+ *
+ * Reported exactly that way, twice: "in a battle, after each contact, the black
+ * outlines get thicker and thicker. even though at launch they all appear
+ * normal and fine." That is not a description of a concavity artefact or a
+ * torn hull, which is what it was first diagnosed as — see BLACK-SHARDS.md
+ * parts two and three, both of which chased the wrong thing. It is a
+ * description of this ramp, and the owner's two screenshots — one at launch,
+ * one at the end of the same round with Victory Valtryek — show the two ends of
+ * it.
+ *
+ * WHY THE VALUE IS THE LOW END RATHER THAN THE HIGH END. 0.45 is what a top
+ * looked like at launch, and launch is the state the owner called normal and
+ * fine. It also keeps the original reason the thinning existed: at this weight
+ * the individual blade walls stop reading as separate lines, so a dense blur
+ * does not turn into a fence. Holding it there for the whole round gets both.
+ *
+ * WHY NOT SIMPLY AUTHOR THE LAYER'S INK THINNER. Because the layer is not the
+ * only inked part, and the disc and driver never rode this ramp — `collectInk`
+ * only ever walked the layer. Thinning at the authoring site would drag those
+ * with it and change every surface that draws a top without a blur (the
+ * inspector, the garage preview, the contact sheet), none of which had the bug.
  */
-const INK_AT_FULL_BLUR = 0.45;
+const LAYER_INK_IN_BATTLE = 0.45;
 
 /** Scratch for the view-angle fade; onBeforeRender must not allocate. */
 const camPos = new THREE.Vector3();
@@ -398,8 +429,13 @@ export function buildSpinBlur(
       glintMat.opacity = k * 0.6 * viewFade;
       for (let i = 0; i < ghostMats.length; i++) ghostMats[i].opacity = k * alphas[i];
 
+      // Deliberately NOT scaled by `k`. See LAYER_INK_IN_BATTLE — tying line
+      // weight to remaining spin is what made the outlines thicken through a
+      // round. Still assigned every frame rather than once at build time,
+      // because OutlineEffect re-reads these blocks per object per draw and a
+      // top can outlive a theme switch that rebuilt its materials.
       for (const line of ink) {
-        line.params.thickness = line.base * (1 - (1 - INK_AT_FULL_BLUR) * k);
+        line.params.thickness = line.base * LAYER_INK_IN_BATTLE;
       }
 
       return k;

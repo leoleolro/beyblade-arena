@@ -156,6 +156,10 @@ all yet. It also has real authored colour, which the metal-finish override in
 
 # Part two: the ink thickens as a round goes on
 
+> **Superseded — see part four.** The cause is not the hull and not concavity.
+> The conclusion below is wrong; the measurements are kept because the way they
+> misled is instructive.
+
 Reported later, and separately: *"the epic beyblades, in a battle, after each
 contact, the black outlines get thicker and thicker. even though at launch they
 all appear normal and fine."*
@@ -302,3 +306,68 @@ Still open, and still believed, but it needs a reproduction before it needs a
 fix. What would pin it down: the bey, the theme and roughly how far into a round
 it appears — or a screenshot. The analysis above is the head start for whoever
 picks it up.
+
+
+---
+
+# Part four: found it, and it was never the hull
+
+Parts two and three are both wrong about the cause. Keeping them, because how a
+diagnosis goes wrong is worth as much as the answer, but read this first.
+
+## The cause
+
+`spinBlur.ts` thinned the layer's ink and scaled the thinning by blur dominance:
+
+```ts
+const k = clamp01((spinNorm - BLUR_FROM) / BLUR_SPAN);   // pure function of spin
+line.params.thickness = line.base * (1 - (1 - 0.45) * k);
+```
+
+At launch `k = 1`, so the outline drew at **0.45x** its authored thickness. As
+contacts drained the spin, `k` fell to 0 and the same outline grew to **1.0x**.
+
+**A 2.2x change in line weight over a round, keyed to the one quantity in the
+game that only ever falls.** That is the whole bug, and it explains the half of
+the report that the hull theories never accounted for: "even though at launch
+they all appear normal and fine."
+
+Fixed by making it constant at the launch value — `LAYER_INK_IN_BATTLE = 0.45`.
+The original reason for the thinning survives, because 0.45 is the value that
+reason picked: at that weight the individual blade walls stop reading as
+separate lines through a dense blur.
+
+## How two diagnoses missed it
+
+**Part two measured the right number in the wrong state.** It sampled
+`userData.outlineParameters.thickness` after each hit and found it constant at
+0.02 / 0.014. It is constant — when nothing is driving `SpinBlur.update()`.
+Stepping the sim by hand does not run the blur's update, so `k` never moved and
+the ramp never fired. The measurement was real, reproducible, and taken in a
+state the bug cannot occur in.
+
+**Part three then went looking for a mechanism inside the hull**, found a
+genuine one (the vec4 offset moves the hull in depth), built a fix for it, and
+correctly reverted it when it changed nothing. The reasoning was sound and the
+target was wrong.
+
+The common error in both: the report said *thicker*, and "thicker" was read as
+"the hull is misbehaving" rather than as "something is writing a bigger number".
+Nothing checked whether anything wrote `thickness` at all. One `grep` for
+`outlineParameters` across `src/` — four hits, one of them an assignment in
+`spinBlur.ts` — would have found it at any point.
+
+**Ask what writes the value before asking why the renderer is wrong.**
+
+## What settled it
+
+Two screenshots from the owner: the same round, launch and end, Victory
+Valtryek against Ragnaruk. Thin crisp line in the first, heavy black band in the
+second. Reproduced exactly by posing one top at 8% spin with the ramp restored,
+and gone with it constant — same bey, same camera, same lean, one line of
+difference.
+
+Pinned by `spinBlur.test.ts`, which drives the real `SpinBlur.update()` at both
+ends of the spin range and reads the thickness back. Both tests fail against the
+old formula. A test that recomputed the formula instead would have agreed with
+the bug.
