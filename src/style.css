@@ -564,7 +564,7 @@ kbd {
   flex-wrap: wrap;
 }
 
-button.primary {
+.primary {
   padding: 12px 26px;
   border-radius: 11px;
   border: 1px solid rgba(56, 189, 248, 0.55);
@@ -576,7 +576,7 @@ button.primary {
   cursor: pointer;
 }
 
-button.primary:hover {
+.primary:hover {
   background: linear-gradient(180deg, rgba(56, 189, 248, 0.42), rgba(56, 189, 248, 0.2));
 }
 
@@ -743,14 +743,102 @@ button.primary:hover {
   justify-content: center;
 }
 
-button.primary.ghost {
+.primary.ghost {
   border-color: var(--line);
   background: rgba(255, 255, 255, 0.05);
   color: var(--text);
 }
 
-button.primary.ghost:hover {
+.primary.ghost:hover {
   background: rgba(255, 255, 255, 0.1);
+}
+
+/* An <a> that has to sit in a row of buttons and match them exactly. It stays a
+   link because it navigates to another page, which matters to middle-click and
+   to screen readers — only the painting is borrowed.
+
+   The .primary rules above are deliberately element-agnostic for this: scoped
+   to `button` they left this anchor with the browser's default link blue on the
+   panel's dark blue, which is invisible rather than merely unstyled. */
+a.primary.as-button {
+  display: inline-block;
+  text-decoration: none;
+  line-height: normal;
+}
+
+/* ------------------------------------------------------------ mode select */
+
+.mode-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 14px;
+  margin: 22px 0 26px;
+}
+
+/* Cards, not chips. The two modes hold different beyblades, so they are two
+   places rather than two settings of one — and a chip row says "setting". */
+.mode-card {
+  --accent: #7cc4ff;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+  padding: 16px 18px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s;
+}
+
+.mode-card:hover {
+  border-color: var(--accent);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.mode-card.on {
+  border-color: var(--accent);
+  /* colour-mix keeps the wash tied to the card's own accent, so a third mode
+     needs no new rule here — only an accent on the mode. */
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.mode-name {
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.mode-tag {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--accent);
+}
+
+.mode-blurb {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--dim);
+}
+
+.mode-looks {
+  margin-top: 2px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--dim);
+  opacity: 0.75;
+}
+
+.stadium-panel .slot + .slot {
+  margin-top: 14px;
+}
+
+.stadium-panel .dim {
+  color: var(--dim);
+  font-weight: 400;
 }
 
 /* ----------------------------------------------------------- how to play */

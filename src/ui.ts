@@ -10,9 +10,9 @@ import * as C from './sim/constants';
 import { SKINS, skinById } from './render/skins';
 import type { Channel } from './audio';
 import { THEMES, themeById } from './render/theme';
+import { MODES, modeById, stadiumsByLook } from './modes';
 import { GarageView } from './render/garageView';
 import { LADDER } from './ladder';
-import { ARENAS } from './sim/arena';
 import type { BeyState, MoveKind } from './sim/types';
 
 const hex = (n: number): string => `#${n.toString(16).padStart(6, '0')}`;
@@ -95,12 +95,20 @@ export class Ui {
       this.root.appendChild(this.home());
       return;
     }
+    if (g.screen === 'mode') {
+      this.root.appendChild(this.modeScreen());
+      return;
+    }
     if (g.screen === 'howto') {
       this.root.appendChild(this.howTo());
       return;
     }
     if (g.screen === 'garage') {
       this.root.appendChild(this.garage());
+      return;
+    }
+    if (g.screen === 'stadium') {
+      this.root.appendChild(this.stadiumScreen());
       return;
     }
 
@@ -563,32 +571,6 @@ export class Ui {
    */
 
   /**
-   * Arena picker. A match setting, not a cosmetic: it changes the physics.
-   */
-  private arenaSection(): HTMLElement {
-    const g = this.game;
-      // Arena. Unlike skins and themes this changes the physics, so it is
-      // labelled as a match setting rather than sitting with the cosmetics.
-      const arenaRow = document.createElement('div');
-      arenaRow.className = 'slot';
-      arenaRow.innerHTML = '<h4>Arena — changes how the match plays</h4>';
-      const arenaChips = document.createElement('div');
-      arenaChips.className = 'chips';
-      for (const a of ARENAS) {
-        const chip = document.createElement('button');
-        chip.className = 'chip' + (g.arenaId === a.id ? ' on' : '');
-        chip.innerHTML = `<span>${escapeHtml(a.name)}<br><small>${escapeHtml(a.blurb)}</small></span>`;
-        chip.addEventListener('click', () => {
-          g.setArena(a.id);
-          this.render();
-        });
-        arenaChips.appendChild(chip);
-      }
-      arenaRow.appendChild(arenaChips);
-    return arenaRow;
-  }
-
-  /**
    * Spin direction. Also a match setting — the two pairings measure completely
    * differently, so this decides what kind of fight you get.
    */
@@ -695,10 +677,22 @@ export class Ui {
     const row = document.createElement('div');
     row.className = 'row home-row';
 
+    // Play goes to the mode choice, not straight to the garage. The mode
+    // decides which beyblade gets built at all — see modes.ts — so arriving in
+    // the garage without having made it means being shown a roster that is
+    // whatever last session happened to leave in storage.
     const play = document.createElement('button');
     play.className = 'primary';
     play.textContent = 'Play';
-    play.addEventListener('click', () => g.goTo('garage'));
+    play.addEventListener('click', () => g.goTo('mode'));
+
+    // Inspect is a destination now, not a link in the footer. Judging a design
+    // is the thing this project does most often, and it was reached by knowing
+    // a filename.
+    const inspect = document.createElement('a');
+    inspect.className = 'primary ghost as-button';
+    inspect.href = 'inspect.html';
+    inspect.textContent = 'Inspect';
 
     const how = document.createElement('button');
     how.className = 'primary ghost';
@@ -706,25 +700,13 @@ export class Ui {
     how.addEventListener('click', () => g.goTo('howto'));
 
     row.appendChild(play);
+    row.appendChild(inspect);
     row.appendChild(how);
     panel.appendChild(row);
 
-    // The style switch, on the front door. It also lives in the garage, but a
-    // toggle between two whole looks is a decision people make from the home
-    // screen — buried at the bottom of the garage it read as "can't switch".
-    const styleRow = document.createElement('div');
-    styleRow.className = 'chips home-style';
-    for (const t of THEMES) {
-      const chip = document.createElement('button');
-      chip.className = 'chip' + (g.themeId === t.id ? ' on' : '');
-      chip.innerHTML = `<span>${escapeHtml(t.name)}<br><small>${escapeHtml(t.blurb)}</small></span>`;
-      chip.addEventListener('click', () => {
-        g.setTheme(t.id);
-        this.render();
-      });
-      styleRow.appendChild(chip);
-    }
-    panel.appendChild(styleRow);
+    // The visual style chips used to sit here AND in the garage. Both are gone:
+    // the look is now part of choosing a stadium, because a look with no arena
+    // attached is not somewhere you can have a match. See modes.ts.
 
     // Career state, so the home screen answers "where was I?".
     const d = g.progress.data;
@@ -762,20 +744,136 @@ export class Ui {
       'New here? How to play takes about a minute and covers the one thing that decides most battles.';
     panel.appendChild(hint);
 
-    // The bey inspector, which until now was a page you had to know the
-    // filename of. It is a real part of the build and the fastest way to judge
-    // whether a top actually looks right — every model change gets checked
-    // there — so hiding it behind "remember it is called inspect.html" was
-    // costing time on every single visual pass.
-    //
-    // A plain link rather than a button: it navigates to another page, and a
-    // link is the control that says so, including to middle-click and to
-    // screen readers.
     const tools = document.createElement('p');
     tools.className = 'sub home-tools';
-    tools.innerHTML =
-      `<a href="inspect.html">Bey inspector</a> — every top, up close, on a turntable`;
+    tools.textContent = 'Inspect — every top, up close, on a turntable.';
     panel.appendChild(tools);
+
+    overlay.appendChild(panel);
+    return overlay;
+  }
+
+  /**
+   * Mode select: the first choice, and the one that decides what a beyblade is.
+   *
+   * This screen exists because the alternative was a "visual style" row at the
+   * bottom of the garage, under two shops. That row was not a cosmetic setting
+   * — `theme.toon` picks between two different construction paths, so it was
+   * silently choosing between the designed roster and the prototype's plain
+   * metal tops. A decision that large cannot be the ninth thing on a screen.
+   *
+   * Two cards rather than a chip row, because the two are not variants of one
+   * another. Each says what its beyblades are, since that is the actual
+   * difference and the reason the choice comes first.
+   */
+  private modeScreen(): HTMLElement {
+    const g = this.game;
+    const overlay = document.createElement('div');
+    overlay.className = 'overlay';
+
+    const panel = document.createElement('div');
+    panel.className = 'panel mode-panel';
+    panel.innerHTML = `
+      <h2>Choose your game</h2>
+      <p class="sub">This sets what the beyblades are, not just how they look.</p>`;
+
+    const cards = document.createElement('div');
+    cards.className = 'mode-cards';
+
+    for (const m of MODES) {
+      const card = document.createElement('button');
+      card.className = 'mode-card' + (g.modeId === m.id ? ' on' : '');
+      card.style.setProperty('--accent', '#' + m.accent.toString(16).padStart(6, '0'));
+      const looks = m.themeIds.map((id) => themeById(id).name).join(' · ');
+      card.innerHTML = `
+        <span class="mode-name">${escapeHtml(m.name)}</span>
+        <span class="mode-tag">${escapeHtml(m.tagline)}</span>
+        <span class="mode-blurb">${escapeHtml(m.blurb)}</span>
+        <span class="mode-looks">${escapeHtml(looks)}</span>`;
+      card.addEventListener('click', () => {
+        g.setMode(m.id);
+        g.goTo('garage');
+      });
+      cards.appendChild(card);
+    }
+    panel.appendChild(cards);
+
+    const row = document.createElement('div');
+    row.className = 'row';
+    const back = document.createElement('button');
+    back.className = 'primary ghost';
+    back.textContent = 'Back';
+    back.addEventListener('click', () => g.goTo('home'));
+    row.appendChild(back);
+    panel.appendChild(row);
+
+    overlay.appendChild(panel);
+    return overlay;
+  }
+
+  /**
+   * Stadium select: where the fight happens, arena and look together.
+   *
+   * Asked for directly — "combine arena and visual style into just simply Arena
+   * or Stadium". Grouped by look rather than listed flat, because within one
+   * look the three entries differ by physics and that is the comparison a
+   * player is actually making. The heading carries the look's own blurb so the
+   * grouping explains itself instead of being decoration.
+   */
+  private stadiumScreen(): HTMLElement {
+    const g = this.game;
+    const overlay = document.createElement('div');
+    overlay.className = 'overlay';
+
+    const panel = document.createElement('div');
+    panel.className = 'panel stadium-panel';
+    panel.innerHTML = `
+      <h2>Choose your stadium</h2>
+      <p class="sub">${escapeHtml(modeById(g.modeId).name)} — the floor changes how the match plays.</p>`;
+
+    for (const group of stadiumsByLook(g.modeId)) {
+      const theme = THEMES.find((t) => t.name === group.look);
+      const section = document.createElement('div');
+      section.className = 'slot';
+      section.innerHTML = `<h4>${escapeHtml(group.look)}${
+        theme ? ` — <span class="dim">${escapeHtml(theme.blurb)}</span>` : ''
+      }</h4>`;
+
+      const chips = document.createElement('div');
+      chips.className = 'chips';
+      for (const s of group.items) {
+        const chip = document.createElement('button');
+        chip.className = 'chip' + (g.stadium.id === s.id ? ' on' : '');
+        chip.innerHTML = `<span>${escapeHtml(s.name)}<br><small>${escapeHtml(s.blurb)}</small></span>`;
+        chip.addEventListener('click', () => {
+          g.setStadium(s.id);
+          this.render();
+        });
+        chips.appendChild(chip);
+      }
+      section.appendChild(chips);
+      panel.appendChild(section);
+    }
+
+    const row = document.createElement('div');
+    row.className = 'row';
+    const go = document.createElement('button');
+    go.className = 'primary';
+    go.textContent = 'Let it rip';
+    go.addEventListener('click', () => {
+      // First real gesture on this path: browsers won't start an AudioContext
+      // before one, and the garage no longer has the button that used to be it.
+      g.audio.resume();
+      g.startMatch();
+    });
+    row.appendChild(go);
+
+    const back = document.createElement('button');
+    back.className = 'primary ghost';
+    back.textContent = 'Back to your bey';
+    back.addEventListener('click', () => g.goTo('garage'));
+    row.appendChild(back);
+    panel.appendChild(row);
 
     overlay.appendChild(panel);
     return overlay;
@@ -950,9 +1048,12 @@ export class Ui {
     const panel = document.createElement('div');
     panel.className = 'panel';
 
+    // Named for the MODE, not the game. Standing under "Beyblade Arena" while
+    // holding an Overdrive top is the exact confusion the mode select exists to
+    // remove — the heading has to confirm which game you are in.
     const header = document.createElement('div');
     header.innerHTML = `
-      <h1>Beyblade Arena</h1>
+      <h1>${escapeHtml(modeById(g.modeId).name)}</h1>
       <p class="sub">Build your top, then let it rip. First to ${C.POINTS_TO_WIN} points takes the match —
       ring out or burst scores 2, outlasting your rival scores 1.</p>`;
     panel.appendChild(header);
@@ -1066,7 +1167,9 @@ export class Ui {
     // simply never been scrolled to. Arena and spin direction both change how
     // the match *plays*, so they belong with the choice of bey, not filed
     // under cosmetics.
-    collection.appendChild(this.arenaSection());
+    // The arena picker moved out to its own screen and took the visual style
+    // with it — they are one choice now. Spin direction stays: it is a property
+    // of how you launch THIS bey, so it belongs beside the bey.
     collection.appendChild(this.spinSection());
     // Crates sit in Collection because acquiring is what this tab is for; the
     // Workshop is about tuning what you already own.
@@ -1220,7 +1323,7 @@ export class Ui {
       });
       tabs.appendChild(b);
     };
-    mkTab('Collection', 'your beys, arena and spin', 'collection');
+    mkTab('Collection', 'your beys and spin', 'collection');
     mkTab('Workshop', 'build one from parts', 'workshop');
 
     collection.hidden = this.garageTab !== 'collection';
@@ -1229,38 +1332,22 @@ export class Ui {
     panel.appendChild(collection);
     panel.appendChild(workshop);
 
-    // Visual theme. Cosmetic and fully reversible — 'Arena' is the original
-    // look, reproduced exactly.
-    const themeRow = document.createElement('div');
-    themeRow.className = 'slot';
-    themeRow.innerHTML = '<h4>Visual style</h4>';
-    const themeChips = document.createElement('div');
-    themeChips.className = 'chips';
-    for (const t of THEMES) {
-      const chip = document.createElement('button');
-      chip.className = 'chip' + (g.themeId === t.id ? ' on' : '');
-      chip.innerHTML = `<span>${escapeHtml(t.name)}<br><small>${escapeHtml(t.blurb)}</small></span>`;
-      chip.addEventListener('click', () => {
-        g.setTheme(t.id);
-        this.render();
-      });
-      themeChips.appendChild(chip);
-    }
-    themeRow.appendChild(themeChips);
-    panel.appendChild(themeRow);
-
-
     const row = document.createElement('div');
     row.className = 'row';
     const go = document.createElement('button');
     go.className = 'primary';
-    go.textContent = 'Enter the arena';
-    go.addEventListener('click', () => {
-      // First real gesture: browsers won't start an AudioContext before one.
-      g.audio.resume();
-      g.startMatch();
-    });
+    // Not "Enter the arena" any more, because it no longer does: the arena is
+    // the next screen. A button that names the screen it opens is the whole
+    // reason a two-step setup reads as two steps.
+    go.textContent = 'Choose your stadium';
+    go.addEventListener('click', () => g.goTo('stadium'));
     row.appendChild(go);
+
+    const modeBtn = document.createElement('button');
+    modeBtn.className = 'primary ghost';
+    modeBtn.textContent = 'Change game';
+    modeBtn.addEventListener('click', () => g.goTo('mode'));
+    row.appendChild(modeBtn);
 
     const howto = document.createElement('button');
     howto.className = 'primary ghost';

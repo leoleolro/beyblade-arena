@@ -13,15 +13,16 @@ import {
 } from './render/topModels';
 import { topModelFor } from './render/topModelIndex';
 import { skinById } from './render/skins';
-import { THEMES, themeById } from './render/theme';
+import { themeById } from './render/theme';
 import type { Theme } from './render/theme';
+import { rosterThemes } from './modes';
 import { BEY_PRESETS } from './render/beydex';
 import { groupByClass } from './render/beyClass';
 import { DISCS, DRIVERS, LAYERS, deriveStats, makeBuild } from './sim/parts';
 import type { BeyBuild } from './sim/types';
 
 /**
- * The bey inspector: every top in the game, up close, in every theme.
+ * The bey inspector: every top in the roster, up close, in every roster look.
  *
  * WHY IT IS A PAGE AND NOT A DEV HARNESS. What stood here was a debug strip —
  * four fixed camera pitches, a hardcoded IMPORTED button and a console.log —
@@ -38,10 +39,12 @@ import type { BeyBuild } from './sim/types';
  *
  *  - **Every bey, always.** No unlock gate. A tool for judging artwork that
  *    hides most of the artwork behind ladder progress is not a tool.
- *  - **All three themes.** A top is built differently per theme — cel
- *    construction under Anime, metal under the other two — so "does this look
- *    right" has three different answers and the page has to be able to ask all
- *    of them.
+ *  - **Every roster look, and only those.** A top is built differently per
+ *    theme — `toon` chooses between the designed construction and the plain
+ *    metal one — so "does this look right" has an answer per look and the page
+ *    has to be able to ask each of them. Overdrive's look is not among them:
+ *    it is a kept prototype, not part of the roster, and this page is for
+ *    judging the designs. See modes.ts.
  *  - **Exploded, on demand.** Top, middle and bottom are separately designed
  *    parts. Assembled hides two thirds of that work.
  *  - **Real orbit.** Fixed pitches answer whatever question they were chosen
@@ -91,7 +94,7 @@ let outline: OutlineEffect | null = null;
 
 /* ----------------------------------------------------------------- state */
 
-let theme: Theme = THEMES[0];
+let theme: Theme = rosterThemes()[0];
 let build: BeyBuild = makeBuild(BEY_PRESETS[0].layerId, 'gravity', 'atomic');
 let mesh: THREE.Group | null = null;
 let parts: BeyParts | null = null;
@@ -332,8 +335,27 @@ function buildRoster(): void {
   if (first?.dataset.layer) build = makeBuild(first.dataset.layer, build.disc.id, build.driver.id);
 }
 
+/**
+ * Look buttons — the ROSTER's looks only.
+ *
+ * Overdrive is excluded by its owner's instruction: it is a kept prototype to
+ * look back at rather than part of the roster, and this page is for judging
+ * designs. The exclusion is by mode rather than by a hardcoded id here, so a
+ * theme that later joins or leaves the prototype changes in one place. See
+ * modes.ts.
+ *
+ * The row hides itself at one option. A picker with a single choice is not a
+ * picker; it is a label that looks clickable.
+ */
 function buildThemeButtons(): void {
-  for (const t of THEMES) {
+  const looks = rosterThemes();
+  if (looks.length < 2) {
+    // Hide the LABEL too, not just the buttons — a lone "THEME" caption with
+    // nothing beside it reads as a control that failed to load.
+    (document.getElementById('themes-group') ?? themesEl).hidden = true;
+    return;
+  }
+  for (const t of looks) {
     const b = document.createElement('button');
     b.textContent = t.name;
     b.className = t.id === theme.id ? 'on' : '';

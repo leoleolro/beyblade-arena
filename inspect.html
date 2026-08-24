@@ -40,6 +40,9 @@
       header a { color: var(--dim); text-decoration: none; margin-left: auto; }
       header a:hover { color: var(--ink); }
       .group { display: flex; align-items: center; gap: 6px; }
+      /* `hidden` is an attribute, not a rule, so any `display` set by a class
+         beats it. Without this, hiding a group leaves it fully visible. */
+      [hidden] { display: none !important; }
       .group > span { color: var(--dim); font-size: 11px; letter-spacing: 0.08em; }
       button {
         background: #16203a; color: var(--ink); border: 1px solid var(--line);
@@ -77,7 +80,7 @@
   <body>
     <header>
       <h1>BEY INSPECTOR</h1>
-      <div class="group"><span>THEME</span><div id="themes"></div></div>
+      <div class="group" id="themes-group"><span>THEME</span><div id="themes"></div></div>
       <div class="group"><span>VIEW</span><button id="explode">Exploded</button><button id="spin" class="on">Spin</button></div>
       <a href="index.html">&larr; back to the game</a>
     </header>

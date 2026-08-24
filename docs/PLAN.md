@@ -123,6 +123,28 @@ arena mechanics and layout. Design output, not code.
 - Garage labels sit at fixed thirds and drift when the model is rotated.
 - The shelf restocks per match but does not rotate on a clock.
 
+### Named by the owner, not yet started
+
+- **A roster of up to 100 beyblades, with no performance cost.** Not a data
+  problem — `BEY_PRESETS` is already a list and the mode/stadium pickers are
+  generated from registries rather than typed out, which is why adding an arena
+  or a look costs no UI edit. The cost is in the *render* surfaces that build
+  one three.js object per entry: the garage picker thumbnails, the inspector
+  roster, the shop. Those need to become virtualised and cached before the list
+  is long enough to notice, and the honest first step is to measure the current
+  per-entry cost rather than guess which of the three bites first.
+- **Real beyblade physics.** Jumping out of and back into the stadium, spin
+  stealing under load, near-vertical launches, and how the X-rail actually
+  accelerates — "five times under three seconds, small bumps then big bumps".
+  Research first, in the shape of `docs/ARENA-IDEAS.md`: what the real thing
+  does, what this sim can support, what each idea would cost.
+- **The white shockwave disk under a clash.** Still not big or heavy enough.
+  See "Round two" below for what has been tried.
+- **The thickening outlines on Epic beys.** Diagnosed, not fixed — it is a
+  concavity failure in the inverted-hull pass, not an over-thick line, so
+  tuning cannot reach it. Full measurements in `docs/BLACK-SHARDS.md` part two.
+- **A second look for Beyblade Arena mode.** See `docs/UX-FLOW.md`, "Known gap".
+
 
 ---
 

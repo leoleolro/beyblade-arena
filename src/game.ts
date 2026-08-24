@@ -6,8 +6,17 @@ import { Progress } from './progress';
 import type { Difficulty } from './ai';
 import { ArenaRenderer } from './render/arena';
 import { pickContrastingSkin, skinById } from './render/skins';
-import { loadImpactFrames, loadThemeId, saveImpactFrames, saveThemeId } from './render/theme';
+import { loadImpactFrames, saveImpactFrames, saveThemeId } from './render/theme';
 import { arenaById, ARENAS } from './sim/arena';
+import {
+  loadModeId,
+  loadStadiumId,
+  modeById,
+  saveModeId,
+  saveStadiumId,
+  stadiumIn,
+} from './modes';
+import type { ModeId, Stadium } from './modes';
 import { Battle } from './sim/battle';
 import type { Fighter } from './sim/battle';
 import * as C from './sim/constants';
@@ -19,8 +28,10 @@ import type { CrateResult, OfferSlot, RewardRef } from './economy';
 /** Screens the player moves through. */
 export type Screen =
   | 'home'
+  | 'mode'
   | 'howto'
   | 'garage'
+  | 'stadium'
   | 'launch'
   | 'battle'
   | 'round-over'
@@ -71,17 +82,59 @@ export class Game {
    */
   private readonly crateRng: () => number = Math.random;
 
+  /**
+   * Which game this is — the roster, or the kept prototype. See modes.ts.
+   *
+   * The first choice a player makes, and the only one that changes what a
+   * beyblade IS rather than how it is lit.
+   */
+  modeId: ModeId = loadModeId();
+
+  /**
+   * Where the fight happens: an arena and a look, chosen together. See modes.ts
+   * for why those are one decision and not two.
+   */
+  stadium: Stadium = stadiumIn(loadModeId(), loadStadiumId());
+
   /** Visual theme id. Cosmetic only; 'arena' is the untouched original look. */
-  themeId = loadThemeId();
+  themeId = this.stadium.themeId;
   /**
    * Gameplay arena. Unlike skins and themes this changes the physics, so it is
    * a match setting the player picks — never something that could be sold.
    */
-  arenaId = loadArenaId();
+  arenaId = this.stadium.arenaId;
 
-  setArena(id: string): void {
-    this.arenaId = id;
-    saveArenaId(id);
+  /**
+   * Switch mode, and re-resolve the stadium inside it.
+   *
+   * The re-resolve is not defensive tidying: a stadium carries the theme, the
+   * theme carries `toon`, and `toon` decides which beyblade gets built. Keeping
+   * a stadium across a mode switch would put prototype tops in the roster mode.
+   * `stadiumIn` falls back to the new mode's own default, so that cannot happen
+   * even if a stale id survives in storage.
+   */
+  setMode(id: string): void {
+    this.modeId = modeById(id).id;
+    saveModeId(this.modeId);
+    this.setStadium(stadiumIn(this.modeId, this.stadium.id).id);
+  }
+
+  setStadium(id: string): void {
+    this.stadium = stadiumIn(this.modeId, id);
+    saveStadiumId(this.stadium.id);
+    // The stadium is the persisted unit. Arena and theme were saved separately
+    // when they were separate choices; storing all three would be three keys
+    // that must agree, and the one that disagreed would decide the match.
+    this.arenaId = this.stadium.arenaId;
+    this.setTheme(this.stadium.themeId);
+    // Show the floor being chosen, not the one from last match.
+    //
+    // The arena behind the panels is a live scene, and until now the renderer
+    // only learned the arena at `startMatch`. That was invisible when the
+    // picker was a chip row inside the garage; on a screen whose entire job is
+    // choosing a floor, picking the X-Rail and watching the plain dish stay put
+    // reads as the click not having registered.
+    this.renderer.setArena(arenaById(this.arenaId));
   }
 
   /** Manga impact frames, on or off. Anime theme only; cosmetic. */
@@ -358,7 +411,7 @@ export class Game {
     return true;
   }
 
-  goTo(screen: 'home' | 'howto' | 'garage'): void {
+  goTo(screen: 'home' | 'mode' | 'howto' | 'garage' | 'stadium'): void {
     this.audio.resume();
     this.setScreen(screen);
   }
@@ -567,21 +620,3 @@ export class Game {
 }
 
 export { PLAYER_ID, AI_ID, C, LADDER, ARENAS };
-
-const ARENA_KEY = 'beyblade-arena.arena.v1';
-
-function loadArenaId(): string {
-  try {
-    return localStorage.getItem(ARENA_KEY) ?? 'standard';
-  } catch {
-    return 'standard';
-  }
-}
-
-function saveArenaId(id: string): void {
-  try {
-    localStorage.setItem(ARENA_KEY, id);
-  } catch {
-    // Storage unavailable; the choice still applies for this session.
-  }
-}
