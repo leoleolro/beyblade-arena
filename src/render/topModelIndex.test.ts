@@ -1,9 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { existsSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
-const __dirname = fileURLToPath(new URL('.', import.meta.url));
+/**
+ * Every file under public/models, as Vite sees it.
+ *
+ * `import.meta.glob` rather than node's `fs`: this project has no @types/node
+ * and adding it to satisfy one test would put node globals in scope for the
+ * whole renderer, which is the half of the codebase that must stay
+ * browser-only. Vite resolves this at transform time, so it costs nothing at
+ * runtime and needs no types.
+ */
+const MODEL_FILES = import.meta.glob('../../public/models/**/*', { eager: true, query: '?url' });
+const HAVE = new Set(
+  Object.keys(MODEL_FILES).map((k) => k.replace('../../public/', '')),
+);
 import { TOP_MODELS, topModelFor } from './topModelIndex';
 import { LAYERS } from '../sim/parts';
 
@@ -50,8 +59,7 @@ describe('top model index', () => {
     // loader returns null, the bey silently keeps its procedural mesh, and the
     // only symptom is a Legendary top that looks Epic.
     for (const [key, entry] of Object.entries(TOP_MODELS)) {
-      const path = resolve(__dirname, '../../public', entry.url);
-      expect(existsSync(path), `${key} -> public/${entry.url} does not exist`).toBe(true);
+      expect(HAVE.has(entry.url), `${key} -> public/${entry.url} does not exist`).toBe(true);
     }
   });
 
