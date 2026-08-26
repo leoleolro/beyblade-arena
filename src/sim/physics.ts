@@ -449,6 +449,20 @@ function applySeek(beys: BeyState[], dt: number): void {
     if (!b.alive) continue;
     const mv = moveProfile(b);
     if (mv.seek <= 0) continue;
+    // A LUNGE, NOT A LOCK. Measured before this line existed: a Charge
+    // connected 82.6% of the time and took 0.28s to do it — then went on
+    // steering at the foe for the remaining 1.9s of its duration, following
+    // whoever it had just knocked away. That tail is what the owner reported
+    // as "clicking the charge button and the battle becomes cat chase mouse,
+    // one is just following the other beyblade".
+    //
+    // The approach was never the problem; the move not ENDING when it landed
+    // was. So the homing spends itself on contact. The attack and defence
+    // multipliers still run for the full duration — the commitment is real and
+    // still worth spending meter on — but the steering is over, and the
+    // charger flies off ballistically while the target recovers. Strike, then
+    // separate, then re-approach, instead of one continuous tail-chase.
+    if (b.strikeSpent) continue;
 
     const foe = nearestFoe(beys, b);
     if (!foe) continue;
@@ -903,7 +917,13 @@ export function step(
       const b = beys[k];
       if (!a.alive || !b.alive) continue;
       const hit = resolvePair(a, b, rng, contacts);
-      if (hit) hits.push(hit);
+      if (hit) {
+        hits.push(hit);
+        // Contact spends both tops' strikes, not just the aggressor's. A
+        // trade is still a landing.
+        a.strikeSpent = true;
+        b.strikeSpent = true;
+      }
     }
   }
 

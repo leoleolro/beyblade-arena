@@ -24,10 +24,32 @@ import { makeRng } from './sim/math';
  * rookie's sloppy spread wandered into the band sometimes; a champion's never
  * did. Precision was a penalty.
  *
- * This test is what stops that returning. It is deliberately loose: the AI is
- * stochastic and these are 40-match samples, so it asserts the ORDER holds and
- * not a specific rate.
+ * This test is what stops that returning. It asserts the ORDER holds and not a
+ * specific rate, because the AI is stochastic.
+ *
+ * HOW MANY MATCHES, AND WHY IT IS NOT 40. It was 40 seeds per build — 240
+ * matches per pairing — and that is not enough to resolve the effect it is
+ * asserting. Measured at 1440 matches per pairing, the true rates are 57.4%,
+ * 67.2% and 59.2%; the 240-match sample reported 49.2% for the first of those
+ * and FAILED, on a change that had just moved the real number UP. A test that
+ * fails on an improvement is worse than no test, because the natural response
+ * is to tune the game until the sample agrees.
+ *
+ * At 100 seeds — 600 matches per pairing — the standard error on a rate near
+ * 50% is about 2 points, so a genuine 57% clears the 50% bar by three and a
+ * half sigma and a genuine inversion cannot hide. That costs about 12 seconds,
+ * which is the price of the assertion meaning what it says.
+ *
+ * Note the seeds are deterministic, so this is not "unlucky sampling" that a
+ * re-run would shake off: seeds 0..39 are simply unrepresentative for the
+ * champion/blader pairing, permanently. More of them is the only fix.
  */
+
+/**
+ * Seeds per anchor build, per pairing. See the power note above before
+ * lowering this — the previous value of 40 produced a confident false failure.
+ */
+const SEEDS = 100;
 
 function match(
   build: () => ReturnType<(typeof PRESETS)[0]['build']>,
@@ -68,7 +90,7 @@ function ladderRate(hi: Difficulty, lo: Difficulty): number {
   let wins = 0;
   let played = 0;
   for (const preset of PRESETS) {
-    for (let s = 0; s < 40; s++) {
+    for (let s = 0; s < SEEDS; s++) {
       // Alternating seats is the whole reason this measurement is trustworthy:
       // an earlier attempt at this bug chased a seat-bias confound instead.
       const swap = s % 2 === 1;
@@ -91,9 +113,9 @@ describe('the difficulty ladder', () => {
         `champion vs blader ${(cvb * 100).toFixed(1)}%  ` +
         `blader vs rookie ${(bvr * 100).toFixed(1)}%`,
     );
-    // Every tier must beat the one below it. Stochastic AI over 240 matches per
-    // pairing, so the bar is "wins more than it loses", not a target rate — but
-    // the champion losing to the blader, which is what this shipped as, fails.
+    // Every tier must beat the one below it. The bar is "wins more than it
+    // loses", not a target rate — but the champion losing to the blader, which
+    // is what this shipped as, fails.
     expect(cvr, 'champion vs rookie').toBeGreaterThan(0.5);
     expect(cvb, 'champion vs blader').toBeGreaterThan(0.5);
     expect(bvr, 'blader vs rookie').toBeGreaterThan(0.5);

@@ -118,6 +118,7 @@ function makeBey(f: Fighter, launch: LaunchParams): BeyState {
     spinStolen: 0,
     biggestHit: 0,
     movesUsed: 0,
+    strikeSpent: false,
   };
 }
 
@@ -274,6 +275,7 @@ export class Battle {
     bey.meter -= profile.cost;
     bey.move = kind;
     bey.moveTime = profile.duration;
+    bey.strikeSpent = false;
     bey.movesUsed += 1;
 
     if (profile.speedKick > 0) this.applyKick(bey, profile);

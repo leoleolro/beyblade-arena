@@ -178,6 +178,14 @@ export interface BeyState {
   move: MoveKind | null;
   /** Seconds of the active move remaining. */
   moveTime: number;
+  /**
+   * True once the active move has landed its blow.
+   *
+   * Only Charge reads it, and only to stop steering. See `applySeek`: the
+   * homing is a lunge that spends itself on contact, not a lock that holds for
+   * the whole two seconds.
+   */
+  strikeSpent: boolean;
   /** Seconds since this top was launched. Drives the settle ramp. */
   age: number;
   /** Seconds left locked into the X-Rail, if the arena has one. */
