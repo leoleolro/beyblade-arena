@@ -121,6 +121,41 @@ export const MIN_IMPACT = 0.22;
 
 /** Spin knocked off the *defender* per unit of normal impact speed. */
 export const HIT_SPIN_LOSS = 26.0;
+
+/**
+ * How much a top's spin retention also protects it from HIT drain.
+ *
+ * Stamina's problem, measured: 63.4% of all spin loss comes from hits and only
+ * 36.6% from passive decay, so `spinRetention` — the stamina stat — governs a
+ * minority of the spin economy and the archetype cannot win the race its own
+ * premise is about. Measured win rates against the AI preset pool were 11-17%
+ * for every stamina build against 35-39% for attack and defence.
+ *
+ * The obvious fix — shift the ratio toward passive decay — was tried and
+ * REVERTED: it inverted the difficulty ladder, because every move carries
+ * `spinDrain`, so making hits pay less and idling cost more makes doing nothing
+ * the winning policy. See docs/PLAN.md.
+ *
+ * This is the targeted version. A top built to hold spin keeps more of it after
+ * an exchange, which is what "stamina" should mean, and it does NOT reduce what
+ * an attacker gains by landing the hit — the attacker's own reward is
+ * untouched, so acting stays better than idling and the ladder survives.
+ */
+export const RETENTION_VS_HITS = 0.35;
+// 0.35, found by sweep against two failure modes rather than by taste.
+//
+//   k     Silver Wolf   Cross X   difficulty + steal suites
+//   0     11.1%         35.6%     pass      (the problem)
+//   0.30  21.1%         34.4%     pass
+//   0.35  23.3%         35.6%     pass      <- here
+//   0.50  30.0%         32.2%     FAIL: champion vs blader 0.496
+//   0.90  32.2%         25.6%     FAIL: worse, and guts attack
+//
+// The upper bound is real and worth naming: past ~0.4 the absorber's
+// opposite-spin advantage thins out (steal.test.ts) and the champion stops
+// beating the blader. Protecting everyone from hit drain eventually protects
+// the SKILLED player's target as much as the stamina build, and the ladder
+// depends on hits landing.
 /** Spin the *attacker* loses per unit of normal impact speed (recoil). */
 export const HIT_SPIN_RECOIL = 5.5;
 /**

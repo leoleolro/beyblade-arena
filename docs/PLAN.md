@@ -415,6 +415,32 @@ accelerates for everyone so a stamina lead converts.
 Recorded rather than shipped. The measurement that killed it is the useful
 part.
 
+### The targeted fix — **SHIPPED**
+
+`RETENTION_VS_HITS = 0.35`. A top's `spinRetention` now also divides the spin
+it loses to a HIT, not just its passive decay. A top built to hold spin keeps
+more of it after an exchange, which is what stamina should mean.
+
+Crucially it does **not** reduce what an attacker gains by landing the hit —
+the attacker's own reward is untouched — so acting stays better than idling and
+the difficulty ladder survives, which is exactly where the passive-decay version
+died.
+
+    k       Silver Wolf   Cross X   difficulty + steal suites
+    0       11.1%         35.6%     pass   (the problem)
+    0.30    21.1%         34.4%     pass
+    0.35    23.3%         35.6%     pass   <- shipped
+    0.50    30.0%         32.2%     FAIL: champion vs blader 0.496
+    0.90    32.2%         25.6%     FAIL: worse, and guts attack
+
+The upper bound is real: past ~0.4 the absorber's opposite-spin advantage thins
+(`steal.test.ts`) and the champion stops beating the blader. Protecting
+everyone from hit drain eventually protects the skilled player's *target* as
+much as the stamina build, and the ladder depends on hits landing.
+
+Stamina is not solved — 23% against attack's 36% is still a gap — but it is a
+gap rather than a write-off, and it moved without breaking anything.
+
 **One real bug did come out of the check**, and it is fixed: the Bit mapping made
 `wander` linear in attack, which gave Ball — a *stamina* bit at attack 15 — a
 wander of 0.60 against our own stamina drivers' 0.06-0.18. Squaring the term

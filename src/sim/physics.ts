@@ -741,10 +741,18 @@ function resolvePair(
   // Raw drain uses the *build's* defense only. The move's defensive multiplier
   // is applied after the per-hit cap below — applied before it, a big hit blew
   // past the ceiling anyway and a full-meter Block bought a 9% reduction.
+  // Spin retention protects against hit drain too, not just passive decay.
+  // See RETENTION_VS_HITS — stamina's stat previously governed only a third of
+  // the spin economy, which is why the archetype could not win the endurance
+  // race it exists for.
+  const holdA = 1 + (a.stats.spinRetention - 1) * C.RETENTION_VS_HITS;
+  const holdB = 1 + (b.stats.spinRetention - 1) * C.RETENTION_VS_HITS;
   const drainOnB =
-    ((impact * C.HIT_SPIN_LOSS * atkA * aggrA) / b.stats.defense) * oppMul;
+    ((impact * C.HIT_SPIN_LOSS * atkA * aggrA) / (b.stats.defense * Math.max(0.5, holdB))) *
+    oppMul;
   const drainOnA =
-    ((impact * C.HIT_SPIN_LOSS * atkB * aggrB) / a.stats.defense) * oppMul;
+    ((impact * C.HIT_SPIN_LOSS * atkB * aggrB) / (a.stats.defense * Math.max(0.5, holdA))) *
+    oppMul;
   const recoilA = impact * C.HIT_SPIN_RECOIL * shareA * oppMul;
   const recoilB = impact * C.HIT_SPIN_RECOIL * shareB * oppMul;
 
