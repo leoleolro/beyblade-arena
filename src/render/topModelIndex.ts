@@ -42,7 +42,7 @@ export interface TopModel {
 
 export const TOP_MODELS: Record<string, TopModel> = {
   valtryek: {
-    url: 'models/wonder_valtryek_beyblade/scene.gltf',
+    url: 'models/victory-valtryek/scene.gltf',
     credit:
       '"wonder valtryek beyblade" by 101NOTFOUND, licensed CC-BY-4.0 — sketchfab.com/101NOTFOUND',
     // Nothing to keep: the only authored colour is a flat grey behind
@@ -65,7 +65,33 @@ export const TOP_MODELS: Record<string, TopModel> = {
   // them to a uniform silver would flatten the one thing distinguishing it from
   // Valtryek.
   nosferu: {
-    url: 'models/Gemstone/beyblade.obj',
+    url: 'models/gemstone/beyblade.obj',
+    finish: 'own',
+  },
+
+  // The four that arrived together. All GLB, which is why they are one file
+  // each: GLB embeds geometry, materials and textures, so there is no sibling
+  // .bin or texture folder to lose. The .gltf variant of the same export is
+  // smaller precisely because it does not, and Valtryek above is the cautionary
+  // example — it ships a scene.bin that has to travel with it.
+  //
+  // `own` on all four. These are authored product transcriptions with real
+  // colour breaks; the silver override exists for models that arrive grey, and
+  // flattening these would throw away the exact thing they were imported for.
+  dransword: {
+    url: 'models/dran-sword/scene.glb',
+    finish: 'own',
+  },
+  valkyrie: {
+    url: 'models/victory-valkyrie/scene.glb',
+    finish: 'own',
+  },
+  magejab: {
+    url: 'models/mage-jab/scene.glb',
+    finish: 'own',
+  },
+  dsycther: {
+    url: 'models/reaper-dsycther/scene.glb',
     finish: 'own',
   },
 };

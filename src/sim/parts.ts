@@ -62,6 +62,16 @@ export const LAYERS: LayerPart[] = [
   { id: 'solaris',   name: 'Solaris',   kind: 'layer', archetype: 'balance', mass: 0.48, radius: 0.1045, attack: 1.10, defense: 1.02, burstResist: 1.04, spinSteal: 0.0, blades: 3, colour: 0xdc2626 },
   { id: 'chimera',   name: 'Chimera',   kind: 'layer', archetype: 'balance', mass: 0.49, radius: 0.1050, attack: 1.02, defense: 1.10, burstResist: 1.06, spinSteal: 0.0, blades: 6, colour: 0x7c3aed },
 
+  // The imported line — Legendary. These carry real 3D models (see
+  // topModelIndex.ts) and exist because a modelled top reads differently from
+  // anything the procedural builder makes. Stats still sit on the archetype
+  // anchors: an imported model must not be a stronger bey, only a different
+  // looking one, or the class becomes a power tier by accident.
+  { id: 'dransword', name: 'Dran Sword', kind: 'layer', archetype: 'attack',  mass: 0.46, radius: 0.1075, attack: 1.44, defense: 0.78, burstResist: 0.92, spinSteal: 0.0, blades: 3, colour: 0x1e3a8a },
+  { id: 'valkyrie',  name: 'Valkyrie',   kind: 'layer', archetype: 'attack',  mass: 0.45, radius: 0.1065, attack: 1.38, defense: 0.84, burstResist: 0.96, spinSteal: 0.0, blades: 3, colour: 0x1d4ed8 },
+  { id: 'magejab',   name: 'Mage Jab',   kind: 'layer', archetype: 'stamina', mass: 0.49, radius: 0.1090, attack: 0.80, defense: 1.08, burstResist: 1.12, spinSteal: 0.0, blades: 5, colour: 0x6d28d9 },
+  { id: 'dsycther',  name: 'Dsycther',   kind: 'layer', archetype: 'balance', mass: 0.52, radius: 0.1040, attack: 1.06, defense: 1.14, burstResist: 1.08, spinSteal: 0.0, blades: 4, colour: 0x334155 },
+
   // The vampire. The one layer in the catalog with `sameSteal`: it absorbs in
   // *every* matchup, not only against an opposite-spin opponent, so there is no
   // launch that denies it its mechanic (see constants.ts, spin steal).

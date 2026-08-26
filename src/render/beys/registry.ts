@@ -45,6 +45,10 @@ export interface BeyEntry {
   };
 }
 
+import { entry as dransword } from './dransword';
+import { entry as valkyrie } from './valkyrie';
+import { entry as magejab } from './magejab';
+import { entry as dsycther } from './dsycther';
 import { entry as tempest } from './tempest';
 import { entry as basilisk } from './basilisk';
 import { entry as golem } from './golem';
@@ -89,6 +93,10 @@ export const BEY_REGISTRY: BeyEntry[] = [
   wyrm,
   solaris,
   chimera,
+  dransword,
+  valkyrie,
+  magejab,
+  dsycther,
 ];
 
 /** The anime design set — the projection beydex.ts used to hand-maintain. */
