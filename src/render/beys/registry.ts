@@ -45,6 +45,7 @@ export interface BeyEntry {
   };
 }
 
+import { entry as orichalcum } from './orichalcum';
 import { entry as blackshell } from './blackshell';
 import { entry as sharkedge } from './sharkedge';
 import { entry as knightshield } from './knightshield';
@@ -109,6 +110,7 @@ export const BEY_REGISTRY: BeyEntry[] = [
   wizardrod,
   hellsscythe,
   sphinxcowl,
+  orichalcum,
 ];
 
 /** The anime design set — the projection beydex.ts used to hand-maintain. */

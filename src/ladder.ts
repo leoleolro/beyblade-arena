@@ -97,7 +97,7 @@ export const LADDER: Rival[] = [
     skinId: 'rose',
     difficulty: 'champion',
     line: 'Reads your move before you commit to it. Blocks are not free here.',
-    unlocks: { layers: ['ragnaruk', 'solaris', 'hellsscythe'], discs: ['wall'], skins: ['solar'] },
+    unlocks: { layers: ['ragnaruk', 'solaris', 'hellsscythe', 'orichalcum'], discs: ['wall', 'outer'], drivers: ['octa'], skins: ['solar'] },
   },
   {
     id: 'zeph',

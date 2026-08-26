@@ -104,6 +104,11 @@ export const LAYERS: LayerPart[] = [
   { id: 'hellsscythe',name: 'Hells Scythe',   kind: 'layer', archetype: 'balance', mass: 0.487, radius: 0.1033, attack: 1.24, defense: 1.23, burstResist: 1.01, spinSteal: 0.0, blades: 4, colour: 0x7f1d1d },
   { id: 'sphinxcowl', name: 'Sphinx Cowl',    kind: 'layer', archetype: 'defense', mass: 0.453, radius: 0.0993, attack: 1.16, defense: 1.59, burstResist: 0.92, spinSteal: 0.0, blades: 9, colour: 0x8a6a2f },
 
+  // ORICHALCUM O3 — Stamina, and the layer half of the first WHOLE bey
+  // transcribed here: Layer, Disc and Driver all from one documented product.
+  // Burst-era rather than Beyblade X, which is why its parts are a Disc and a
+  // Driver rather than a Ratchet and a Bit.
+  { id: 'orichalcum', name: 'Orichalcum', kind: 'layer', archetype: 'stamina', mass: 0.475, radius: 0.1118, attack: 0.84, defense: 1.14, burstResist: 1.28, spinSteal: 0.0, blades: 3, colour: 0xc9a227 },
   // The vampire. The one layer in the catalog with `sameSteal`: it absorbs in
   // *every* matchup, not only against an opposite-spin opponent, so there is no
   // launch that denies it its mechanic (see constants.ts, spin steal).
@@ -148,6 +153,30 @@ export const DISCS: DiscPart[] = [
   { id: 'spread',  name: 'Spread',  kind: 'disc', mass: 0.44, stability: 0.84, spinRetention: 1.18, colour: 0xfbbf24 },
   { id: 'blitz',   name: 'Blitz',   kind: 'disc', mass: 0.42, stability: 0.74, spinRetention: 0.95, colour: 0xf87171 },
   { id: 'wall',    name: 'Wall',    kind: 'disc', mass: 0.72, stability: 1.42, spinRetention: 0.90, colour: 0x64748b },
+
+  // OUTER — the first disc transcribed from a real part rather than invented.
+  //
+  // Source: beyblade.fandom.com/wiki/Orichalcum_O3_Outer_Octa. "Outer features
+  // a wide, almost perfectly circular shape with large gaps separating the
+  // center from the edge, these gaps are meant to increase Outward Weight
+  // Distribution (OWD) to increase Stamina while the circular perimeter
+  // increases Life-After-Death. Outer boasts the highest Stamina and
+  // Life-After-Death in the game... while not presenting the same Burst risk
+  // as [Cross/Glaive combinations] due to its weight."
+  //
+  // Every number below is that paragraph:
+  //   spinRetention 1.32  "highest Stamina in the game" — beats Spread's 1.18,
+  //                       which was the previous ceiling
+  //   mass 0.66           heavy, which is what the source credits for its LOW
+  //                       burst risk; it is not a light stamina disc
+  //   stability 1.15      the circular perimeter, which is what Life-After-Death
+  //                       actually describes: staying upright once spin is gone
+  //
+  // The interesting part is that these do not point the same way. It is the
+  // best stamina disc AND a heavy one, which in this sim's terms is a genuinely
+  // strong combination rather than a trade-off — matching the source, which
+  // calls it outclassing.
+  { id: 'outer',   name: 'Outer',   kind: 'disc', mass: 0.66, stability: 1.15, spinRetention: 1.32, colour: 0xb0b6bd },
 ];
 
 export const DRIVERS: DriverPart[] = [
@@ -157,6 +186,34 @@ export const DRIVERS: DriverPart[] = [
   { id: 'orbit',    name: 'Orbit',    kind: 'driver', archetype: 'stamina', mass: 0.22, friction: 0.70, spinRetention: 1.35, wander: 0.18, burstResist: 0.82 },
   { id: 'needle',   name: 'Needle',   kind: 'driver', archetype: 'stamina', mass: 0.19, friction: 0.50, spinRetention: 1.42, wander: 0.06, burstResist: 1.15 },
   { id: 'bastion',  name: 'Bastion',  kind: 'driver', archetype: 'defense', mass: 0.30, friction: 1.35, spinRetention: 0.95, wander: 0.10, burstResist: 1.30 },
+
+  // OCTA — a documented TRAP, transcribed rather than balanced.
+  //
+  // Source: the same page. "Octa is a driver with an octagonal metal piece and
+  // 4 holes and an octagonal shaped pattern that it expands into a dome. The
+  // metal piece will make it one of the heaviest drivers implying Knock-Out
+  // Resistance. Near Octa's spring lock, there are bumps, which increase
+  // friction on the burst locks causing Burst Resistance."
+  //
+  // And then, in the same entry, three drawbacks: "the heavy weight decreases
+  // Octa's Burst Resistance as a trade-off"; it "lacks behind Atomic for
+  // Life-After-Death due to the octagonal design which nullifies
+  // Life-After-Death"; and "due to segments on Octa, the tip has poor stamina".
+  // The source's verdict: "Despite being a rare item, Octa is useless for
+  // tournament play."
+  //
+  // So it ships as the heaviest driver in the game with the WORST spin
+  // retention, and that is deliberate. A parts list where every option is
+  // viable is a parts list with no decisions in it; a real catalogue contains
+  // items that look impressive and lose, and the reason this one loses is
+  // written down and checkable rather than a stealth nerf.
+  //
+  //   mass 0.34            heaviest, above Bastion — the metal piece
+  //   friction 1.10        the dome, high but under Bastion's flat 1.35
+  //   spinRetention 0.74   worst in the catalogue — "the tip has poor stamina"
+  //   wander 0.12          octagonal segments do not chase
+  //   burstResist 1.08     bumps help, weight hurts; the source says both
+  { id: 'octa',     name: 'Octa',     kind: 'driver', archetype: 'defense', mass: 0.34, friction: 1.10, spinRetention: 0.74, wander: 0.12, burstResist: 1.08 },
 ];
 
 const byId = <T extends { id: string }>(list: T[], id: string): T => {

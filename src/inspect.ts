@@ -285,13 +285,17 @@ function buildRoster(): void {
   // Named presets first — those are the beys as designed — then the raw layer
   // list for anything the preset table does not cover.
   const seen = new Set<string>();
-  const all: { id: string; name: string }[] = [];
-  const collect = (id: string, name: string): void => {
+  // Carries the canonical disc and driver where a preset defines them, because
+  // a preset is a WHOLE beyblade — "Orichalcum O3 Outer Octa" names its disc
+  // and its driver, and for entries transcribed from real products those parts
+  // carry documented behaviour of their own.
+  const all: { id: string; name: string; discId?: string; driverId?: string }[] = [];
+  const collect = (id: string, name: string, discId?: string, driverId?: string): void => {
     if (seen.has(id)) return;
     seen.add(id);
-    all.push({ id, name });
+    all.push({ id, name, discId, driverId });
   };
-  for (const p of BEY_PRESETS) collect(p.layerId, p.name);
+  for (const p of BEY_PRESETS) collect(p.layerId, p.name, p.discId, p.driverId);
   for (const l of LAYERS) collect(l.id, l.name);
 
   // GROUPED BY CLASS: Legendary (imported) and Epic (designed here). A flat
@@ -315,7 +319,14 @@ function buildRoster(): void {
       b.textContent = item.name;
       b.dataset.layer = item.id;
       b.addEventListener('click', () => {
-        build = makeBuild(item.id, build.disc.id, build.driver.id);
+        // Adopt the bey's CANONICAL disc and driver, not whatever was selected
+        // before. A preset is a whole beyblade — "Orichalcum O3 Outer Octa"
+        // names its disc and its driver — and for the entries transcribed from
+        // real products those two parts carry documented behaviour of their
+        // own. Keeping the previously chosen parts showed Outer/Octa as
+        // Gravity/Atomic and hid the half of the transcription that is not the
+        // layer. The pickers below still override freely.
+        build = makeBuild(item.id, item.discId ?? build.disc.id, item.driverId ?? build.driver.id);
         for (const el of rosterEl.querySelectorAll('[data-layer]')) el.classList.remove('on');
         b.classList.add('on');
         rebuild();
@@ -327,7 +338,10 @@ function buildRoster(): void {
   first?.classList.add('on');
   // Start on whatever the first group offers, so the opening view matches the
   // highlighted entry rather than defaulting to a bey further down the list.
-  if (first?.dataset.layer) build = makeBuild(first.dataset.layer, build.disc.id, build.driver.id);
+  if (first?.dataset.layer) {
+    const p = BEY_PRESETS.find((x) => x.layerId === first?.dataset.layer);
+    build = makeBuild(first.dataset.layer, p?.discId ?? build.disc.id, p?.driverId ?? build.driver.id);
+  }
 }
 
 /**
