@@ -209,6 +209,18 @@ export function buildStadium(
   ) as THREE.MeshStandardMaterial;
   wallMat.side = THREE.DoubleSide;
 
+  // Ribs sit a shade darker than the wall. A LIGHTER rib reads as a painted
+  // stripe; a darker one reads as a shadowed seam, which is what a moulding
+  // join actually looks like.
+  const ribColour = new THREE.Color(wallColour).multiplyScalar(0.82).getHex();
+  const ribMat = theme.toon
+    ? toonMaterial(ribColour)
+    : new THREE.MeshStandardMaterial({
+        color: ribColour,
+        metalness: theme.wallMetalness,
+        roughness: theme.wallRoughness,
+      });
+
   for (let i = 0; i < exits.length; i++) {
     const start = exits[i] + C.POCKET_HALF_WIDTH;
     const end = exits[(i + 1) % exits.length] - C.POCKET_HALF_WIDTH;
@@ -235,6 +247,36 @@ export function buildStadium(
     wall.rotation.y = Math.PI / 2 - start - sweep;
     wall.position.y = rimY;
     group.add(wall);
+
+    // VERTICAL RIBS along the wall.
+    //
+    // Reported as the arena looking "very bare bone and not detailed at the
+    // level of the beyblades", and that was fair: the rim was one smooth
+    // extruded band, which next to a faceted chrome top reads as a placeholder.
+    // Real stadiums are moulded in segments and every seam between them shows
+    // as a vertical rib — it is the cheapest detail that makes a wall read as a
+    // manufactured object rather than a cylinder.
+    //
+    // Spaced by ARC LENGTH rather than a fixed count per segment, so a long
+    // wall gets more ribs than a short one and the spacing stays even all the
+    // way round. A fixed count would crowd them on the short segments of a
+    // clustered-pocket floor like Three Sides Safe.
+    const ribEvery = 0.19;
+    const ribs = Math.max(1, Math.round(sweep / ribEvery));
+    const ribGeo = new THREE.BoxGeometry(0.012, rimHeight * 0.86, 0.016);
+    for (let k = 1; k < ribs; k++) {
+      const a = start + (sweep * k) / ribs;
+      const rib = new THREE.Mesh(ribGeo, ribMat);
+      rib.position.set(
+        Math.cos(a) * (C.STADIUM_RADIUS + 0.004),
+        rimY,
+        Math.sin(a) * (C.STADIUM_RADIUS + 0.004),
+      );
+      // Face outward, so the rib stands proud of the wall rather than cutting
+      // through it.
+      rib.rotation.y = -a;
+      group.add(rib);
+    }
   }
 
   // Glowing markers either side of each pocket, so exits are obvious.
