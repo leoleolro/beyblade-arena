@@ -186,7 +186,14 @@ export const abrasion = (a: BeyState, b: BeyState): number => {
  * fight the precession model and make the orbit unreadable.
  */
 function updatePit(b: BeyState, pit: PitSpec, dt: number): void {
-  const r = len(b.pos);
+  // Distance from the PIT's centre, which is not always the dish's. See
+  // PitSpec.offset — an off-centre hazard is the only way this sim breaks
+  // radial symmetry without leaving radial coordinates, and symmetry is what
+  // keeps the two tops phase-locked into a chase.
+  const off = pit.offset ?? 0;
+  const ox = off === 0 ? 0 : Math.cos(pit.offsetAngle ?? 0) * off * C.STADIUM_RADIUS;
+  const oy = off === 0 ? 0 : Math.sin(pit.offsetAngle ?? 0) * off * C.STADIUM_RADIUS;
+  const r = off === 0 ? len(b.pos) : Math.hypot(b.pos.x - ox, b.pos.y - oy);
   if (r >= pit.radius) {
     b.pitTime = 0;
     return;
@@ -201,6 +208,20 @@ function updatePit(b: BeyState, pit: PitSpec, dt: number): void {
   const after = Math.max(0, before - loss);
   b.spin = after * Math.sign(b.spin);
   b.pitDrained += before - after;
+
+  // Outward shove, for zones that have one. Spin drain alone cannot change a
+  // trajectory, so it cannot break two tops out of a shared orbit — only a
+  // velocity change does that. See PitSpec.push for the measurement.
+  const shove = pit.push ?? 0;
+  if (shove > 0 && r > 1e-6) {
+    const nx = -(b.pos.y - oy) / r;
+    const ny = (b.pos.x - ox) / r;
+    // Strongest at the centre of the zone and fading to nothing at its edge,
+    // so a top skimming the rim is nudged rather than flung.
+    const k = shove * depth * dt;
+    b.vel.x += nx * k;
+    b.vel.y += ny * k;
+  }
 }
 
 function updateRail(b: BeyState, rail: RailSpec, dt: number): void {

@@ -77,6 +77,53 @@ export interface RailSpec {
 export interface PitSpec {
   /** Radius of the hazard zone. */
   radius: number;
+  /**
+   * Where the pit sits, as a fraction of stadium radius from the centre.
+   * Omitted or 0 puts it dead centre, which is what every pit did before.
+   *
+   * WHY OFF-CENTRE IS INTERESTING. Measured across all seven arenas, the two
+   * tops spend around half of every round within 2.2x contact radius — the
+   * "cat chase mouse" the owner reported — and **only the arenas with a rail
+   * break it** (35-39% against 48-51%). Pits did nothing, pocket layout did
+   * nothing, launch tilt did nothing.
+   *
+   * The reason the rail works is that it grabs ONE top and changes its speed
+   * and bearing independently of the other. Everything else in this sim is
+   * radially symmetric, so both tops experience identical forces at the same
+   * radius and stay phase-locked however their orbits are shaped.
+   *
+   * An off-centre hazard is the cheapest way to break that symmetry without
+   * leaving the radial coordinate system (which is what a square floor would
+   * require — see ARENA-IDEAS.md E3). Two tops at the same radius but
+   * different bearings now meet different floors, so they drift apart in phase.
+   */
+  offset?: number;
+  /** Bearing of that offset in radians. Ignored when `offset` is 0. */
+  offsetAngle?: number;
+  /**
+   * Outward acceleration applied to a top inside the zone, in units/s^2.
+   *
+   * A DRAIN CANNOT DESYNCHRONISE TWO TOPS, and that is the measurement that
+   * produced this field. An off-centre pit was built on the theory that
+   * breaking the dish's radial symmetry would stop the two tops phase-locking
+   * into a chase. Measured, it changed nothing: 48.8% adjacency against the
+   * 47-49% of every other rail-less floor.
+   *
+   * The reason is that a pit drains SPIN and spin is not a trajectory. Two tops
+   * on identical orbits stay on identical orbits however much spin one of them
+   * loses. The rail desynchronises because it changes VELOCITY — it grabs one
+   * top and throws it on a new bearing at a new speed.
+   *
+   * So a floor feature that wants to break the lock has to change velocity.
+   * This applies a TANGENTIAL acceleration — a current that swirls a top around
+   * the zone rather than shoving it out of it.
+   *
+   * The direction matters and was measured. An OUTWARD push made the chase
+   * WORSE (48.8% to 54.3%), because it moves both tops outward together and
+   * keeps them paired. A tangential one changes each top's BEARING, which is
+   * what the rail does and the only thing found that helps.
+   */
+  push?: number;
   /** Spin drained per second at the very centre. */
   drain: number;
   /**
@@ -395,6 +442,78 @@ export const THREE_SIDES: ArenaSpec = {
   finishPocket: 1,
 };
 
+/**
+ * Crater — the only floor in the game that is not radially symmetric.
+ *
+ * Built from a measurement rather than an idea. Across all seven other arenas
+ * the two tops spend roughly half of every round adjacent without resolving,
+ * and only the ones with a rail break it. The rail works because it acts on ONE
+ * top at a time; everything else here is radially symmetric, so both tops meet
+ * identical forces at the same radius and stay phase-locked.
+ *
+ * So: put the hazard somewhere other than the middle. Two tops at the same
+ * radius but different bearings now sit on different floors — one over the
+ * crater, one over clean dish — and drift apart in phase without a rail.
+ *
+ * The pit is wide and shallow rather than the Spike Pit's narrow bite. A
+ * deep off-centre well would just be a second exit; a broad soft one is a
+ * region of the floor you would rather your opponent were in, which is the
+ * geography this dish has never had.
+ */
+/**
+ * Crater — an off-centre current, and the only floor here that is not radially
+ * symmetric.
+ *
+ * Built from a measurement. Across every other arena the two tops spend roughly
+ * half of each round adjacent without resolving, and only the ones with a rail
+ * break it. The rail works because it acts on ONE top at a time; everything
+ * else here is radially symmetric, so both tops meet identical forces at the
+ * same radius and stay phase-locked.
+ *
+ * The build took three attempts and the first two failed, which is worth
+ * carrying because it narrows what "geography" can do in this sim:
+ *
+ *     off-centre spin drain      48.8%   no change — a drain is not a trajectory
+ *     off-centre outward push    54.3%   WORSE — moves both tops out together
+ *     off-centre tangential      44.7%   the best rail-less floor measured
+ *
+ * Against a plain dish's 48.9% and the X-Rail's 35.8%. So the current helps and
+ * does not solve: it is worth four points of adjacency and costs about three
+ * tenths of a second of round length. Both honest, neither tuned away.
+ *
+ * A drain cannot desynchronise two tops because spin is not a trajectory: two
+ * tops on identical orbits stay on identical orbits however much spin one
+ * loses. An outward shove fails for the opposite reason — it acts on both of
+ * them the same way. Only changing a top's BEARING works, which is precisely
+ * what the rail does when it drives tangentially and releases inward.
+ *
+ * So this is a swirling current in an off-centre well: a top that crosses it
+ * comes out pointed somewhere else.
+ */
+export const CRATER: ArenaSpec = {
+  id: 'crater',
+  name: 'Crater',
+  blurb: 'an off-centre current — cross it and you come out pointed elsewhere',
+  suggestedTheme: 'anime',
+  rail: null,
+  pit: {
+    radius: 0.34,
+    // Light, because the current is the mechanic here and the drain is
+    // flavour. The Spike Pit bites at 12; this taxes at half that.
+    drain: 6,
+    grace: 0.6,
+    // A QUARTER OUT, not halfway. The first version sat at 0.42 with a 0.46
+    // radius, which put its far edge where the bowl climbs steeply — and the
+    // hazard is a flat disc displaced to follow the floor, so at that radius it
+    // warped into a swooping ribbon instead of reading as a circular zone.
+    // Inboard, where the bowl is shallow, it stays a crater.
+    offset: 0.26,
+    offsetAngle: Math.PI * 0.25,
+    push: 6.0,
+  },
+  look: { dish: 0xe3dbd2, wall: 0xf4efe9, ridge: 0x9a6b4a, guide: 0xcdbcae, post: 0x8a4b2a },
+};
+
 export const ARENAS: ArenaSpec[] = [
   STANDARD,
   XRAIL,
@@ -403,6 +522,7 @@ export const ARENAS: ArenaSpec[] = [
   SUDDEN_DEATH,
   TIGHT_DISH,
   THREE_SIDES,
+  CRATER,
 ];
 
 export const arenaById = (id: string): ArenaSpec =>

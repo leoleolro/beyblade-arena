@@ -74,7 +74,7 @@ function hazardTexture(): THREE.CanvasTexture {
   return tex;
 }
 
-export function buildPit(radius: number): PitHandles {
+export function buildPit(radius: number, offX = 0, offZ = 0): PitHandles {
   const group = new THREE.Group();
 
   const floorMat = new THREE.MeshBasicMaterial({
@@ -97,12 +97,17 @@ export function buildPit(radius: number): PitHandles {
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i);
     const y = pos.getY(i);
-    pos.setZ(i, bowlHeight(Math.hypot(x, y)) + 0.006);
+    // Height from the vertex's WORLD radius, not its local one. The hazard can
+    // sit off-centre now (see PitSpec.offset), and a mesh that computes its
+    // bowl height as if it were centred hangs through the floor on its far
+    // side and floats on its near side — visible as a red arc outside the dish.
+    pos.setZ(i, bowlHeight(Math.hypot(x + offX, y + offZ)) + 0.006);
   }
   geo.computeVertexNormals();
 
   const floor = new THREE.Mesh(geo, floorMat);
   floor.rotation.x = -Math.PI / 2;
+  floor.position.set(offX, 0, offZ);
   // Above the dish paint, below the tops and their contact shadows.
   floor.renderOrder = -3;
   group.add(floor);
@@ -119,7 +124,10 @@ export function buildPit(radius: number): PitHandles {
     ringMat,
   );
   ring.rotation.x = Math.PI / 2;
-  ring.position.y = bowlHeight(radius) + 0.004;
+  // The ring is a flat torus, so it can only sit at ONE height. Placed at the
+  // bowl height of the zone's own centre, which is the best single answer for
+  // an off-centre well; dead centre it reduces to the old behaviour exactly.
+  ring.position.set(offX, bowlHeight(Math.hypot(offX, offZ) + radius) + 0.004, offZ);
   ring.renderOrder = -3;
   group.add(ring);
 

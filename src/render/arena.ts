@@ -287,6 +287,8 @@ export class ArenaRenderer {
   private readonly clashPools = new ClashPool();
   /** Which pocket layout the current stadium mesh was cut for. */
   private pocketKey = '';
+  /** Radius the current pit mesh was built for, so a size change rebuilds it. */
+  private pitRadius = '';
   /** Remembered so a theme rebuild keeps the current arena's geometry and palette. */
   private arenaPockets: number[] | undefined;
   private arenaLook: ArenaLook | undefined;
@@ -548,11 +550,37 @@ export class ArenaRenderer {
       this.rail.setToon(this.theme.toon);
     }
 
+    // Rebuilt when the RADIUS changes, not merely toggled — arenas no longer
+    // share one pit size, and a Crater drawn at the Spike Pit's radius is a
+    // hazard whose picture does not match where the sim actually bites.
+    const pitKey = `${arena.pit?.radius ?? 0}:${arena.pit?.offset ?? 0}:${arena.pit?.offsetAngle ?? 0}`;
+    if (arena.pit && this.pit && this.pitRadius !== pitKey) {
+      this.scene.remove(this.pit.group);
+      disposeTree(this.pit.group);
+      this.pit = null;
+    }
     if (arena.pit && !this.pit) {
-      this.pit = buildPit(arena.pit.radius);
+      const po = arena.pit.offset ?? 0;
+      const pa = arena.pit.offsetAngle ?? 0;
+      this.pit = buildPit(
+        arena.pit.radius,
+        Math.cos(pa) * po * C.STADIUM_RADIUS,
+        Math.sin(pa) * po * C.STADIUM_RADIUS,
+      );
+      this.pitRadius = pitKey;
       this.scene.add(this.pit.group);
     }
-    if (this.pit) this.pit.group.visible = !!arena.pit;
+    if (this.pit) {
+      this.pit.group.visible = !!arena.pit;
+      // AND PUT IT WHERE THE SIM PUTS IT. `PitSpec.offset` moves the hazard off
+      // centre; drawing it at the dish's middle would show players a danger
+      // zone that is not where the danger is. Exactly the mismatch the pocket
+      // geometry hit — the sim and the picture have to agree or everything
+      // "works" and nothing makes sense.
+      // The offset is baked into the MESH rather than applied to the group, so
+      // every vertex can take its bowl height from where it really sits. See
+      // buildPit.
+    }
   }
 
   /**
