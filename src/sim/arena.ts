@@ -154,7 +154,110 @@ export const SPIKE_PIT: ArenaSpec = {
   },
 };
 
-export const ARENAS: ArenaSpec[] = [STANDARD, XRAIL, SPIKE_PIT];
+/**
+ * The Gauntlet — a rail AND a pit, which nothing else combines.
+ *
+ * `ArenaSpec` has always allowed both and no arena has ever set both, so the
+ * one floor where the outer orbit is rewarded and the middle is taxed did not
+ * exist. That combination is the sharpest positional statement the current
+ * physics can make: there is nowhere neutral to stand. Stamina builds cannot
+ * park in the calm centre and outlast, and attackers riding the rail are
+ * committed to a bearing they do not fully choose.
+ *
+ * Both hazards are softened from their solo versions on purpose. The Spike
+ * Pit's drain was tuned against a floor whose only other feature was the bowl,
+ * and stacking a full-strength pit under a full-strength rail taxes the same
+ * top twice for one decision. The rail is also given a slightly wider band so
+ * the escape from the pit has somewhere to land.
+ *
+ * NOT balance-swept yet. The Spike Pit's own history is the warning — a harsher
+ * drain made the archetype spread WORSE, not flatter, and the response was not
+ * monotonic. Treat these numbers as a starting point, not a result.
+ */
+export const GAUNTLET: ArenaSpec = {
+  id: 'gauntlet',
+  name: 'The Gauntlet',
+  blurb: 'rail outside, spikes inside — nowhere neutral to stand',
+  suggestedTheme: 'anime',
+  rail: {
+    radius: 0.9,
+    // Wider than XRAIL's 0.08: a top fleeing the pit arrives at the wall on a
+    // steeper bearing and would otherwise cross the band without biting.
+    halfWidth: 0.11,
+    engageSpeed: 1.9,
+    accel: 2.6,
+    maxSpeed: 3.1,
+    duration: 0.5,
+    cooldown: 1.7,
+    releaseInward: 0.8,
+  },
+  pit: {
+    radius: 0.38,
+    // 8, against the Spike Pit's tuned 12. The rail already punishes the middle
+    // indirectly by rewarding the rim, so a full-strength drain would charge
+    // twice for one positional mistake.
+    drain: 8,
+    grace: 0.55,
+  },
+  finishPocket: 2,
+};
+
+/**
+ * Sudden Death — a plain bowl with one graded pocket.
+ *
+ * The Xtreme Finish currently exists only on the X-Rail, which confounds two
+ * things: the graded pocket is always measured alongside a mechanic that biases
+ * exits toward it. Measured on the rail, 33.3% of knockouts go through the
+ * graded pocket against 25% by chance, and that surplus is the rail's doing.
+ *
+ * This is the control. Same bowl as STANDARD, one pocket worth 3 instead of 2,
+ * nothing else. It answers "is a graded exit interesting on its own" — and it
+ * gives a floor where positioning matters to players who find the rail's
+ * variance unpleasant, which is a real competitive preference and the reason
+ * plain stadiums stay popular in the real game.
+ */
+export const SUDDEN_DEATH: ArenaSpec = {
+  id: 'sudden',
+  name: 'Sudden Death',
+  blurb: 'the plain bowl, but one exit is worth more',
+  suggestedTheme: 'arena',
+  rail: null,
+  finishPocket: 1,
+};
+
+/**
+ * Tight Dish — the same bowl with the fight pushed outward.
+ *
+ * From the real product: the Hasbro Xtreme Beystadium is smaller than the
+ * Takara Tomy one and is described as producing more dashes and quicker, more
+ * violent battles for exactly that reason. Less floor means less room to
+ * disengage.
+ *
+ * The sim's `STADIUM_RADIUS` is a global constant and the whole physics is
+ * radial against it, so shrinking the floor for one arena is not a parameter —
+ * see docs/ARENA-IDEAS.md E3, which reaches the same conclusion about a square
+ * floor. What IS reachable is the same effect by a different route: a wide,
+ * gentle pit that covers most of the middle and makes the usable floor an
+ * annulus. The tops end up fighting in a ring rather than a disc.
+ *
+ * Deliberately a much weaker drain over a much larger radius than the Spike
+ * Pit. The Pit is a hazard you avoid; this is a slope you are always slightly
+ * on, and at 4/second it costs a fraction of what a single heavy hit does.
+ */
+export const TIGHT_DISH: ArenaSpec = {
+  id: 'tight',
+  name: 'Tight Dish',
+  blurb: 'the middle is dead ground — fight happens in the ring',
+  suggestedTheme: 'arena',
+  rail: null,
+  pit: {
+    radius: 0.66,
+    drain: 4,
+    grace: 0.8,
+  },
+};
+
+export const ARENAS: ArenaSpec[] = [STANDARD, XRAIL, SPIKE_PIT, GAUNTLET, SUDDEN_DEATH, TIGHT_DISH];
 
 export const arenaById = (id: string): ArenaSpec =>
   ARENAS.find((a) => a.id === id) ?? STANDARD;

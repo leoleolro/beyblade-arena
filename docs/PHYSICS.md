@@ -311,3 +311,83 @@ tuned game number and should stay one.
 - [BBX Arena — Launch Techniques](https://bbxarena.com/blog/launch-techniques)
 - [Beyblade Wiki — Advanced Techniques](https://beyblade.wiki/advanced-techniques/)
 - [Hasbro — Xtreme Battle Set instructions](https://instructions.hasbro.com/en-us/instruction/beyblade-x-xtreme-battle-set-with-beystadium-2-right-spinning-top-toys-and-2-launchers)
+
+
+---
+
+# Deep research pass: the design language, and what it bought
+
+A second, wider research pass was run as a fan-out of six parallel dives. Four
+returned before the session limit stopped the rest: **dash**, **spin**,
+**launch** and **designs** (107 findings and 140 hard numbers between them). The
+**stadiums** and **spectacle** dives did not complete, and neither did the
+adversarial fact-check stage — so everything below is single-sourced research
+that has NOT been independently verified. Treated accordingly: it was used to
+shape *designs*, where being wrong costs a redraw, and deliberately not to
+retune balance numbers, where being wrong costs a sweep.
+
+## What the dash dive added over part 1
+
+- The rail **redirects the top toward the centre of the stadium**, it does not
+  merely speed it along the wall. Our `releaseInward: 0.85` was already the
+  right shape; this confirms it rather than changing it.
+- Only three tooth counts exist across the whole Bit catalogue: **10, 12, 16**.
+  12 is standard.
+- The trade is not "more teeth is better". **Fewer teeth (10) means a slower but
+  MORE FREQUENT dash and less stamina burn**; more teeth (16) means a faster
+  dash at a stamina cost. Rush's own product copy says so directly. That is a
+  genuinely better model for P2 than the one in part 1, which assumed teeth
+  simply scaled dash strength.
+- Rail reach is set by **Bit height class**, not ratchet: Low −1mm, High +1mm,
+  Under −2mm.
+- Gear Bits extend the teeth to the floor contact, so the tip *is* the gear —
+  and Gear Ball dashes **involuntarily when struck**, which is a Stamina part
+  with an attack-shaped failure mode.
+
+## The design language, which is what got built
+
+This is the part that produced work rather than notes. The conventions are
+consistent enough to design from:
+
+| Type | Contact points | Silhouette | Weight | Modern colour |
+| --- | --- | --- | --- | --- |
+| Attack | 2–4 large | sharp, jagged, upward-slanting | heaviest, 33–39 g | blue |
+| Defence | 5–9 small | round, thick, near-continuous rim | **central** | green |
+| Stamina | 0–5 smooth | circular, no corners | **outward** | orange |
+| Balance | mixed | heterogeneous or asymmetric rim | middling | red |
+
+Three rules worth keeping:
+
+**Fewer, larger blades create recoil; more, smaller blades damp it.** Not a
+metaphor — KnightShield's copy says its six blades "create an impact dampening
+structure", and SphinxCowl's nine "repel attacks from multiple directions".
+
+**Balance is heterogeneity, not averageness.** WeissTiger carries three
+separately named blade families on one rim. A balance bey that is just a
+middling attacker reads as nothing.
+
+**Three-fold symmetry is the structural default**, because every Beyblade X
+blade physically needs three launcher hooks.
+
+Colour conventions flipped between generations — attack was red in the older
+lines and is blue in Burst/X — so the roster follows the modern set.
+
+## Built from this
+
+Six new Epic beys, each one an argument from the table above rather than a
+recolour: **Tempest Lance** (attack, the only 2-blade top), **Basilisk Coil**
+(stamina, roundest in the roster, outward weight), **Golem Bastion** (defence,
+8 points, central weight), **Wyrm Fang** (attack, left spin — the documented
+rival trope, and the roster's first left-spin attacker), **Solaris Halo**
+(balance, asymmetric `flame` rim), **Chimera Maw** (balance, 6 hooks).
+
+Stats sit on the existing archetype anchors on purpose. These exist for their
+looks, and novel numbers would reopen a balance question the anchors already
+answered.
+
+## Still unverified
+
+Carried forward rather than dropped: the stadiums and spectacle dives never ran,
+the fact-check stage never ran, and 50 of the numbers gathered are single-source
+wiki figures. Anything from this pass that is about to drive a *balance* change
+should be re-checked first.

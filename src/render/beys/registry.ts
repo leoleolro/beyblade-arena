@@ -45,6 +45,12 @@ export interface BeyEntry {
   };
 }
 
+import { entry as tempest } from './tempest';
+import { entry as basilisk } from './basilisk';
+import { entry as golem } from './golem';
+import { entry as wyrm } from './wyrm';
+import { entry as solaris } from './solaris';
+import { entry as chimera } from './chimera';
 import { entry as valtryek } from './valtryek';
 import { entry as ragnaruk } from './ragnaruk';
 import { entry as spryzen } from './spryzen';
@@ -77,6 +83,12 @@ export const BEY_REGISTRY: BeyEntry[] = [
   leon,
   drake,
   nosferu,
+  tempest,
+  basilisk,
+  golem,
+  wyrm,
+  solaris,
+  chimera,
 ];
 
 /** The anime design set — the projection beydex.ts used to hand-maintain. */

@@ -45,6 +45,23 @@ export const LAYERS: LayerPart[] = [
   { id: 'leon',      name: 'Leon',      kind: 'layer', archetype: 'defense', mass: 0.55, radius: 0.1080, attack: 0.82, defense: 1.46, burstResist: 1.24, spinSteal: 0.0, blades: 3, colour: 0xc7ccd2 },
   { id: 'drake',     name: 'Drake',     kind: 'layer', archetype: 'balance', mass: 0.47, radius: 0.1000, attack: 1.08, defense: 1.00, burstResist: 1.02, spinSteal: 0.0, blades: 3, colour: 0x2a3f9f },
 
+  // Six more of the player-designed line, built from the real type conventions
+  // researched in docs/PHYSICS.md rather than invented: attack clusters at 2-4
+  // large blades and is the heaviest class; defence runs 5-9 small points with
+  // CENTRAL weight (hence the smaller radius); stamina goes near-circular with
+  // OUTWARD weight (hence the larger one, moment of inertia going as r^2);
+  // balance is signalled by a heterogeneous rim rather than by average numbers.
+  //
+  // Stats still sit on the archetype anchors above. These exist for their
+  // looks, and novel numbers would reopen a balance question the anchors have
+  // already answered — same reasoning as the four entries above this comment.
+  { id: 'tempest',   name: 'Tempest',   kind: 'layer', archetype: 'attack',  mass: 0.46, radius: 0.1085, attack: 1.48, defense: 0.74, burstResist: 0.88, spinSteal: 0.0, blades: 2, colour: 0x2563eb },
+  { id: 'basilisk',  name: 'Basilisk',  kind: 'layer', archetype: 'stamina', mass: 0.50, radius: 0.1105, attack: 0.78, defense: 1.06, burstResist: 1.14, spinSteal: 0.0, blades: 5, colour: 0xf59e0b },
+  { id: 'golem',     name: 'Golem',     kind: 'layer', archetype: 'defense', mass: 0.56, radius: 0.1035, attack: 0.74, defense: 1.58, burstResist: 1.30, spinSteal: 0.0, blades: 8, colour: 0x16a34a },
+  { id: 'wyrm',      name: 'Wyrm',      kind: 'layer', archetype: 'attack',  mass: 0.45, radius: 0.1070, attack: 1.40, defense: 0.82, burstResist: 0.93, spinSteal: 0.0, blades: 4, colour: 0x9f1239 },
+  { id: 'solaris',   name: 'Solaris',   kind: 'layer', archetype: 'balance', mass: 0.48, radius: 0.1045, attack: 1.10, defense: 1.02, burstResist: 1.04, spinSteal: 0.0, blades: 3, colour: 0xdc2626 },
+  { id: 'chimera',   name: 'Chimera',   kind: 'layer', archetype: 'balance', mass: 0.49, radius: 0.1050, attack: 1.02, defense: 1.10, burstResist: 1.06, spinSteal: 0.0, blades: 6, colour: 0x7c3aed },
+
   // The vampire. The one layer in the catalog with `sameSteal`: it absorbs in
   // *every* matchup, not only against an opposite-spin opponent, so there is no
   // launch that denies it its mechanic (see constants.ts, spin steal).
