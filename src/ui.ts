@@ -1260,7 +1260,14 @@ export class Ui {
           id: d.id,
           name: d.name,
           colour: d.colour,
-          note: `${d.mass}kg · stab ${d.stability}`,
+          // Protrusion count where the part has one — it is half the real
+          // Ratchet's NAME (`4-60` is four protrusions at 6.0 mm) and it is
+          // what the blade/ratchet alignment rule reads. A player choosing
+          // between them should see the number the name is made of.
+          note:
+            d.protrusions !== undefined
+              ? `${d.protrusions} prong${d.protrusions === 1 ? '' : 's'} · ${d.heightMm}mm · stab ${d.stability}`
+              : `${d.mass}kg · stab ${d.stability}`,
         })),
         'disc',
       ],
@@ -1269,7 +1276,13 @@ export class Ui {
         DRIVERS.map((d) => ({
           id: d.id,
           name: d.name,
-          note: `${d.archetype} · spin ${d.spinRetention} · aggro ${d.wander}`,
+          // Dash shown where it is transcribed, because it is the stat that
+          // decides how hard the X-Rail throws you and the only reason to
+          // prefer one attack bottom over another.
+          note:
+            d.railGrip !== undefined
+              ? `${d.archetype} · dash ${Math.round(d.railGrip * 40)} · spin ${d.spinRetention}`
+              : `${d.archetype} · spin ${d.spinRetention} · aggro ${d.wander}`,
         })),
         'driver',
       ],
