@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { finishImported, loadTopModel, normaliseToRadius, seatOnOrigin } from './topModels';
+import { finishImported, instantiateModel, loadTopModel, normaliseToRadius, seatOnOrigin } from './topModels';
 import { MODEL_TINT } from './topModels';
 import { studioEnvironment } from './environment';
 import { topModelFor } from './topModelIndex';
@@ -123,7 +123,7 @@ export function modelThumb(
       const gl = offscreen();
       const scene = new THREE.Scene();
 
-      const model = src.clone(true);
+      const model = instantiateModel(src);
       normaliseToRadius(model, radius);
       seatOnOrigin(model);
       // Full exposure regardless of theme: a chip is read against a panel, not

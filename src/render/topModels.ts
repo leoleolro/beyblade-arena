@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { isDiscLike, uprightAxis } from './motion';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
@@ -199,6 +200,44 @@ export function uprightModel(obj: THREE.Object3D): boolean {
   if (!isDiscLike(up)) return false;
   if (up.rotateX !== 0) obj.rotateX(up.rotateX);
   return true;
+}
+
+/**
+ * Make a usable copy of a loaded model.
+ *
+ * THE BUG THIS EXISTS FOR, reported three times as Dran Sword being "very
+ * broken": a large top sitting motionless in the middle of the dish while an
+ * invisible bey fought around it.
+ *
+ * `Object3D.clone()` DOES NOT REBIND SKELETONS. The copy's `SkinnedMesh` keeps
+ * a reference to the ORIGINAL skeleton — whose bones live in the loader's
+ * cached scene, which is never added to ours. And a skinned mesh draws its
+ * vertices from bone matrices, not from its own transform. So the geometry was
+ * rendered wherever those orphaned bones sat, which is the world origin, while
+ * the mesh object itself dutifully followed the bey.
+ *
+ * Measured in the running game, and this is the shape of the whole problem:
+ *
+ *     meshRootIsScene   true     — the mesh is in our scene, at (-0.62, 0.24, 1.27)
+ *     boneRootIsScene   FALSE    — its bones are not in our scene at all
+ *     boneWorld         (0, -0.44, 0)
+ *
+ * WHY EVERY EARLIER FIX MISSED IT. `Box3.setFromObject` measures a skinned mesh
+ * from its own world matrix, so the box reported the mesh following the bey at
+ * the correct size — agreeing with the uprighting check, with
+ * `normaliseToRadius`, with `seatOnOrigin`, and with the audit built to catch
+ * the previous bug. Every one of those measured the object. None of them
+ * measured what the GPU draws, and the gap between those two is exactly where
+ * this lived.
+ *
+ * `SkeletonUtils.clone` copies the hierarchy AND rebinds each skinned mesh to
+ * the cloned bones, so the copy is self-contained. It is safe for unskinned
+ * models too, which is why this is the single entry point rather than a
+ * conditional at six call sites — the previous two fixes both had to be moved
+ * inside a shared function for the same reason.
+ */
+export function instantiateModel(src: THREE.Object3D): THREE.Object3D {
+  return cloneSkinned(src);
 }
 
 /**

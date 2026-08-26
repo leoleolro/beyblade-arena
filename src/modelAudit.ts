@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { TOP_MODELS } from './render/topModelIndex';
-import { loadTopModel, normaliseToRadius, seatOnOrigin } from './render/topModels';
+import { instantiateModel, loadTopModel, normaliseToRadius, seatOnOrigin } from './render/topModels';
 import { isDiscLike, uprightAxis } from './render/motion';
 import { LAYERS } from './sim/parts';
 
@@ -59,7 +59,40 @@ export async function auditModels(): Promise<Row[]> {
       continue;
     }
 
-    const model = src.clone(true);
+    const model = instantiateModel(src);
+
+    // THE INVARIANT NO BOUNDING BOX CAN SEE: a skinned mesh's bones must live
+    // inside the model it skins.
+    //
+    // A SkinnedMesh draws its vertices from BONE matrices, not from its own
+    // transform. `Object3D.clone()` does not rebind skeletons, so a naively
+    // cloned model keeps pointing at the loader cache's bones — which are never
+    // added to the scene and sit at the world origin. The mesh then follows the
+    // bey correctly in every measurement while its geometry is drawn at the
+    // centre of the dish. That is a whole class of bug that is invisible to
+    // size, axis and seating checks, because all three measure the OBJECT and
+    // the GPU is reading the BONES.
+    const detached: string[] = [];
+    model.traverse((c) => {
+      const sm = c as THREE.SkinnedMesh;
+      if (!sm.isSkinnedMesh || !sm.skeleton) return;
+      for (const bone of sm.skeleton.bones) {
+        let root: THREE.Object3D = bone;
+        while (root.parent) root = root.parent;
+        let meshRoot: THREE.Object3D = sm;
+        while (meshRoot.parent) meshRoot = meshRoot.parent;
+        if (root !== meshRoot) {
+          detached.push(sm.name || 'mesh');
+          break;
+        }
+      }
+    });
+    if (detached.length) {
+      notes.push(
+        `${detached.length} mesh(es) skinned to bones OUTSIDE the model ` +
+          `(${detached.slice(0, 3).join(', ')}) — will draw at the world origin`,
+      );
+    }
 
     // Rig report BEFORE preparation, since preparation is what neutralises it.
     let skinned = 0;
@@ -109,7 +142,7 @@ export async function auditModels(): Promise<Row[]> {
       notes.push(`taller (${size.y.toFixed(3)}) than wide — still on its side`);
     }
 
-    rows.push({ bey: layerId, ok: notes.every((n) => !/vs expected|not on the floor|on its side|failed|declined/.test(n)), notes });
+    rows.push({ bey: layerId, ok: notes.every((n) => !/vs expected|not on the floor|on its side|failed|declined|OUTSIDE the model/.test(n)), notes });
   }
 
   return rows;

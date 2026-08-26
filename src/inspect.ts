@@ -5,12 +5,7 @@ import type { BeyParts } from './render/beyMesh';
 import { renderInked } from './render/outlineHull';
 import { studioEnvironment } from './render/environment';
 import { addFresnelRim } from './render/rimMetal';
-import {
-  finishImported,
-  loadTopModel,
-  normaliseToRadius,
-  seatOnOrigin,
-} from './render/topModels';
+import { finishImported, instantiateModel, loadTopModel, normaliseToRadius, seatOnOrigin } from './render/topModels';
 import { topModelFor } from './render/topModelIndex';
 import { skinById } from './render/skins';
 import { themeById } from './render/theme';
@@ -157,7 +152,7 @@ function rebuild(): void {
     const held = parts;
     void loadTopModel(entry.url).then((src) => {
       if (!src || token !== modelToken || !held) return;
-      const model = src.clone(true);
+      const model = instantiateModel(src);
       normaliseToRadius(model, build.layer.radius);
       seatOnOrigin(model);
       finishImported(

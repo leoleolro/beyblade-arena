@@ -163,9 +163,49 @@ now instead of one playthrough away:
     OK   valkyrie  — arrived Z-up — rotated to Y
     OK   magejab   — arrived Z-up — rotated to Y
 
-The deeper lesson is about the *kind* of check: a measurement taken from the
-same source the bug lives in will confirm the bug. The bounding box was not a
-second opinion, it was the first opinion restated.
+### Third round — the actual cause
+
+Still broken after both fixes above, and this one is the real answer.
+
+`Object3D.clone()` **does not rebind skeletons.** The copy's `SkinnedMesh` kept
+pointing at the ORIGINAL skeleton, whose bones live in the loader cache and are
+never added to our scene. A skinned mesh draws its vertices from bone matrices,
+not from its own transform — so the geometry rendered wherever those orphaned
+bones sat, which is the world origin, while the mesh object followed the bey
+perfectly.
+
+Measured in the running game, and this is the whole shape of it:
+
+    meshRootIsScene   true    — mesh in our scene at (-0.62, 0.24, 1.27)
+    boneRootIsScene   FALSE   — its bones are not in our scene at all
+    boneWorld         (0, -0.44, 0)
+
+That is precisely the report: "a big object in the middle of the stadium
+sitting, and a ghost blade that is not visible is battling." The object at the
+centre was the mesh drawn at the orphaned bones. The ghost was the bey group,
+moving, with an emptied layer.
+
+Fixed with `SkeletonUtils.clone`, behind a single `instantiateModel()` — the
+third fix in a row that had to be moved inside a shared function, because six
+call sites cloned models and any conditional at the call site drifts.
+
+### The lesson, and it is not "check harder"
+
+All three bugs shared one property: **every check measured the object, and the
+GPU was reading something else.**
+
+- Bug one: the box was right, the axis was wrong.
+- Bug two: the box read the bind pose; the GPU read posed bones.
+- Bug three: the box read the mesh's transform; the GPU read detached bones.
+
+Adding more measurements of the same kind found nothing, three times. What
+finally worked was checking a *different sort of thing* — a structural
+invariant: **a skinned mesh's bones must live inside the model that skins
+them.** `__models()` asserts that now, and it has teeth: run against the old
+`clone(true)` it reports 12 detached meshes on Dran Sword alone.
+
+A measurement taken from the same source as the bug will confirm the bug. The
+bounding box was never a second opinion; it was the first opinion restated.
 
 ## F. Process
 

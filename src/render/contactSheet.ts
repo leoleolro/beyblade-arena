@@ -9,7 +9,7 @@ import { THEMES } from './theme';
 import type { Theme } from './theme';
 import { renderInked } from './outlineHull';
 import { studioEnvironment } from './environment';
-import { finishImported, loadTopModel, normaliseToRadius, seatOnOrigin } from './topModels';
+import { finishImported, instantiateModel, loadTopModel, normaliseToRadius, seatOnOrigin } from './topModels';
 import { topModelFor } from './topModelIndex';
 import { LAYERS, makeBuild } from '../sim/parts';
 
@@ -113,7 +113,7 @@ async function buildCell(
   if (entry) {
     const src = await loadTopModel(entry.url);
     if (src) {
-      const model = src.clone(true);
+      const model = instantiateModel(src);
       normaliseToRadius(model, radius);
       seatOnOrigin(model);
       finishImported(

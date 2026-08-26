@@ -32,12 +32,7 @@ import { buildAura } from './aura';
 import type { Aura } from './aura';
 import { contactShadow, noOutline } from './toon';
 import { designByLayer } from './beydex';
-import {
-  finishImported,
-  loadTopModel,
-  normaliseToRadius,
-  seatOnOrigin,
-} from './topModels';
+import { finishImported, instantiateModel, loadTopModel, normaliseToRadius, seatOnOrigin } from './topModels';
 import { renderInked } from './outlineHull';
 import { setEnvironmentIntensity, studioEnvironment } from './environment';
 import { addFresnelRim } from './rimMetal';
@@ -948,7 +943,7 @@ export class ArenaRenderer {
       // The group may already have been torn down for the next round.
       if (!group.parent) return;
 
-      const model = src.clone(true);
+      const model = instantiateModel(src);
       normaliseToRadius(model, radius);
       seatOnOrigin(model);
       finishImported(model, this.theme.modelTint, studioEnvironment(this.renderer), entry.finish, this.theme.envIntensity, {

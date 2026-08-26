@@ -4,12 +4,7 @@ import { buildBeyMesh } from './beyMesh';
 import type { BeyParts } from './beyMesh';
 import { skinById } from './skins';
 import { themeById } from './theme';
-import {
-  finishImported,
-  loadTopModel,
-  normaliseToRadius,
-  seatOnOrigin,
-} from './topModels';
+import { finishImported, instantiateModel, loadTopModel, normaliseToRadius, seatOnOrigin } from './topModels';
 import { renderInked } from './outlineHull';
 import { studioEnvironment } from './environment';
 import { topModelFor } from './topModelIndex';
@@ -174,7 +169,7 @@ export class GarageView {
         // A later setBuild may have replaced this mesh while the file loaded;
         // the token says whether this result is still the one being asked for.
         if (!src || token !== this.modelToken) return;
-        const model = src.clone(true);
+        const model = instantiateModel(src);
         normaliseToRadius(model, build.layer.radius);
         seatOnOrigin(model);
         finishImported(
