@@ -22,7 +22,7 @@ import { ARENA, THEMES, loadImpactFrames, themeById } from './theme';
 import type { Theme } from './theme';
 import { Shockwave } from './shockwave';
 import { ClashPool } from './clashPool';
-import type { ArenaSpec } from '../sim/arena';
+import type { ArenaLook, ArenaSpec } from '../sim/arena';
 import { buildRail } from './rail';
 import type { RailHandles } from './rail';
 import { buildPit } from './pit';
@@ -287,6 +287,9 @@ export class ArenaRenderer {
   private readonly clashPools = new ClashPool();
   /** Which pocket layout the current stadium mesh was cut for. */
   private pocketKey = '';
+  /** Remembered so a theme rebuild keeps the current arena's geometry and palette. */
+  private arenaPockets: number[] | undefined;
+  private arenaLook: ArenaLook | undefined;
   private composer: EffectComposer | null = null;
   /**
    * Inverted-hull outline pass. Created lazily on first toon use and then kept:
@@ -405,7 +408,7 @@ export class ArenaRenderer {
     if (toonChanged) {
       this.scene.remove(this.stadium.group);
       disposeTree(this.stadium.group);
-      this.stadium = buildStadium(t);
+      this.stadium = buildStadium(t, this.arenaPockets, this.arenaLook);
       this.scene.add(this.stadium.group);
       if (this.lastBeys.length) this.setBeys(this.lastBeys, this.lastSkins);
     }
@@ -518,12 +521,18 @@ export class ArenaRenderer {
     // are geometry, not a flag, so a clustered floor needs new geometry — see
     // buildStadium. Keyed on the bearings themselves so the common case (same
     // layout, different rail or pit) still costs nothing.
-    const key = (arena.pockets ?? []).join(',');
+    // Keyed on pockets AND palette: both are baked into the mesh at build time,
+    // so a change to either needs new geometry or new materials. Without the
+    // palette in the key, switching between two arenas with the same exit
+    // layout would keep the first one's colours.
+    const key = (arena.pockets ?? []).join(',') + '|' + JSON.stringify(arena.look ?? {});
     if (key !== this.pocketKey) {
       this.pocketKey = key;
       this.scene.remove(this.stadium.group);
       disposeTree(this.stadium.group);
-      this.stadium = buildStadium(this.theme, arena.pockets);
+      this.arenaPockets = arena.pockets;
+      this.arenaLook = arena.look;
+      this.stadium = buildStadium(this.theme, arena.pockets, arena.look);
       this.scene.add(this.stadium.group);
     }
 

@@ -127,10 +127,47 @@ export interface ArenaSpec {
    * docs/ARENA-IDEAS.md E2, written before the regulation confirmed it.
    */
   pockets?: number[];
+  /**
+   * This floor's own colours, overriding the theme's.
+   *
+   * WHY THIS EXISTS. Reported as "every arena looks like the anime arena...
+   * that shouldn't be the case", and correct: every stadium colour came from
+   * the THEME, and the roster mode has exactly one theme, so seven stadiums
+   * rendered identically apart from whether a rail or a pit was switched on.
+   * The floor is the biggest object on screen and it was the same object every
+   * time.
+   *
+   * The separation this restores: a **theme** is a rendering STYLE — cel or 3D,
+   * bloom, ink, impact frames — and applies to everything in the scene. An
+   * **arena** is a place, and places have their own colours. Overriding here
+   * rather than adding themes keeps one look per mode while giving every floor
+   * an identity, and an arena that sets nothing still inherits the theme
+   * exactly as before.
+   *
+   * Deliberately NOT the full theme surface. Metalness, roughness, bloom and
+   * opacity stay with the theme, because those are what make Anime look like
+   * Anime; letting an arena reach them would let one floor quietly leave the
+   * mode's visual language.
+   */
+  look?: ArenaLook;
+}
+
+export interface ArenaLook {
+  /** The bowl. */
+  dish?: number;
+  /** The rim wall. */
+  wall?: number;
+  /** The tornado ridge line. */
+  ridge?: number;
+  /** The concentric guide rings on the floor. */
+  guide?: number;
+  /** The exit posts. */
+  post?: number;
 }
 
 export const STANDARD: ArenaSpec = {
   id: 'standard',
+  look: { dish: 0xdfe7f2, wall: 0xf2f5fa, ridge: 0x8fb4e8, guide: 0xb9c9e4, post: 0xe2544a },
   name: 'Standard Dish',
   blurb: 'the plain bowl — no archetype favoured',
   suggestedTheme: 'arena',
@@ -139,6 +176,7 @@ export const STANDARD: ArenaSpec = {
 
 export const XRAIL: ArenaSpec = {
   id: 'xrail',
+  look: { dish: 0xd8e6f6, wall: 0xeef3fa, ridge: 0xe0b23c, guide: 0xc3d4ea, post: 0xe2544a },
   name: 'X-Rail Stadium',
   blurb: 'outer rail slingshots fast tops — faster, deadlier rounds',
   suggestedTheme: 'anime',
@@ -188,6 +226,7 @@ export const XRAIL: ArenaSpec = {
 
 export const SPIKE_PIT: ArenaSpec = {
   id: 'spikepit',
+  look: { dish: 0xf0dcd6, wall: 0xf7ece8, ridge: 0xd4644e, guide: 0xdcb6a8, post: 0xb8342a },
   name: 'Spike Pit',
   blurb: 'the centre bites — camping the middle bleeds spin',
   suggestedTheme: 'anime',
@@ -238,6 +277,7 @@ export const SPIKE_PIT: ArenaSpec = {
  */
 export const GAUNTLET: ArenaSpec = {
   id: 'gauntlet',
+  look: { dish: 0xd9d3e8, wall: 0xe9e4f4, ridge: 0x8b6fd0, guide: 0xbdb2da, post: 0x6d3fc4 },
   name: 'The Gauntlet',
   blurb: 'rail outside, spikes inside — nowhere neutral to stand',
   suggestedTheme: 'anime',
@@ -286,6 +326,7 @@ export const GAUNTLET: ArenaSpec = {
  */
 export const SUDDEN_DEATH: ArenaSpec = {
   id: 'sudden',
+  look: { dish: 0xd6e8dd, wall: 0xeaf4ee, ridge: 0x3fa06a, guide: 0xb2d4c0, post: 0x2f8f5c },
   name: 'Sudden Death',
   blurb: 'the plain bowl, but one exit is worth more',
   suggestedTheme: 'arena',
@@ -314,6 +355,7 @@ export const SUDDEN_DEATH: ArenaSpec = {
  */
 export const TIGHT_DISH: ArenaSpec = {
   id: 'tight',
+  look: { dish: 0xe8e4d8, wall: 0xf5f2e9, ridge: 0xb99a4a, guide: 0xd2c9ae, post: 0x9a7a2c },
   name: 'Tight Dish',
   blurb: 'the middle is dead ground — fight happens in the ring',
   suggestedTheme: 'arena',
@@ -343,6 +385,7 @@ export const TIGHT_DISH: ArenaSpec = {
  */
 export const THREE_SIDES: ArenaSpec = {
   id: 'threesides',
+  look: { dish: 0xdcdfe6, wall: 0xf0f2f6, ridge: 0x4a5570, guide: 0xbcc3d2, post: 0x3d4863 },
   name: 'Three Sides Safe',
   blurb: 'every exit on one wall — the rest of the floor is safe',
   suggestedTheme: 'anime',

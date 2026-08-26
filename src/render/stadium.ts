@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import * as C from '../sim/constants';
 import { bowlHeight, pocketAngles } from '../sim/physics';
 import type { Theme } from './theme';
+import type { ArenaLook } from '../sim/arena';
 import { dishMaterial, noOutline, toonMaterial } from './toon';
 
 /**
@@ -124,7 +125,20 @@ export function markFinishPocket(
  *   holes do not line up with where the sim lets tops leave is the worst kind
  *   of mismatch, because everything still works and nothing looks right.
  */
-export function buildStadium(theme: Theme, pockets?: number[]): StadiumHandles {
+export function buildStadium(
+  theme: Theme,
+  pockets?: number[],
+  look?: ArenaLook,
+): StadiumHandles {
+  // The arena's own colours where it has an opinion, the theme's where it does
+  // not. A theme is a rendering STYLE and applies to the whole scene; an arena
+  // is a PLACE, and places have their own palette. Without this every stadium
+  // in a one-theme mode renders identically — see ArenaSpec.look.
+  const dishColour = look?.dish ?? theme.dishColour;
+  const wallColour = look?.wall ?? theme.wallColour;
+  const ridgeColour = look?.ridge ?? theme.ridgeColour;
+  const guideColour = look?.guide ?? theme.guideColour;
+  const postColour = look?.post ?? theme.postColour;
   const group = new THREE.Group();
   const guides: THREE.MeshBasicMaterial[] = [];
   const posts: THREE.MeshStandardMaterial[] = [];
@@ -144,9 +158,9 @@ export function buildStadium(theme: Theme, pockets?: number[]): StadiumHandles {
     theme.toon
       ? // Unlit and painted — see `dishMaterial` for why this one surface
         // opts out of lighting entirely.
-        dishMaterial(theme.dishColour)
+        dishMaterial(dishColour)
       : new THREE.MeshStandardMaterial({
-          color: theme.dishColour,
+          color: dishColour,
           metalness: theme.dishMetalness,
           roughness: theme.dishRoughness,
           side: THREE.DoubleSide,
@@ -167,7 +181,7 @@ export function buildStadium(theme: Theme, pockets?: number[]): StadiumHandles {
   for (const r of [0.25, 0.5, C.RIDGE_RADIUS]) {
     const isRidge = r === C.RIDGE_RADIUS;
     const mat = new THREE.MeshBasicMaterial({
-      color: isRidge ? theme.ridgeColour : theme.guideColour,
+      color: isRidge ? ridgeColour : guideColour,
       transparent: true,
       opacity: isRidge ? theme.ridgeOpacity : theme.guideOpacity,
     });
@@ -185,9 +199,9 @@ export function buildStadium(theme: Theme, pockets?: number[]): StadiumHandles {
   const exits = (pockets ?? pocketAngles()).slice().sort((a, b) => a - b);
   const wallMat = (
     theme.toon
-      ? toonMaterial(theme.wallColour)
+      ? toonMaterial(wallColour)
       : new THREE.MeshStandardMaterial({
-          color: theme.wallColour,
+          color: wallColour,
           metalness: theme.wallMetalness,
           roughness: theme.wallRoughness,
           side: THREE.DoubleSide,
@@ -229,10 +243,10 @@ export function buildStadium(theme: Theme, pockets?: number[]): StadiumHandles {
       const a = angle + side * C.POCKET_HALF_WIDTH;
       const postMat = (
         theme.toon
-          ? toonMaterial(theme.postColour, theme.postEmissive * 0.4)
+          ? toonMaterial(postColour, theme.postEmissive * 0.4)
           : new THREE.MeshStandardMaterial({
-              color: theme.postColour,
-              emissive: theme.postColour,
+              color: postColour,
+              emissive: postColour,
               emissiveIntensity: theme.postEmissive,
             })
       ) as THREE.MeshStandardMaterial;
