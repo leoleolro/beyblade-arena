@@ -53,7 +53,7 @@ export const LADDER: Rival[] = [
     skinId: 'ember',
     difficulty: 'rookie',
     line: 'All attack, no patience. Survive the opening and it burns itself out.',
-    unlocks: { layers: ['luinor', 'tempest', 'dransword', 'blackshell'], drivers: ['volcanic', 'rush'] },
+    unlocks: { layers: ['luinor', 'tempest', 'dransword', 'blackshell', 'dranbuster'], drivers: ['volcanic', 'rush'] },
   },
   {
     id: 'orin',
@@ -64,7 +64,7 @@ export const LADDER: Rival[] = [
     skinId: 'venom',
     difficulty: 'rookie',
     line: "Won't chase you and won't die. You have to go and take it.",
-    unlocks: { layers: ['basilisk', 'valkyrie', 'sharkedge'], discs: ['spread', 'r160'], drivers: ['needle', 'ball'], skins: ['venom'] },
+    unlocks: { layers: ['basilisk', 'valkyrie', 'sharkedge', 'rhinohorn'], discs: ['spread', 'r160'], drivers: ['needle', 'ball'], skins: ['venom'] },
   },
   {
     id: 'vale',
@@ -75,7 +75,7 @@ export const LADDER: Rival[] = [
     skinId: 'solar',
     difficulty: 'blader',
     line: 'No weakness worth naming. Out-read it or lose slowly.',
-    unlocks: { layers: ['fafnir', 'golem', 'magejab', 'knightshield'], discs: ['blitz', 'r360'], drivers: ['accel'] },
+    unlocks: { layers: ['fafnir', 'golem', 'magejab', 'knightshield', 'silverwolf'], discs: ['blitz', 'r360'], drivers: ['accel'] },
   },
   {
     id: 'kes',
@@ -86,7 +86,7 @@ export const LADDER: Rival[] = [
     skinId: 'void',
     difficulty: 'blader',
     line: 'Charging this is feeding it. Outlast it instead.',
-    unlocks: { layers: ['aegis', 'wyrm', 'dsycther', 'wizardrod'], discs: ['r560'], drivers: ['bastion', 'gearflat'], skins: ['void'] },
+    unlocks: { layers: ['aegis', 'wyrm', 'dsycther', 'wizardrod', 'leonclaw'], discs: ['r560'], drivers: ['bastion', 'gearflat'], skins: ['void'] },
   },
   {
     id: 'rhea',

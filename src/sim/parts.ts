@@ -109,6 +109,17 @@ export const LAYERS: LayerPart[] = [
   // Burst-era rather than Beyblade X, which is why its parts are a Disc and a
   // Driver rather than a Ratchet and a Bit.
   { id: 'orichalcum', name: 'Orichalcum', kind: 'layer', archetype: 'stamina', mass: 0.475, radius: 0.1118, attack: 0.84, defense: 1.14, burstResist: 1.28, spinSteal: 0.0, blades: 3, colour: 0xc9a227 },
+
+  // Four more transcriptions, chosen to push the archetype range rather than
+  // fill it in. DranBuster is the attack ceiling at A70 and the roster's only
+  // ONE-blade top; SilverWolf is the stamina ceiling at S65; RhinoHorn is a
+  // defender that buys its defence from shape rather than mass at 32.7 g;
+  // LeonClaw states balance numerically with attack and defence exactly equal.
+  // Same mapping as the block above.
+  { id: 'dranbuster', name: 'Dran Buster',    kind: 'layer', archetype: 'attack', mass: 0.509, radius: 0.1013, attack: 1.72, defense: 0.96, burstResist: 0.92, spinSteal: 0.0, blades: 1, colour: 0x1e40af },
+  { id: 'rhinohorn',  name: 'Rhino Horn',     kind: 'layer', archetype: 'defense', mass: 0.453, radius: 0.1019, attack: 0.92, defense: 1.5, burstResist: 1.04, spinSteal: 0.0, blades: 5, colour: 0x374151 },
+  { id: 'silverwolf', name: 'Silver Wolf',    kind: 'layer', archetype: 'stamina', mass: 0.513, radius: 0.1085, attack: 0.84, defense: 1.14, burstResist: 1.25, spinSteal: 0.0, blades: 3, colour: 0x475569 },
+  { id: 'leonclaw',   name: 'Leon Claw',      kind: 'layer', archetype: 'balance', mass: 0.434, radius: 0.1026, attack: 1.24, defense: 1.32, burstResist: 0.98, spinSteal: 0.0, blades: 4, colour: 0x9a3412 },
   // The vampire. The one layer in the catalog with `sameSteal`: it absorbs in
   // *every* matchup, not only against an opposite-spin opponent, so there is no
   // launch that denies it its mechanic (see constants.ts, spin steal).

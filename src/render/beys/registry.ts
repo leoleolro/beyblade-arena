@@ -45,6 +45,10 @@ export interface BeyEntry {
   };
 }
 
+import { entry as dranbuster } from './dranbuster';
+import { entry as rhinohorn } from './rhinohorn';
+import { entry as silverwolf } from './silverwolf';
+import { entry as leonclaw } from './leonclaw';
 import { entry as orichalcum } from './orichalcum';
 import { entry as blackshell } from './blackshell';
 import { entry as sharkedge } from './sharkedge';
@@ -111,6 +115,10 @@ export const BEY_REGISTRY: BeyEntry[] = [
   hellsscythe,
   sphinxcowl,
   orichalcum,
+  dranbuster,
+  rhinohorn,
+  silverwolf,
+  leonclaw,
 ];
 
 /** The anime design set — the projection beydex.ts used to hand-maintain. */
