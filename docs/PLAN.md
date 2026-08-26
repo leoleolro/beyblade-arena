@@ -342,6 +342,50 @@ the thing a previous burst effect broke.
 - Garage labels sit at fixed thirds and drift when the model is rotated.
 - The shelf restocks per match but does not rotate on a clock.
 
+### Stamina has no win condition — measured, not fixed
+
+Found while balance-checking the transcribed beys, and it is **not** something
+those introduced. Every stamina build loses badly against the AI preset pool,
+including the roster's own designs:
+
+    silverwolf / 5-60 / Ball        11.1%
+    silverwolf / spread / orbit     13.3%
+    basilisk   / r560  / ball       12.2%
+    basilisk   / spread / atomic    16.7%     <- our own stamina design
+    wizardrod  / spread / atomic    16.7%
+    fafnir     / spread / orbit     31.1%     <- has spinSteal
+
+Attack and defence builds sit at 53-58% on the same probe. Stamina sits at
+11-17%. The only stamina-ish build that is competitive is Fafnir, and it is
+competitive because `spinSteal` gives it a way to *take* spin rather than merely
+keep its own.
+
+**The surprising part is that the win condition fires constantly.** Round end
+reasons over 240 AI-played rounds:
+
+    spin-finish   66.7%
+    burst         17.1%
+    knockout      16.3%
+    mean round    10.9 s
+
+Two thirds of rounds end exactly the way a stamina top wants them to — and
+stamina still loses them. So spin-finishes are not decided by ENDURANCE, they
+are decided by DAMAGE: hits drain spin far faster than `spinRetention`
+preserves it, so the top that hits harder wins the spin race and the stamina
+archetype's whole premise never engages.
+
+**Not fixed here.** The candidates are raising what `spinRetention` is worth,
+lowering per-hit spin drain, or lengthening rounds so passive decay matters —
+and every one of them moves every number in `played.test.ts`, `fairness.test.ts`
+and the preset sweep. This wants doing deliberately and alone, with the sweep
+behind it, exactly as the Spike Pit's history warns.
+
+**One real bug did come out of the check**, and it is fixed: the Bit mapping made
+`wander` linear in attack, which gave Ball — a *stamina* bit at attack 15 — a
+wander of 0.60 against our own stamina drivers' 0.06-0.18. Squaring the term
+puts it at 0.22. It was not the cause of the stamina problem (Silver Wolf moved
+11.1% to 12.2%), but it was wrong on its own terms.
+
 ### Named by the owner, not yet started
 
 - **The controls: four hypotheses tested, three rejected, one shipped.**

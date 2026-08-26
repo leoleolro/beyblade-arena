@@ -279,11 +279,19 @@ export const DRIVERS: DriverPart[] = [
   // so it is reproducible:
   //
   //     mass           0.16 + (grams - 2.0) / 0.6 * 0.14
-  //     wander         0.06 + attack / 50 * 1.80      aggressive tips roam
+  //     wander         0.06 + (attack / 50)^2 * 1.80  aggressive tips roam
   //     friction       0.40 + defense / 100 * 2.00    grippy tips hold position
   //     spinRetention  0.75 + stamina / 100 * 1.40
   //     burstResist    0.75 + burst / 100 * 0.70
   //     railGrip       dash / 40                      1.0 at the catalogue's max
+  //
+  // WANDER IS SQUARED, and that was a bug worth recording. The first mapping
+  // was linear in attack, which gave Ball — a STAMINA bit, attack 15 — a wander
+  // of 0.60, three times our own stamina drivers at 0.06-0.18. A stamina tip
+  // that roams goes to the rim and gets knocked out, and Silver Wolf on Ball
+  // measured a 12.2% win rate against the AI preset pool. Squaring the term
+  // keeps the attack tips aggressive while collapsing the low end to where
+  // stamina tips actually sit.
   //
   // The burst axis is the one worth pausing on, because it inverts what you
   // would guess: attack Bits score 80 and stamina Bits 30. A flat tip's wide
@@ -291,9 +299,9 @@ export const DRIVERS: DriverPart[] = [
   // rather than "corrected", because the source is consistent about it across
   // every entry.
   { id: 'gearflat', name: 'Gear Flat', kind: 'driver', archetype: 'attack',  mass: 0.23, friction: 0.50, spinRetention: 0.82, wander: 1.86, burstResist: 1.31, railGrip: 1.00 },
-  { id: 'accel',    name: 'Accel',    kind: 'driver', archetype: 'attack',  mass: 0.30, friction: 0.60, spinRetention: 0.89, wander: 1.50, burstResist: 1.31, railGrip: 1.00 },
-  { id: 'rush',     name: 'Rush',     kind: 'driver', archetype: 'attack',  mass: 0.18, friction: 0.60, spinRetention: 1.03, wander: 1.50, burstResist: 1.31, railGrip: 0.75 },
-  { id: 'ball',     name: 'Ball',     kind: 'driver', archetype: 'stamina', mass: 0.18, friction: 0.90, spinRetention: 1.45, wander: 0.60, burstResist: 0.96, railGrip: 0.25 },
+  { id: 'accel',    name: 'Accel',    kind: 'driver', archetype: 'attack',  mass: 0.30, friction: 0.60, spinRetention: 0.89, wander: 1.21, burstResist: 1.31, railGrip: 1.00 },
+  { id: 'rush',     name: 'Rush',     kind: 'driver', archetype: 'attack',  mass: 0.18, friction: 0.60, spinRetention: 1.03, wander: 1.21, burstResist: 1.31, railGrip: 0.75 },
+  { id: 'ball',     name: 'Ball',     kind: 'driver', archetype: 'stamina', mass: 0.18, friction: 0.90, spinRetention: 1.45, wander: 0.22, burstResist: 0.96, railGrip: 0.25 },
 ];
 
 const byId = <T extends { id: string }>(list: T[], id: string): T => {
