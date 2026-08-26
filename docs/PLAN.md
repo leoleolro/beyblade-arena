@@ -374,11 +374,46 @@ are decided by DAMAGE: hits drain spin far faster than `spinRetention`
 preserves it, so the top that hits harder wins the spin race and the stamina
 archetype's whole premise never engages.
 
-**Not fixed here.** The candidates are raising what `spinRetention` is worth,
-lowering per-hit spin drain, or lengthening rounds so passive decay matters —
-and every one of them moves every number in `played.test.ts`, `fairness.test.ts`
-and the preset sweep. This wants doing deliberately and alone, with the sweep
-behind it, exactly as the Spike Pit's history warns.
+**Where the spin actually goes**, measured over 120 rounds by attributing every
+frame's spin loss to either a hit or passive decay:
+
+    from hits        63.4%
+    passive decay    36.6%
+
+That is the whole problem in one line. `spinRetention` — the stamina stat —
+only touches the 36.6%, while `attack` drives the 63.4%. Stamina's stat governs
+a minority of the spin economy, so the archetype cannot win the race its own
+premise is about.
+
+### The obvious fix inverts the skill gradient — tested and rejected
+
+Shifting the ratio toward passive decay (`HIT_SPIN_LOSS` 26 -> 19,
+`SPIN_DECAY_BASE` 13 -> 17) does exactly what it should to the archetypes:
+
+    Silver Wolf   11.1% -> 24.4%      Cross X    35.6% -> 33.3%
+    Basilisk      16.7% -> 20.0%      Golem      38.9% -> 36.7%
+
+The gap narrows from 3.5x to 1.5x and mean round length is untouched at 10.8 s.
+It looks like the answer.
+
+**It is not, and the balance suite caught why.** `ai.test.ts` asserts the
+champion beats the rookie in an attack mirror; with the change the champion wins
+**11.25%** — the ladder inverts and the rookie dominates.
+
+The mechanism is obvious once seen: every move carries `spinDrain`, a cost paid
+for acting. Make hits pay less and make passive decay cost more, and *doing
+nothing* becomes the winning policy. The skilled AI spends meter, drains itself,
+and loses to an opponent that idles.
+
+**So stamina cannot be fixed by making the game more passive**, because this
+game's skill expression is active. Any real fix has to raise stamina's ceiling
+without lowering the reward for acting — candidates worth trying next are giving
+`spinRetention` some influence over *hit* drain (so a stamina top keeps more of
+what it has after an exchange), or a late-round mechanic where passive decay
+accelerates for everyone so a stamina lead converts.
+
+Recorded rather than shipped. The measurement that killed it is the useful
+part.
 
 **One real bug did come out of the check**, and it is fixed: the Bit mapping made
 `wander` linear in attack, which gave Ball — a *stamina* bit at attack 15 — a
