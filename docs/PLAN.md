@@ -127,6 +127,51 @@ docs/BLACK-SHARDS.md part three.
 
 ---
 
+## I. A hundred beyblades — **DONE (the binding cost)**
+
+Asked for as an architecture constraint: "should support up to 100 beyblades in
+the future. without affecting the games performance."
+
+**Measured rather than guessed, and the answer was not where it was expected.**
+Not the sim, not the 3D scene — the *thumbnails*. `drawBeyThumb` paints a real
+illustration (lathed tiers, blade fans, an emblem) at **2.52 ms**, the garage
+rebuilds its whole panel on every part click, and it painted one per bey every
+time. Eleven beys was already 27.7 ms per click; a hundred projected to
+**252 ms** — a quarter-second freeze on every tap.
+
+Now painted once per (bey, theme) and blitted. Measured on a synthetic
+hundred-bey roster with a hundred *distinct* masters:
+
+    first pass (all cold)   164 ms, once
+    every pass after        16.1 ms   (0.161 ms per thumbnail)
+    uncached, projected     252 ms    per pass, every pass
+
+A full garage render at a hundred beys, timed end to end, is a **6 ms median**.
+
+**The cache's own sizing turned out to be the real trap.** The first version
+held 48 entries on the reasoning that a visible roster is a few dozen chips.
+That reasoning is wrong: the garage paints every bey in the roster, not the ones
+on screen. A hundred-bey pass against a 48-entry LRU is a sequential scan over a
+working set larger than the cache — it evicts each entry moments before it is
+next needed and hits roughly never, which is *slower* than no cache. Invisible
+from outside: same pictures, no error, just no speed-up.
+
+So the limit is specified as a relationship — it must exceed one render pass —
+and `beyThumb.test.ts` asserts the hit rate on a hundred-bey roster rather than
+a duration. Both of those tests fail against the 48-entry version.
+
+### Still open at a hundred
+
+- `modelThumb` (imported beys) already caches, so it scales; but a hundred
+  imported models is a download problem, not a paint problem, and nothing here
+  addresses that.
+- The roster is one flat DOM list. 138 chips measured fine; a thousand would
+  want virtualising, and nothing does yet.
+- `BEYDEX` and `BEY_PRESETS` are derived from the per-bey registry already, so
+  adding beys is a data edit and costs no UI change.
+
+---
+
 ## H. The thickening outlines — **DONE**
 
 `spinBlur.ts` thinned the layer's ink and scaled the thinning by blur dominance,
@@ -196,14 +241,6 @@ the thing a previous burst effect broke.
 
 ### Named by the owner, not yet started
 
-- **A roster of up to 100 beyblades, with no performance cost.** Not a data
-  problem — `BEY_PRESETS` is already a list and the mode/stadium pickers are
-  generated from registries rather than typed out, which is why adding an arena
-  or a look costs no UI edit. The cost is in the *render* surfaces that build
-  one three.js object per entry: the garage picker thumbnails, the inspector
-  roster, the shop. Those need to become virtualised and cached before the list
-  is long enough to notice, and the honest first step is to measure the current
-  per-entry cost rather than guess which of the three bites first.
 - **Real beyblade physics.** Jumping out of and back into the stadium, spin
   stealing under load, near-vertical launches, and how the X-rail actually
   accelerates — "five times under three seconds, small bumps then big bumps".

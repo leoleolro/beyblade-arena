@@ -60,11 +60,137 @@ const hex = (c: number): string => `#${c.toString(16).padStart(6, '0')}`;
  * thumbnail shows the under-blades filling the upper tier's cutaways exactly
  * as the model does.
  */
+/**
+ * Painted thumbnails, kept so the roster does not repaint itself on every click.
+ *
+ * WHY THIS IS HERE. `drawBeyThumb` is a real 2D illustration — lathed tiers,
+ * blade fans, an emblem — and it costs **2.52 ms** measured. The garage rebuilds
+ * its whole panel on every part click and paints one of these per bey, so at
+ * today's eleven beys that is 27.7 ms of canvas work per click, and the owner's
+ * target of a hundred projects to **252 ms**: a quarter-second freeze every time
+ * you tap a part. Nothing else on that screen comes close.
+ *
+ * The fix is not a faster illustration. It is not painting the same picture
+ * again — a bey's thumbnail depends on its layer id and the theme and nothing
+ * else, so it can be painted once and blitted forever after.
+ *
+ * WHY ONE MASTER PER (BEY, THEME) RATHER THAN PER REQUESTED SIZE. Callers ask
+ * for 56, 64 and 72 px, and caching each separately would trip the roster's
+ * size and the shop's size over the same bey. One master at `MASTER_PX`, scaled
+ * down on blit, serves all three at no visible cost — these are downscales, and
+ * the master is larger than every size asked for.
+ *
+ * WHY BOUNDED. A hundred beys across two themes at `MASTER_PX` and dpr 2 is
+ * roughly 29 MB of canvas backing store, which is a real cost on exactly the
+ * mobile GPUs this project already worries about. A visible roster is a few
+ * dozen entries, so a small LRU holds everything on screen and everything just
+ * scrolled past, and the miss cost is one repaint of something nobody is
+ * looking at.
+ */
+const MASTER_PX = 72;
+
+/**
+ * Entries kept. **Must exceed the largest single render pass**, and that is the
+ * whole specification — not a memory budget with a round number attached.
+ *
+ * This started at 48 on the reasoning that a visible roster is a few dozen
+ * chips. That reasoning is wrong, and wrong in the specific way LRU caches are
+ * famous for: the garage paints EVERY bey in the roster on every render, not
+ * just the ones on screen. A hundred-bey roster against a 48-entry LRU is a
+ * sequential scan over a working set larger than the cache, which evicts each
+ * entry moments before it is next needed and lands at roughly a zero percent
+ * hit rate — measurably worse than no cache at all, because it also pays for
+ * the bookkeeping.
+ *
+ * So the limit is set from the target roster, with headroom: 128 comfortably
+ * clears the owner's hundred. A theme switch can push the total requested past
+ * it, and that is fine — themes do not alternate within a pass, so the evicted
+ * entries are the other theme's and nothing thrashes.
+ *
+ * Cost at that size: `MASTER_PX` is 72 because 72 is the largest size any
+ * caller asks for, which makes that case a 1:1 blit with no resampling at all.
+ * At dpr 2 each master is 144x144x4 bytes, so a hundred of them is about 8 MB —
+ * a real number on a weak device, and the reason this is bounded rather than a
+ * plain Map.
+ */
+export const THUMB_CACHE_LIMIT = 128;
+
+/**
+ * Painted-master count and hit tally, for the test that guards against thrash.
+ *
+ * Exported because the failure this protects against — a cache smaller than one
+ * render pass — looks like nothing at all from outside. The pictures are
+ * identical, no error is thrown, and the only symptom is that the thing runs at
+ * the speed it did before the cache was added. A test needs to see the hit
+ * rate to catch that.
+ */
+export const __thumbStats = { paints: 0, hits: 0 };
+
+/** Insertion-ordered, so the oldest key is the first one `keys()` yields. */
+const thumbCache = new Map<string, HTMLCanvasElement>();
+
+function master(layerId: string, theme: ThumbTheme): HTMLCanvasElement {
+  const key = `${layerId}|${theme}`;
+  const hit = thumbCache.get(key);
+  if (hit) {
+    __thumbStats.hits++;
+    // Refresh recency: delete then re-set moves it to the end of the Map's
+    // insertion order, which is what makes the eviction below an LRU rather
+    // than a FIFO.
+    thumbCache.delete(key);
+    thumbCache.set(key, hit);
+    return hit;
+  }
+
+  const canvas = document.createElement('canvas');
+  __thumbStats.paints++;
+  paintBeyThumb(canvas, layerId, MASTER_PX, theme);
+  thumbCache.set(key, canvas);
+
+  if (thumbCache.size > THUMB_CACHE_LIMIT) {
+    const oldest = thumbCache.keys().next();
+    if (!oldest.done) thumbCache.delete(oldest.value);
+  }
+  return canvas;
+}
+
+/**
+ * Size a canvas and put a bey's thumbnail in it.
+ *
+ * Signature unchanged — the three callers (the roster, the shop shelf and the
+ * crate reveal) are untouched by the cache existing.
+ */
 export function drawBeyThumb(
   canvas: HTMLCanvasElement,
   layerId: string,
   size = 72,
   theme: ThumbTheme = 'anime',
+): void {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = size * dpr;
+  canvas.height = size * dpr;
+  canvas.style.width = `${size}px`;
+  canvas.style.height = `${size}px`;
+
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  const src = master(layerId, theme);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  // `imageSmoothingQuality` matters here: this is a downscale of line art, and
+  // the browser's default bilinear step makes the ink look bitten.
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(src, 0, 0, src.width, src.height, 0, 0, canvas.width, canvas.height);
+}
+
+/** The actual illustration. Called once per bey per theme; see `master`. */
+function paintBeyThumb(
+  canvas: HTMLCanvasElement,
+  layerId: string,
+  size: number,
+  theme: ThumbTheme,
 ): void {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   canvas.width = size * dpr;
