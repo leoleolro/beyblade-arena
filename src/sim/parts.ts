@@ -120,6 +120,14 @@ export const LAYERS: LayerPart[] = [
   { id: 'rhinohorn',  name: 'Rhino Horn',     kind: 'layer', archetype: 'defense', mass: 0.453, radius: 0.1019, attack: 0.92, defense: 1.5, burstResist: 1.04, spinSteal: 0.0, blades: 5, colour: 0x374151 },
   { id: 'silverwolf', name: 'Silver Wolf',    kind: 'layer', archetype: 'stamina', mass: 0.513, radius: 0.1085, attack: 0.84, defense: 1.14, burstResist: 1.25, spinSteal: 0.0, blades: 3, colour: 0x475569 },
   { id: 'leonclaw',   name: 'Leon Claw',      kind: 'layer', archetype: 'balance', mass: 0.434, radius: 0.1026, attack: 1.24, defense: 1.32, burstResist: 0.98, spinSteal: 0.0, blades: 4, colour: 0x9a3412 },
+
+  // Two more, both chosen for a shape the roster lacked. TyrannoBeat is attack
+  // with real defence and almost no stamina (S5, the lowest in the data);
+  // ViperTail is stamina that can actually hit (A30, twice the other stamina
+  // blades) — the archetype's most playable shape in this sim, and one the
+  // source supplies rather than one invented to patch the measured gap.
+  { id: 'tyrannobeat',name: 'Tyranno Beat',   kind: 'layer', archetype: 'attack', mass: 0.516, radius: 0.1007, attack: 1.64, defense: 1.14, burstResist: 0.89, spinSteal: 0.0, blades: 4, colour: 0x166534 },
+  { id: 'vipertail',  name: 'Viper Tail',     kind: 'layer', archetype: 'stamina', mass: 0.482, radius: 0.1065, attack: 1.08, defense: 0.96, burstResist: 1.16, spinSteal: 0.0, blades: 3, colour: 0x3f6212 },
   // The vampire. The one layer in the catalog with `sameSteal`: it absorbs in
   // *every* matchup, not only against an opposite-spin opponent, so there is no
   // launch that denies it its mechanic (see constants.ts, spin steal).

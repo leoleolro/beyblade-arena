@@ -45,6 +45,8 @@ export interface BeyEntry {
   };
 }
 
+import { entry as tyrannobeat } from './tyrannobeat';
+import { entry as vipertail } from './vipertail';
 import { entry as dranbuster } from './dranbuster';
 import { entry as rhinohorn } from './rhinohorn';
 import { entry as silverwolf } from './silverwolf';
@@ -119,6 +121,8 @@ export const BEY_REGISTRY: BeyEntry[] = [
   rhinohorn,
   silverwolf,
   leonclaw,
+  tyrannobeat,
+  vipertail,
 ];
 
 /** The anime design set — the projection beydex.ts used to hand-maintain. */

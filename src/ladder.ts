@@ -97,7 +97,7 @@ export const LADDER: Rival[] = [
     skinId: 'rose',
     difficulty: 'champion',
     line: 'Reads your move before you commit to it. Blocks are not free here.',
-    unlocks: { layers: ['ragnaruk', 'solaris', 'hellsscythe', 'orichalcum'], discs: ['wall', 'outer', 'r460'], drivers: ['octa'], skins: ['solar'] },
+    unlocks: { layers: ['ragnaruk', 'solaris', 'hellsscythe', 'orichalcum', 'tyrannobeat'], discs: ['wall', 'outer', 'r460'], drivers: ['octa'], skins: ['solar'] },
   },
   {
     id: 'zeph',
@@ -112,7 +112,7 @@ export const LADDER: Rival[] = [
     // skin, and the only rival granting no layer. Nosferu is the right thing to
     // put here: it is the one layer whose mechanic changes how you launch, so
     // clearing the ladder hands over a new question rather than a spare part.
-    unlocks: { layers: ['nosferu', 'chimera', 'sphinxcowl'], discs: ['r980'], drivers: ['orbit'], skins: ['rose'] },
+    unlocks: { layers: ['nosferu', 'chimera', 'sphinxcowl', 'vipertail'], discs: ['r980'], drivers: ['orbit'], skins: ['rose'] },
   },
 ];
 
