@@ -1671,6 +1671,39 @@ function layerFaceTexture(
     ctx.arc(0, 0, r * 0.6, 0, Math.PI * 2);
     ctx.stroke();
 
+    // MACHINED DETAIL — fine rings and radial panel lines.
+    //
+    // From product photographs rather than taste. A real blade's face is busy
+    // in a specific way: four to six FINE concentric rings clustered near the
+    // hub, and radial breaks where mouldings meet. Ours had three heavy rings
+    // and a large flat expanse between them, which is what read as "not
+    // detailed enough" — the silhouette was right and the surface was empty.
+    //
+    // Deliberately thin and low-contrast. These have to survive being drawn at
+    // 50 pixels in a match without turning the face into noise, so they are
+    // hairlines against the body colour rather than more black rings competing
+    // with the mesh outlines.
+    const bodyEdge = new THREE.Color(design.primary).multiplyScalar(0.72);
+    ctx.strokeStyle = `#${bodyEdge.getHexString()}`;
+    for (const rad of [0.5, 0.545, 0.665]) {
+      ctx.lineWidth = r * 0.007;
+      ctx.beginPath();
+      ctx.arc(0, 0, r * rad, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // Radial panel breaks, one per blade, running across the body disc. These
+    // are what make the face read as ASSEMBLED rather than printed — a real
+    // blade is several mouldings meeting, and every seam between them shows.
+    ctx.lineWidth = r * 0.009;
+    for (let i = 0; i < blades; i++) {
+      const a = i * step + step * 0.5;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a) * r * 0.42, Math.sin(a) * r * 0.42);
+      ctx.lineTo(Math.cos(a) * r * 0.71, Math.sin(a) * r * 0.71);
+      ctx.stroke();
+    }
+
     if (seam > 0) {
       ctx.strokeStyle = '#11131c';
       ctx.lineWidth = r * 0.02;
