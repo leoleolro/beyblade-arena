@@ -103,7 +103,7 @@ Pit's own history is the warning: a harsher tax made the archetype spread
 *worse*, not flatter. Re-run the preset sweep, read hits-per-round and round
 length, and expect to retune `maxSpeed` downward to pay for the frequency.
 
-### P2. Tooth count as a real part stat
+### P2. Tooth count as a real part stat — **SHIPPED, partly**
 
 The Accel bit trades stamina for dash speed at 16 teeth against 12. We have
 `DRIVERS` with a `spin` stat already; a `railGrip` alongside it would make
@@ -445,3 +445,58 @@ whole character is repeated excursions from centre to rim and back.
 So the rail now has the right *rhythm* when it fires, and the wrong *frequency*
 of firing, and the second half belongs to a different change. Recorded rather
 than tuned around.
+
+
+---
+
+# P2 shipped: the Dash stat
+
+The wiki publishes a five-axis stat block for every Beyblade X Bit — Attack /
+Defense / Stamina / **Dash** / Burst Resistance — and Dash is precisely the
+rail-grip axis P2 proposed. Transcribed rather than invented:
+
+| Bit | type | g | Atk | Def | Sta | Dash | Burst |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Gear Flat | Attack | 2.3 | 50 | 5 | 5 | 40 | 80 |
+| Accel | Attack | 2.6 | 40 | 10 | 10 | 40 | 80 |
+| Flat | Attack | 2.2 | 40 | 15 | 10 | 35 | 80 |
+| Rush | Attack | 2.1 | 40 | 10 | 20 | 30 | 80 |
+| Point | Balance | 2.2 | 25 | 25 | 25 | 25 | 80 |
+| Taper | Balance | 2.2 | 35 | 20 | 20 | 25 | 80 |
+| Needle | Defense | 2.0 | 10 | 50 | 30 | 10 | 30 |
+| Ball | Stamina | 2.1 | 15 | 25 | 50 | 10 | 30 |
+| Orb | Stamina | 2.0 | 10 | 30 | 50 | 10 | 30 |
+
+**The burst axis inverts what you would guess** — attack Bits score 80 and
+stamina Bits 30 — because a flat tip's wide contact grips the burst locks where
+a sharp stamina tip does not. Transcribed rather than "corrected"; the source is
+consistent about it across every entry.
+
+## I had the mechanism backwards first
+
+The obvious reading is that Dash gates whether a tip can catch the rail at all.
+Built that way, it measured a **62% collapse in rail use** — 0.99 rides per top
+per round down to 0.375 — because most bottoms are not attack bottoms, so the
+arena's headline mechanic became unreachable for two thirds of the roster.
+
+The source says otherwise, explicitly. Rush's official description: *"Features a
+ten tooth gear that reduces the SPEED of Xtreme Dashes, but also increases their
+FREQUENCY."* Dash rates how hard the tip is **driven once meshed**. It is not a
+gate on meshing.
+
+## What is live, and what is masked
+
+**Live: dash speed.** Peak speed while railed, measured over 60 rounds each —
+Gear Flat and Accel reach **3.42**, everything else **3.15**.
+
+**Masked: dash frequency.** Grip also scales the cooldown, so a low-Dash tip
+should nag where a high-Dash tip hits hard and rarely. Measured, rides per round
+are identical across every Bit (1.0–1.05) whatever the cooldown — because tops
+only reach the rail about once a round anyway. **Engagement is limited by
+getting to the wall, not by how soon you are allowed back**, which is the same
+bottleneck that keeps our rail at 0.16 engagements per second against the real
+toy's ~1.7.
+
+Kept rather than removed, because it is what the source describes and it becomes
+real the moment engagement improves. Recorded here so it is a known-masked
+mechanic rather than a mystery later.

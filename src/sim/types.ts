@@ -71,6 +71,26 @@ export interface DriverPart {
   wander: number;
   /** Divides burst charge accumulated on contact. */
   burstResist: number;
+  /**
+   * How well this tip bites the X-Celerator rail. 0 = never engages, 1 = full.
+   *
+   * THE REAL GAME PUBLISHES THIS AS A STAT. Beyblade X Bits carry a five-axis
+   * block — Attack / Defense / Stamina / **Dash** / Burst Resistance — and Dash
+   * is exactly this: how well the tip's gear teeth mesh with the stadium rail.
+   * The catalogue splits cleanly, which is the point of having the axis at all:
+   *
+   *     Gear Flat  dash 40      Accel  dash 40      Flat   dash 35
+   *     Rush       dash 30      Point  dash 25      Taper  dash 25
+   *     Ball       dash 10      Orb    dash 10      Needle dash 10
+   *
+   * Attack tips are FOUR TIMES the stamina tips. That is the decision the
+   * X-Rail arena was missing — before this, which bottom you chose changed how
+   * you moved but not whether you could use the arena's headline mechanic.
+   *
+   * Optional so every existing driver keeps working; `railGripOf` supplies a
+   * sane default from the archetype for the ones authored before this existed.
+   */
+  railGrip?: number;
 }
 
 export type Part = LayerPart | DiscPart | DriverPart;
@@ -95,6 +115,8 @@ export interface BeyStats {
   spinRetention: number;
   stability: number;
   wander: number;
+  /** Rail engagement, 0..1. See DriverPart.railGrip. */
+  railGrip: number;
 }
 
 /** The three battle moves. See MOVES in constants.ts for the triangle. */

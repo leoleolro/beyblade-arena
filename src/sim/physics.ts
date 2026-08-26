@@ -207,6 +207,10 @@ function updateRail(b: BeyState, rail: RailSpec, dt: number): void {
   b.railCooldown = Math.max(0, b.railCooldown - dt);
   b.railIdle += dt;
 
+  // The Dash stat, read once. See the note at the engage check below for why
+  // it scales the dash rather than gating it.
+  const grip = Math.max(0.2, b.stats.railGrip);
+
   const r = len(b.pos);
   if (r < 1e-6) return;
 
@@ -233,11 +237,15 @@ function updateRail(b: BeyState, rail: RailSpec, dt: number): void {
     // adds `escalation` until `escalationMax`. Without this every ride was
     // identical and the rail was a rare special event rather than a rhythm that
     // builds — see docs/PHYSICS.md.
-    const ceiling = railCeiling(b, rail);
+    // Grip scales BOTH the drive and the ceiling, so a low-Dash tip gets a
+    // shorter, gentler dash rather than none. Floored at 0.55 of the rated
+    // values: even the weakest tip meshes with the teeth, it just is not thrown.
+    const gripK = 0.55 + 0.45 * grip;
+    const ceiling = railCeiling(b, rail) * gripK;
     const speed = Math.hypot(b.vel.x, b.vel.y);
     if (speed < ceiling) {
-      b.vel.x += tanX * rail.accel * dt;
-      b.vel.y += tanY * rail.accel * dt;
+      b.vel.x += tanX * rail.accel * gripK * dt;
+      b.vel.y += tanY * rail.accel * gripK * dt;
     }
 
     // Hold it on the band itself.
@@ -255,11 +263,44 @@ function updateRail(b: BeyState, rail: RailSpec, dt: number): void {
       dy /= dl;
       b.vel.x = dx * sp;
       b.vel.y = dy * sp;
-      b.railCooldown = rail.cooldown;
+      // FEWER TEETH, MORE DASHES. The other half of the documented trade-off:
+      // Rush's ten-tooth gear "reduces the speed of Xtreme Dashes, but also
+      // increases their FREQUENCY", where Accel's sixteen buy speed at a cost.
+      // So grip lengthens the wait as well as strengthening the push — a
+      // high-Dash tip hits harder and less often, a low-Dash tip nags.
+      //
+      // CURRENTLY MASKED, and worth saying so rather than implying a trade-off
+      // that is not live. Measured, rides per round are identical across every
+      // Bit (1.0-1.05) whatever the cooldown, because tops only reach the rail
+      // about once a round anyway — engagement is limited by getting to the
+      // wall, not by how soon you are allowed back. Same bottleneck that keeps
+      // our rail at 0.16 engagements per second against the real toy's ~1.7,
+      // documented in docs/PHYSICS.md.
+      //
+      // Kept because it is what the source describes and it becomes real the
+      // moment engagement improves. The speed half of the stat IS live: 3.42
+      // peak dash for Gear Flat and Accel against 3.15 for the rest.
+      b.railCooldown = rail.cooldown * (0.62 + 0.55 * grip);
     }
     return;
   }
 
+  // THE DASH STAT SCALES THE DASH, NOT THE ENGAGEMENT.
+  //
+  // I had this backwards first, and the source is explicit. Rush's official
+  // description: "Features a ten tooth gear that reduces the SPEED of Xtreme
+  // Dashes, but also increases their FREQUENCY." Fewer teeth is a slower dash
+  // and MORE of them; Accel's sixteen teeth buy a faster dash at a stamina
+  // cost. So Dash rates how hard the tip is driven once meshed — it is not a
+  // gate on meshing at all.
+  //
+  // Gating engagement on it measured as a 62% collapse in rail use (0.99 rides
+  // per top per round down to 0.375) because most bottoms are not attack
+  // bottoms, which made the arena's headline mechanic unreachable for two
+  // thirds of the roster. That is not the trade-off the real part describes.
+  //
+  // So grip multiplies the drive and the ceiling. A stamina tip still catches
+  // the rail; it just gets a gentle push where an Accel gets flung.
   const inBand = Math.abs(r - rail.radius) <= rail.halfWidth;
   if (inBand && b.railCooldown === 0 && tangential >= rail.engageSpeed) {
     b.railTime = rail.duration;

@@ -180,12 +180,12 @@ export const DISCS: DiscPart[] = [
 ];
 
 export const DRIVERS: DriverPart[] = [
-  { id: 'xtreme',   name: 'Xtreme',   kind: 'driver', archetype: 'attack',  mass: 0.20, friction: 0.55, spinRetention: 0.85, wander: 1.55, burstResist: 0.92 },
-  { id: 'volcanic', name: 'Volcanic', kind: 'driver', archetype: 'attack',  mass: 0.18, friction: 0.42, spinRetention: 0.95, wander: 1.85, burstResist: 0.85 },
-  { id: 'atomic',   name: 'Atomic',   kind: 'driver', archetype: 'balance', mass: 0.24, friction: 0.82, spinRetention: 1.02, wander: 0.55, burstResist: 0.95 },
-  { id: 'orbit',    name: 'Orbit',    kind: 'driver', archetype: 'stamina', mass: 0.22, friction: 0.70, spinRetention: 1.35, wander: 0.18, burstResist: 0.82 },
-  { id: 'needle',   name: 'Needle',   kind: 'driver', archetype: 'stamina', mass: 0.19, friction: 0.50, spinRetention: 1.42, wander: 0.06, burstResist: 1.15 },
-  { id: 'bastion',  name: 'Bastion',  kind: 'driver', archetype: 'defense', mass: 0.30, friction: 1.35, spinRetention: 0.95, wander: 0.10, burstResist: 1.30 },
+  { id: 'xtreme',   name: 'Xtreme',   kind: 'driver', archetype: 'attack',  mass: 0.20, friction: 0.55, spinRetention: 0.85, wander: 1.55, burstResist: 0.92, railGrip: 0.80 },
+  { id: 'volcanic', name: 'Volcanic', kind: 'driver', archetype: 'attack',  mass: 0.18, friction: 0.42, spinRetention: 0.95, wander: 1.85, burstResist: 0.85, railGrip: 0.85 },
+  { id: 'atomic',   name: 'Atomic',   kind: 'driver', archetype: 'balance', mass: 0.24, friction: 0.82, spinRetention: 1.02, wander: 0.55, burstResist: 0.95, railGrip: 0.55 },
+  { id: 'orbit',    name: 'Orbit',    kind: 'driver', archetype: 'stamina', mass: 0.22, friction: 0.70, spinRetention: 1.35, wander: 0.18, burstResist: 0.82, railGrip: 0.25 },
+  { id: 'needle',   name: 'Needle',   kind: 'driver', archetype: 'stamina', mass: 0.19, friction: 0.50, spinRetention: 1.42, wander: 0.06, burstResist: 1.15, railGrip: 0.25 },
+  { id: 'bastion',  name: 'Bastion',  kind: 'driver', archetype: 'defense', mass: 0.30, friction: 1.35, spinRetention: 0.95, wander: 0.10, burstResist: 1.30, railGrip: 0.25 },
 
   // OCTA — a documented TRAP, transcribed rather than balanced.
   //
@@ -213,7 +213,30 @@ export const DRIVERS: DriverPart[] = [
   //   spinRetention 0.74   worst in the catalogue — "the tip has poor stamina"
   //   wander 0.12          octagonal segments do not chase
   //   burstResist 1.08     bumps help, weight hurts; the source says both
-  { id: 'octa',     name: 'Octa',     kind: 'driver', archetype: 'defense', mass: 0.34, friction: 1.10, spinRetention: 0.74, wander: 0.12, burstResist: 1.08 },
+  { id: 'octa',     name: 'Octa',     kind: 'driver', archetype: 'defense', mass: 0.34, friction: 1.10, spinRetention: 0.74, wander: 0.12, burstResist: 1.08, railGrip: 0.25 },
+
+  // THE BEYBLADE X BIT CATALOGUE, transcribed with its published stat blocks.
+  //
+  // The wiki gives every Bit five axes — Attack / Defense / Stamina / Dash /
+  // Burst Resistance — out of 100 each. The mapping onto this sim, written down
+  // so it is reproducible:
+  //
+  //     mass           0.16 + (grams - 2.0) / 0.6 * 0.14
+  //     wander         0.06 + attack / 50 * 1.80      aggressive tips roam
+  //     friction       0.40 + defense / 100 * 2.00    grippy tips hold position
+  //     spinRetention  0.75 + stamina / 100 * 1.40
+  //     burstResist    0.75 + burst / 100 * 0.70
+  //     railGrip       dash / 40                      1.0 at the catalogue's max
+  //
+  // The burst axis is the one worth pausing on, because it inverts what you
+  // would guess: attack Bits score 80 and stamina Bits 30. A flat tip's wide
+  // contact grips the burst locks; a sharp stamina tip does not. Transcribed
+  // rather than "corrected", because the source is consistent about it across
+  // every entry.
+  { id: 'gearflat', name: 'Gear Flat', kind: 'driver', archetype: 'attack',  mass: 0.23, friction: 0.50, spinRetention: 0.82, wander: 1.86, burstResist: 1.31, railGrip: 1.00 },
+  { id: 'accel',    name: 'Accel',    kind: 'driver', archetype: 'attack',  mass: 0.30, friction: 0.60, spinRetention: 0.89, wander: 1.50, burstResist: 1.31, railGrip: 1.00 },
+  { id: 'rush',     name: 'Rush',     kind: 'driver', archetype: 'attack',  mass: 0.18, friction: 0.60, spinRetention: 1.03, wander: 1.50, burstResist: 1.31, railGrip: 0.75 },
+  { id: 'ball',     name: 'Ball',     kind: 'driver', archetype: 'stamina', mass: 0.18, friction: 0.90, spinRetention: 1.45, wander: 0.60, burstResist: 0.96, railGrip: 0.25 },
 ];
 
 const byId = <T extends { id: string }>(list: T[], id: string): T => {
@@ -245,6 +268,10 @@ export function deriveStats(build: BeyBuild): BeyStats {
     spinRetention: dr.spinRetention * d.spinRetention,
     stability: d.stability,
     wander: dr.wander,
+    // The Dash stat. Defaults from the archetype for drivers authored before
+    // the axis existed, so nothing silently gets zero grip and quietly loses
+    // access to the rail.
+    railGrip: dr.railGrip ?? (dr.archetype === 'attack' ? 0.8 : 0.3),
   };
 }
 
