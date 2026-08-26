@@ -67,13 +67,32 @@ function makeBey(f: Fighter, launch: LaunchParams): BeyState {
   const speed = orbital * (0.78 + 0.34 * power);
   const tangent = vec(-Math.sin(a), Math.cos(a));
 
+  // The radial component — the whole of the flower pattern.
+  //
+  // A tangential launch at orbital velocity is a circle. Adding radial velocity
+  // makes it an oscillation between two radii, because the bowl's slope is a
+  // restoring force: throw a top outward and the slope brings it back, dive it
+  // inward and its own angular momentum carries it out again.
+  //
+  // Scaled by `speed` rather than absolute, so tilt means the same thing at any
+  // launch power. Capped at 0.55 because past roughly that the excursion
+  // reaches the wall on the first swing and the top rings itself out, which is
+  // a real risk in the source material too — "excess tilt causes scraping and
+  // destabilisation".
+  const tilt = clamp(launch.tilt ?? 0, -1, 1);
+  const radial = vec(Math.cos(a), Math.sin(a));
+  const radialSpeed = tilt * 0.55 * speed;
+
   return {
     id: f.id,
     name: f.name,
     build: f.build,
     stats,
     pos: vec(Math.cos(a) * r, Math.sin(a) * r),
-    vel: vec(tangent.x * speed * f.spinDir, tangent.y * speed * f.spinDir),
+    vel: vec(
+      tangent.x * speed * f.spinDir + radial.x * radialSpeed,
+      tangent.y * speed * f.spinDir + radial.y * radialSpeed,
+    ),
     spin: spin * f.spinDir,
     spinAtLaunch: spin,
     burst: 0,

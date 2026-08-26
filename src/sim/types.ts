@@ -208,4 +208,23 @@ export interface LaunchParams {
   entryAngle: number;
   /** How far in from the rim to drop, in [0, 1]. 0 = rim, 1 = centre. */
   entryDepth: number;
+  /**
+   * Launcher tilt, in [-1, 1]. The radial component of the launch.
+   *
+   * 0 launches purely tangentially, which — at orbital velocity — is by
+   * definition a CIRCULAR orbit. That was the only launch this sim could
+   * produce, and it is why every top settled into the same orbital band and
+   * stayed there: two tops at the same radius and similar speed orbit adjacent
+   * to each other for the whole round without resolving.
+   *
+   * Negative dives inward, positive throws outward. Either way the bowl's slope
+   * pulls it back, so the top oscillates between two radii instead of holding
+   * one — repeated excursions from centre to rim and back. That is the real
+   * game's **flower pattern**, and it is not scripted here: it falls out of an
+   * off-circular launch meeting the restoring slope that `bowlHeight` and
+   * `slopeAccel` already provide.
+   *
+   * Optional so every existing caller keeps the old behaviour exactly.
+   */
+  tilt?: number;
 }

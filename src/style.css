@@ -1975,3 +1975,43 @@ body.theme-anime .coach.on {
 .class-head b { color: var(--accent); font-weight: 700; }
 .class-head span { color: var(--dim); font-size: 11px; letter-spacing: 0.04em; text-transform: none; }
 .slot .class-head:first-of-type { margin-top: 4px; }
+
+/* Launcher tilt, on the launch screen. Sits under the power meter because it
+   is the same decision at a different scale: power picks orbit size, tilt
+   picks orbit shape.
+
+   The panel background matters here: the launch bar floats over a live 3D
+   dish, and unbacked chips over a pale stadium floor were unreadable. */
+.launch-tilt {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 12px;
+  flex-wrap: nowrap;
+}
+
+.launch-tilt .chip {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 7px 8px;
+  background: var(--panel);
+  backdrop-filter: blur(8px);
+  text-align: center;
+}
+
+.launch-tilt .chip small {
+  display: block;
+  margin-top: 2px;
+  font-size: 9px;
+  line-height: 1.25;
+  opacity: 0.75;
+}
+
+/* The instruction line needs the same treatment for the same reason. */
+.launch p {
+  background: var(--panel);
+  backdrop-filter: blur(8px);
+  border-radius: 8px;
+  padding: 6px 10px;
+  margin: 8px 0 0;
+}

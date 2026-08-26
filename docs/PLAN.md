@@ -344,36 +344,59 @@ the thing a previous burst effect broke.
 
 ### Named by the owner, not yet started
 
-- **The controls are not fun.** Reported directly: "clicking the charge button
-  and the battle becomes cat chase mouse, one is just following the other
-  beyblade."
+- **The controls: four hypotheses tested, three rejected, one shipped.**
 
-  **One hypothesis tested and rejected, with the numbers.** The obvious suspect
-  was Charge's homing: `applySeek` turns the charger's velocity toward its
-  target at `seek * 0.8 * spinNorm`, and Charge's seek of 8.5 allows 6.8 rad/s
-  — about 390 degrees per second, enough to reverse heading in half a second.
-  Capping that at 1.9 rad/s drops the seek's turn authority from ~312 deg/s to
-  ~87 deg/s, which sounds decisive.
+  Reported as "clicking the charge button and the battle becomes cat chase
+  mouse, one is just following the other beyblade."
 
-  Measured across 100 AI-played rounds, mean heading change while charging:
+  **The right metric took two attempts to find.** The first probe measured
+  heading swing, which is not what "chasing" means. The metric that answers the
+  question is **how much of a round the two tops spend within 2.2x contact
+  radius**. Baseline on the plain dish: **49.5%**, of which 48.3% produces no
+  contact. Half the round is spent adjacent and unresolved.
 
-      uncapped   324 deg/s     round 10.05 s
-      capped     303 deg/s     round  9.84 s
+  Four candidates, measured across 100 AI-played rounds each:
 
-  **A 6% difference.** The seek was rarely the binding constraint: a charging
-  top's heading is dominated by orbital motion and the bowl's inward slope, not
-  by how hard it is allowed to steer. So the cap was reverted — it changes
-  balance without changing the thing it was meant to change, and shipping it
-  would have been a fix justified by a hypothesis its own measurement refutes.
+      1. Charge homes too hard   324 -> 303 deg/s heading   REJECTED (6%)
+      2. Collisions not bouncy   49.5 -> 47.0% adjacency    REJECTED
+      3. Sustained grinding      49.5 -> 49.1% adjacency    REJECTED
+      4. Orbits are circular     radial spread already 0.76 REJECTED
 
-  **What that leaves.** Two candidates remain, in order of suspicion: the direct
-  closing push (`mv.seek * 0.45`, which shortens distance regardless of
-  heading), and the absence of any *positional* input for the player — three
-  buttons and no way to influence WHERE anything happens, so the only variable
-  is when to press. The second is the same hole the launch-tilt work
-  (docs/PHYSICS.md P5) opens from the other side, and the next experiment should
-  measure time-spent-in-close-range-without-contact rather than heading, since
-  that is what "chasing" actually describes.
+  Hypothesis 4 is the interesting failure. Launch tilt genuinely produces the
+  flower pattern — measured radius over 1.25s, tilt 0 goes 0.82 -> 0.39 and
+  settles, tilt -0.8 goes 0.80 -> 0.38 -> 0.88 -> 0.44 -> 0.73 -> 0.82 — but it
+  does **not** reduce adjacency, because both tops oscillate with the *same
+  period*. The bowl's restoring force is identical for every top, so they stay
+  phase-locked whatever shape their orbit is.
+
+  **What DOES break it, measured across all seven arenas:**
+
+      standard     50.4%     round  9.9 s
+      xrail        35.4%     round  6.6 s
+      spikepit     50.3%     round  9.2 s
+      gauntlet     38.9%     round  6.5 s
+      sudden       50.4%     round  9.9 s
+      tight        48.5%     round  9.7 s
+      threesides   51.2%     round  9.3 s
+
+  **Only the two arenas with a rail.** Pits do nothing, pocket layout does
+  nothing. The rail works because it grabs ONE top and changes its speed and
+  bearing independently of the other — it desynchronises them, which nothing
+  else in the sim does.
+
+  So the chase is a property of radial symmetry: in a featureless bowl, two
+  similar tops share an orbital period and stay in phase. The routes out are
+  the rail (built), or an asymmetric floor — the square stadium in
+  ARENA-IDEAS.md E3, which is a different coordinate system rather than a
+  parameter.
+
+  **Shipped from this: launcher tilt as a player control.** Not because it
+  fixes the chase — measured, it does not — but because the investigation
+  confirmed the other half of the original diagnosis: the player had three
+  buttons and no way to influence WHERE anything happened. Tilt is chosen
+  before the rip, as a real blader chooses launcher angle, and it decides orbit
+  shape. Three presets (Dive / Flat / Bank) rather than a slider, because the
+  measured difference between them is large and within them is not.
 
 - **Epic beys are not detailed enough.** Measured against product photographs,
   four things are missing: faceted chrome (real blades are many small angled

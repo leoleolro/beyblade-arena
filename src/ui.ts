@@ -468,6 +468,7 @@ export class Ui {
   }
 
   private launchBar(): HTMLElement {
+    const g = this.game;
     const el = document.createElement('div');
     el.className = 'launch';
     el.innerHTML = `
@@ -477,6 +478,36 @@ export class Ui {
       </div>
       <p><b>Tap <kbd>SPACE</kbd> once</b> to let it rip. Stop the needle in the green band for a perfect launch and bonus spin.</p>`;
     this.live.needle = el.querySelector('.needle') as HTMLElement;
+
+    // LAUNCHER TILT — the player's only positional input.
+    //
+    // Everything else in a battle is a timing decision: three move buttons and
+    // a meter to stop. Tilt is the one thing that decides WHERE the round
+    // happens, and it is chosen before the launch because that is when a real
+    // blader chooses it — the launcher angle is set before the rip, not
+    // adjusted mid-battle.
+    //
+    // Three presets rather than a slider. The measured difference between them
+    // is large and the difference within them is not, so a continuous control
+    // would offer a precision that does not exist.
+    const tilts: [string, number, string][] = [
+      ['Dive', -0.7, 'in toward the centre, then back out'],
+      ['Flat', 0, 'settles into the middle and stays'],
+      ['Bank', 0.7, 'out to the rim, then back in'],
+    ];
+    const row = document.createElement('div');
+    row.className = 'chips launch-tilt';
+    for (const [label, value, note] of tilts) {
+      const chip = document.createElement('button');
+      chip.className = 'chip' + (Math.abs(g.launchTilt - value) < 0.05 ? ' on' : '');
+      chip.innerHTML = `<span>${escapeHtml(label)}<br><small>${escapeHtml(note)}</small></span>`;
+      chip.addEventListener('click', () => {
+        g.setLaunchTilt(value);
+        this.render();
+      });
+      row.appendChild(chip);
+    }
+    el.appendChild(row);
     return el;
   }
 

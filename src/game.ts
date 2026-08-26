@@ -175,6 +175,29 @@ export class Game {
   /** Power the player locked in. */
   lockedPower = 0.8;
 
+  /**
+   * Launcher tilt for the next launch, -1 to 1. The player's only POSITIONAL
+   * input, and the reason it exists.
+   *
+   * The battle had three buttons and no way to influence WHERE anything
+   * happened, so the only variable was when to press — which is what made the
+   * fight read as a pursuit. Tilt is decided before the round and shapes the
+   * whole orbit: zero spirals to the centre and settles there, either extreme
+   * oscillates between rim and centre, which is the real game's flower pattern.
+   * Measured radius over the first 1.25s of a round:
+   *
+   *     tilt  0.0   0.82 -> 0.61 -> 0.51 -> 0.43 -> 0.39 -> 0.44   settles
+   *     tilt -0.8   0.80 -> 0.38 -> 0.88 -> 0.44 -> 0.73 -> 0.82   oscillates
+   *
+   * Held across rounds on purpose: it is a stance, not a twitch input, and
+   * re-choosing it every round would make it noise rather than a decision.
+   */
+  launchTilt = 0;
+
+  setLaunchTilt(v: number): void {
+    this.launchTilt = Math.max(-1, Math.min(1, v));
+  }
+
   /** The rival's spin for this match, shown in the HUD. */
   rivalSpinDir: 1 | -1 = -1;
 
@@ -275,6 +298,7 @@ export class Game {
       entryAngle: playerAngle,
       // A hard launch rides the rim; a soft one drops toward the centre.
       entryDepth: 0.05 + (1 - this.lockedPower) * 0.35,
+      tilt: this.launchTilt,
     };
     const aiBuild = this.battle.fighters.find((f) => f.id === AI_ID)!.build;
     const aiLaunch = this.ai.chooseLaunch(aiBuild, playerAngle);
