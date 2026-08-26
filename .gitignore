@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# autobuild loop state (runtime, per-machine)
+.claude/autobuild/

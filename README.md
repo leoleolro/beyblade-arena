@@ -426,6 +426,29 @@ exactly why it must never become something sold.
 | --- | --- |
 | Standard Dish | the plain bowl — no archetype favoured |
 | X-Rail Stadium | outer rail slingshots fast tops — faster, deadlier rounds |
+| Spike Pit | the centre bites — camping the middle bleeds spin |
+| The Gauntlet | rail outside, spikes inside — nowhere neutral to stand |
+| Sudden Death | the plain bowl, but one exit is worth more |
+| Tight Dish | the middle is dead ground — the fight happens in the ring |
+| Three Sides Safe | every exit on one wall — the rest of the floor is safe |
+
+**Three Sides Safe is transcribed from the real thing.** Takara Tomy's own
+regulation for the Xtreme Stadium puts all three pockets on one face — two Over
+Zones flanking a central Xtreme Zone — so three of the four walls are solid.
+Ours were four identical exits at 90 degrees, which meant no part of the floor
+was safer than any other and there was never a reason to prefer one direction to
+shove someone.
+
+**Measured, only the arenas with a rail break up a chase.** The fraction of a
+round the two tops spend within 2.2x contact radius:
+
+    standard 50.4%   xrail 35.4%   spikepit 50.3%   gauntlet 38.9%
+    sudden   50.4%   tight 48.5%   threesides 51.2%
+
+Pits do nothing to it and pocket layout does nothing to it. The rail works
+because it grabs ONE top and changes its speed and bearing independently — it
+desynchronises them, and nothing else in the sim does. See docs/PLAN.md for the
+four hypotheses tested and rejected on the way to that.
 
 The **X-Rail** is the signature mechanic of the current Beyblade generation.
 Engaging it requires being in the band, off cooldown, *and* carrying real
@@ -478,6 +501,31 @@ catch 25% of knockouts by chance; this one catches 33%, because the rail slings
 on a bearing the rider does not fully choose. See `docs/ARENA-IDEAS.md` for the
 rest of the research and the ideas that were *not* taken.
 
+## Modes and stadiums
+
+The **first** choice is which game you are playing, and it is first because it
+is the only one that changes what a beyblade *is* rather than how it is lit.
+`theme.toon` selects between two construction paths in `buildBeyMesh` — the
+designed roster, built part by part, and the plain metal build this project
+started with.
+
+| Mode | Beyblades | Looks |
+| --- | --- | --- |
+| **Beyblade Arena** | the roster — 32 tops, designed and imported | Anime |
+| **Overdrive** | the kept prototype, preserved to look back at | Overdrive, Arena |
+
+That choice used to be a "Visual style" chip row at position 7 of the garage,
+under two shops — so the single biggest decision about what the game looks like
+was the last thing a player would ever find.
+
+Then a **Stadium**: an arena and a look chosen together, generated as the
+product of the mode's looks and the arena registry rather than hand-listed.
+Adding an arena or a look adds stadiums with no edit to the picker.
+
+The flow is `HOME → Play → MODE → GARAGE → STADIUM → LAUNCH → BATTLE`, with
+**Inspect** as its own destination from home. Full reasoning in
+`docs/UX-FLOW.md`.
+
 ## Visual themes
 
 Three looks, switchable in the garage and persisted:
@@ -494,7 +542,19 @@ Three looks, switchable in the garage and persisted:
   theme that owns the whole treatment.
 
 There are three: **Arena** (clean, technical, readable), **Overdrive** (3D with
-glow, bloom and impact) and **Anime** (full cartoon). Overdrive is the default.
+glow, bloom and impact) and **Anime** (full cartoon).
+
+**They are no longer picked freely.** A theme is now bundled with an arena into
+a **Stadium**, and stadiums belong to a **mode** — see "Modes and stadiums"
+below. A look with no floor attached is not somewhere you can have a match.
+
+An arena may also carry its own palette, overriding the theme's dish, wall,
+ridge, guide and post colours, so seven stadiums do not all look identical
+inside one mode. That is gated on `Theme.acceptsArenaLook`, and **Overdrive
+declines it** — its identity is how much of the frame is black, and a bright
+arena palette turned its near-black dish near-white, which made the additive
+clash pool blow out across half the stadium. Two features that are each correct
+can still be wrong together.
 
 This used to be two, and the consolidation that produced them was half right and
 half a mistake worth recording. Four themes had accumulated — Arena plus three
@@ -571,8 +631,32 @@ played.
 
 Their stats deliberately sit on the existing archetype anchors, and they stay
 out of the AI's `PRESETS` pool. Both choices protect the same thing: the
-balance and pacing suites sweep `PRESETS`, so adding ten beys to the roster
-changes nothing the sim was measured on.
+balance and pacing suites sweep `PRESETS`, so adding beys to the roster changes
+nothing the sim was measured on.
+
+**The later additions are transcriptions rather than originals**, and they do
+NOT sit on the anchors — they carry their source beyblade's own published
+numbers. The Beyblade Wiki gives every Blade a stat spread out of 100 and a
+weight in grams, and the mapping onto this sim is written at the entries in
+`sim/parts.ts` so it is reproducible rather than magic:
+
+    attack   0.60 + A/100 * 1.60        mass    0.44 + (g - 31.8) / 8.9 * 0.13
+    defense  0.60 + D/100 * 1.80        radius  0.1000 + S/100 * 0.0130
+
+The last one encodes a rule the sources state outright: stamina blades use
+**outward** weight distribution ("two large blades create an outward center of
+gravity, which generates strong centrifugal force"), so a high-stamina blade is
+*wider*; defence blades use **central** distribution and are narrower at the
+same mass.
+
+The same treatment reaches the parts. Discs carry real Ratchet data — `4-60` is
+four protrusions at 6.0 mm, and both numbers live on the part — and drivers
+carry the real Bit stat block including **Dash**, the axis that decides how hard
+the X-Rail throws you. One entry, Orichalcum O3 Outer Octa, is transcribed end
+to end: layer, disc *and* driver, including a driver the source calls "useless
+for tournament play" and which ships as the heaviest in the game with the worst
+spin retention. A parts list where every option is viable has no decisions in
+it.
 
 They also drove three engine changes, because their construction is genuinely
 different from the first six:
