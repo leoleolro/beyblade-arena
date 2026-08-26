@@ -4,6 +4,7 @@ import { Ui } from './ui';
 import { applyUnlockAll, unlockMode } from './devUnlock';
 import { showContactSheet } from './render/contactSheet';
 import { showMoment } from './momentSheet';
+import { showModelAudit } from './modelAudit';
 import type { Moment } from './momentSheet';
 import type { MoveKind } from './sim/types';
 
@@ -101,6 +102,12 @@ Object.assign(window as unknown as Record<string, unknown>, {
    * unconditional for the same reason; nothing reads this in normal play.
    */
   __game: game,
+  /**
+   * Audit every imported model in one command — size, upright axis, seating,
+   * and leftover rig. See modelAudit.ts for why a bounding box alone is not
+   * enough. Run it after dropping any new model in.
+   */
+  __models: (): Promise<unknown> => showModelAudit(),
   __sweep: (ids?: string[]): Promise<void> => showContactSheet(ids),
   /**
    * A filmstrip of a clash, launch or defeat, stepped by hand out of the

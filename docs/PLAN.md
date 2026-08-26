@@ -135,6 +135,38 @@ The general lesson, which is now in the `game-visual-qa` skill: **N assets
 imported means N assets checked.** One is a spot check, and a spot check on
 asset one of four has a 25% chance of finding a per-asset bug.
 
+### And a second round, because the first fix was not enough
+
+Dran Sword was still wrong after the axis fix — reported again as "still very
+broken". It rendered 38% oversized and floating, and **every static measurement
+said it was fine**, including the ones added to catch the first bug.
+
+The cause: `Blead_metal` is a `SkinnedMesh` under an `Armature`, and the file
+carries two baked animations, one of them named "exploded view". Its bones were
+exported part-way through one. `Box3.setFromObject` computes a skinned mesh's
+box from the **bind pose** and does not run the skinning — so the box, the
+uprighting, `normaliseToRadius` and `seatOnOrigin` all agreed with each other
+and with nothing on screen. Measured live: blade 0.296 wide against a scaled
+prediction of 0.211.
+
+`Skeleton.pose()` restores the base pose and makes the box true again. We never
+play these clips — the whole top is spun by its parent group — so the rig is
+dead weight the exporter left behind. After the fix: 0.209 against 0.215, seated
+at y 0.002.
+
+**The check that now exists: `__models()`.** It runs the real preparation path
+on every registered model and reports width error, upright axis, seating, and
+leftover rig, with a verdict per bey. Both classes of bug are one command away
+now instead of one playthrough away:
+
+    OK   dransword — 12 skinned mesh(es) — rest-posed on import; box would otherwise lie
+    OK   valkyrie  — arrived Z-up — rotated to Y
+    OK   magejab   — arrived Z-up — rotated to Y
+
+The deeper lesson is about the *kind* of check: a measurement taken from the
+same source the bug lives in will confirm the bug. The bounding box was not a
+second opinion, it was the first opinion restated.
+
 ## F. Process
 
 `docs/design-targets/` — done. Screenshot approved states as they happen.

@@ -201,7 +201,44 @@ export function uprightModel(obj: THREE.Object3D): boolean {
   return true;
 }
 
+/**
+ * Put any skinned model back into its bind pose.
+ *
+ * THE BUG THIS EXISTS FOR, reported twice as "dran sword is still very broken":
+ * a big object sitting in the middle of the dish, oversized, while the real bey
+ * fought elsewhere.
+ *
+ * Dran Sword ships as a RIGGED model — `Blead_metal` is a `SkinnedMesh` under
+ * an `Armature`, and the file carries two baked animations, one of them called
+ * "exploded view". Its bones were exported part-way through one of them, so the
+ * geometry the GPU draws is displaced from the geometry on disk.
+ *
+ * WHY THAT DEFEATED EVERY MEASUREMENT. `Box3.setFromObject` computes a skinned
+ * mesh's box from the geometry's BIND-POSE bounds transformed by the object's
+ * world matrix. It does not run the skinning. So the bounding box says one
+ * thing and the screen shows another, and every check built on that box —
+ * uprighting, `normaliseToRadius`, `seatOnOrigin` — agreed with each other and
+ * with nothing the player could see. Measured live: the blade rendered 0.296
+ * wide against a scaled prediction of 0.211, a 38% error that no static probe
+ * could find.
+ *
+ * `Skeleton.pose()` restores every bone from its stored inverse — the base pose
+ * — which makes the drawn geometry match the bind pose again, and therefore
+ * makes the bounding box true. We never play these animations; the whole top is
+ * spun by its parent group, so the rig is dead weight the exporter left behind.
+ */
+export function restPose(obj: THREE.Object3D): void {
+  obj.traverse((child) => {
+    const skinned = child as THREE.SkinnedMesh;
+    if (skinned.isSkinnedMesh && skinned.skeleton) skinned.skeleton.pose();
+  });
+}
+
 export function normaliseToRadius(obj: THREE.Object3D, radius: number): void {
+  // Bind pose BEFORE anything measures, for the same reason uprighting is here
+  // rather than at the call sites: a posed rig makes every box below a lie.
+  restPose(obj);
+
   // Upright FIRST, and from in here rather than at the five call sites.
   //
   // It has to happen before the measurement below, because that reads x and z
