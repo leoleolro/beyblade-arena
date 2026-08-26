@@ -134,11 +134,16 @@ export function buildStadium(
   // not. A theme is a rendering STYLE and applies to the whole scene; an arena
   // is a PLACE, and places have their own palette. Without this every stadium
   // in a one-theme mode renders identically — see ArenaSpec.look.
-  const dishColour = look?.dish ?? theme.dishColour;
-  const wallColour = look?.wall ?? theme.wallColour;
-  const ridgeColour = look?.ridge ?? theme.ridgeColour;
-  const guideColour = look?.guide ?? theme.guideColour;
-  const postColour = look?.post ?? theme.postColour;
+  // Only where the theme's visual language allows it — see
+  // Theme.acceptsArenaLook. Overdrive refuses, because its identity is how much
+  // of the frame is black and a bright arena palette destroys the clash effect
+  // that reads correctly on a dark floor.
+  const paint = theme.acceptsArenaLook ? look : undefined;
+  const dishColour = paint?.dish ?? theme.dishColour;
+  const wallColour = paint?.wall ?? theme.wallColour;
+  const ridgeColour = paint?.ridge ?? theme.ridgeColour;
+  const guideColour = paint?.guide ?? theme.guideColour;
+  const postColour = paint?.post ?? theme.postColour;
   const group = new THREE.Group();
   const guides: THREE.MeshBasicMaterial[] = [];
   const posts: THREE.MeshStandardMaterial[] = [];

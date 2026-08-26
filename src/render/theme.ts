@@ -192,6 +192,27 @@ export interface Theme {
   speedLines: boolean;
   /** Full-screen white pulse on a heavy clash. */
   impactFlash: boolean;
+  /**
+   * Whether an arena's own palette may override this theme's stadium colours.
+   *
+   * WHY THIS IS A THEME DECISION AND NOT A GLOBAL ONE. Per-arena palettes exist
+   * so seven stadiums do not all look identical, and within a bright cel
+   * language that works — a warm Spike Pit against a cool Standard Dish reads as
+   * two places in one world.
+   *
+   * Overdrive is a different world. Its whole identity is how much of the frame
+   * is BLACK: dish 0x140a26, a near-black purple, with the tops as the only
+   * bright things in it. Letting a bright arena palette overwrite that turned
+   * its dish near-white, and the additive clash pool — which is correct on a
+   * dark floor — blew out across half the stadium. Filmstripped, frames 0 and 4
+   * of a clash were a white mass with no beyblades visible in them at all, which
+   * is precisely the "glowing led light bulbs, full of light pollution" failure
+   * this theme was restored from.
+   *
+   * So a theme states whether arena palettes belong to its language. Overdrive
+   * says no and keeps its own floor.
+   */
+  acceptsArenaLook: boolean;
   /** Class applied to <body>, so CSS can theme the DOM overlay too. */
   bodyClass: string;
 }
@@ -269,6 +290,7 @@ export const ARENA: Theme = {
   // No ring at all in this theme; the value is inert.
   shockwaveInk: null,
 
+  acceptsArenaLook: true,
   bodyClass: 'theme-arena',
 };
 
@@ -386,6 +408,7 @@ export const ANIME: Theme = {
   // additive white ring every other theme uses was literally invisible.
   shockwaveInk: 0x1e2f57,
 
+  acceptsArenaLook: true,
   bodyClass: 'theme-anime',
 };
 
@@ -548,6 +571,7 @@ export const OVERDRIVE: Theme = {
   // Dark floor: glow is correct here and the ring reads as pressure.
   shockwaveInk: null,
 
+  acceptsArenaLook: false,
   bodyClass: 'theme-overdrive',
 };
 
