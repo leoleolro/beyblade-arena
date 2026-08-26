@@ -53,7 +53,7 @@ export const LADDER: Rival[] = [
     skinId: 'ember',
     difficulty: 'rookie',
     line: 'All attack, no patience. Survive the opening and it burns itself out.',
-    unlocks: { layers: ['luinor', 'tempest', 'dransword'], drivers: ['volcanic'] },
+    unlocks: { layers: ['luinor', 'tempest', 'dransword', 'blackshell'], drivers: ['volcanic'] },
   },
   {
     id: 'orin',
@@ -64,7 +64,7 @@ export const LADDER: Rival[] = [
     skinId: 'venom',
     difficulty: 'rookie',
     line: "Won't chase you and won't die. You have to go and take it.",
-    unlocks: { layers: ['basilisk', 'valkyrie'], discs: ['spread'], drivers: ['needle'], skins: ['venom'] },
+    unlocks: { layers: ['basilisk', 'valkyrie', 'sharkedge'], discs: ['spread'], drivers: ['needle'], skins: ['venom'] },
   },
   {
     id: 'vale',
@@ -75,7 +75,7 @@ export const LADDER: Rival[] = [
     skinId: 'solar',
     difficulty: 'blader',
     line: 'No weakness worth naming. Out-read it or lose slowly.',
-    unlocks: { layers: ['fafnir', 'golem', 'magejab'], discs: ['blitz'] },
+    unlocks: { layers: ['fafnir', 'golem', 'magejab', 'knightshield'], discs: ['blitz'] },
   },
   {
     id: 'kes',
@@ -86,7 +86,7 @@ export const LADDER: Rival[] = [
     skinId: 'void',
     difficulty: 'blader',
     line: 'Charging this is feeding it. Outlast it instead.',
-    unlocks: { layers: ['aegis', 'wyrm', 'dsycther'], drivers: ['bastion'], skins: ['void'] },
+    unlocks: { layers: ['aegis', 'wyrm', 'dsycther', 'wizardrod'], drivers: ['bastion'], skins: ['void'] },
   },
   {
     id: 'rhea',
@@ -97,7 +97,7 @@ export const LADDER: Rival[] = [
     skinId: 'rose',
     difficulty: 'champion',
     line: 'Reads your move before you commit to it. Blocks are not free here.',
-    unlocks: { layers: ['ragnaruk', 'solaris'], discs: ['wall'], skins: ['solar'] },
+    unlocks: { layers: ['ragnaruk', 'solaris', 'hellsscythe'], discs: ['wall'], skins: ['solar'] },
   },
   {
     id: 'zeph',
@@ -112,7 +112,7 @@ export const LADDER: Rival[] = [
     // skin, and the only rival granting no layer. Nosferu is the right thing to
     // put here: it is the one layer whose mechanic changes how you launch, so
     // clearing the ladder hands over a new question rather than a spare part.
-    unlocks: { layers: ['nosferu', 'chimera'], drivers: ['orbit'], skins: ['rose'] },
+    unlocks: { layers: ['nosferu', 'chimera', 'sphinxcowl'], drivers: ['orbit'], skins: ['rose'] },
   },
 ];
 

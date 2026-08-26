@@ -72,6 +72,38 @@ export const LAYERS: LayerPart[] = [
   { id: 'magejab',   name: 'Mage Jab',   kind: 'layer', archetype: 'stamina', mass: 0.49, radius: 0.1090, attack: 0.80, defense: 1.08, burstResist: 1.12, spinSteal: 0.0, blades: 5, colour: 0x6d28d9 },
   { id: 'dsycther',  name: 'Dsycther',   kind: 'layer', archetype: 'balance', mass: 0.52, radius: 0.1040, attack: 1.06, defense: 1.14, burstResist: 1.08, spinSteal: 0.0, blades: 4, colour: 0x334155 },
 
+  // TRANSCRIBED FROM THE WIKI, not from the type conventions — these six carry
+  // their source beyblade's own documented numbers rather than sitting on the
+  // archetype anchors like the invented line above.
+  //
+  // The mapping, stated so it is reproducible rather than magic. Each source
+  // entry publishes a stat spread out of 100 (A/D/S) and a weight in grams:
+  //
+  //     attack       0.60 + A/100 * 1.60
+  //     defense      0.60 + D/100 * 1.80
+  //     burstResist  0.86 + S/100 * 0.60
+  //     mass         0.44 + (grams - 31.8) / (40.7 - 31.8) * 0.13
+  //     radius       0.1000 + S/100 * 0.0130, less 0.0020 for defence
+  //
+  // The last two encode the two weight-distribution rules the sources state
+  // outright: stamina blades use OUTWARD weight distribution ("two large blades
+  // create an outward center of gravity, which generates strong centrifugal
+  // force"), so a high-stamina blade is WIDER; defence blades use CENTRAL
+  // distribution, so they are narrower for the same mass.
+  //
+  // Sources: BlackShell 4-60D (Defense, 40.7 g, "overall diamond shape with
+  // eight protrusions"), SharkEdge (A60/D25/S15, 34.5 g, two keel fins),
+  // KnightShield (A20/D55/S25, 32.4 g, "six defensive blades create an impact
+  // dampening structure"), WizardRod (A15/D25/S60, 35.3 g, "wide circular
+  // shape"), HellsScythe (Balance, 4 blades), SphinxCowl (A35/D55/S10, 32.7 g,
+  // nine "Barrage Blade" protrusions).
+  { id: 'blackshell', name: 'Black Shell',    kind: 'layer', archetype: 'defense', mass: 0.57, radius: 0.0999, attack: 1.0, defense: 1.68, burstResist: 0.95, spinSteal: 0.0, blades: 8, colour: 0x14181f },
+  { id: 'sharkedge',  name: 'Shark Edge',     kind: 'layer', archetype: 'attack', mass: 0.479, radius: 0.1019, attack: 1.56, defense: 1.05, burstResist: 0.95, spinSteal: 0.0, blades: 2, colour: 0x5b21b6 },
+  { id: 'knightshield',name: 'Knight Shield',  kind: 'layer', archetype: 'defense', mass: 0.449, radius: 0.1013, attack: 0.92, defense: 1.59, burstResist: 1.01, spinSteal: 0.0, blades: 6, colour: 0x046c4a },
+  { id: 'wizardrod',  name: 'Wizard Rod',     kind: 'layer', archetype: 'stamina', mass: 0.491, radius: 0.1078, attack: 0.84, defense: 1.05, burstResist: 1.22, spinSteal: 0.0, blades: 5, colour: 0x3b2f7a },
+  { id: 'hellsscythe',name: 'Hells Scythe',   kind: 'layer', archetype: 'balance', mass: 0.487, radius: 0.1033, attack: 1.24, defense: 1.23, burstResist: 1.01, spinSteal: 0.0, blades: 4, colour: 0x7f1d1d },
+  { id: 'sphinxcowl', name: 'Sphinx Cowl',    kind: 'layer', archetype: 'defense', mass: 0.453, radius: 0.0993, attack: 1.16, defense: 1.59, burstResist: 0.92, spinSteal: 0.0, blades: 9, colour: 0x8a6a2f },
+
   // The vampire. The one layer in the catalog with `sameSteal`: it absorbs in
   // *every* matchup, not only against an opposite-spin opponent, so there is no
   // launch that denies it its mechanic (see constants.ts, spin steal).

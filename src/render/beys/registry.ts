@@ -45,6 +45,12 @@ export interface BeyEntry {
   };
 }
 
+import { entry as blackshell } from './blackshell';
+import { entry as sharkedge } from './sharkedge';
+import { entry as knightshield } from './knightshield';
+import { entry as wizardrod } from './wizardrod';
+import { entry as hellsscythe } from './hellsscythe';
+import { entry as sphinxcowl } from './sphinxcowl';
 import { entry as dransword } from './dransword';
 import { entry as valkyrie } from './valkyrie';
 import { entry as magejab } from './magejab';
@@ -97,6 +103,12 @@ export const BEY_REGISTRY: BeyEntry[] = [
   valkyrie,
   magejab,
   dsycther,
+  blackshell,
+  sharkedge,
+  knightshield,
+  wizardrod,
+  hellsscythe,
+  sphinxcowl,
 ];
 
 /** The anime design set — the projection beydex.ts used to hand-maintain. */
