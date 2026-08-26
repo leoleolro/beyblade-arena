@@ -1514,7 +1514,32 @@ export class ArenaRenderer {
     // `group.visible` is the renderer's own record of that. Framing on it means
     // the camera holds both tops for exactly as long as there are two to hold,
     // with no new timer to keep in sync with the animations.
-    const alive = beys.filter((b) => b.alive || this.visuals.get(b.id)?.group.visible);
+    // FRAME WHERE THE TOP IS DRAWN, not where the sim last had it.
+    //
+    // The paragraph above got the framing SET right and the framing POSITIONS
+    // wrong, which is a subtle enough combination that the fix looked complete.
+    // A knocked-out top's `b.pos` is frozen at the moment it crossed
+    // EXIT_RADIUS — the sim has stopped touching it — while its VISUAL keeps
+    // going, on the ballistic arc in `playDefeat`, out past the rim and up. So
+    // the camera dutifully held a point the top had already left, and the arc
+    // still flew out of frame; filmstripped with `__moment('ringout')`, the
+    // top is near the top edge by +8f and gone entirely by +20f.
+    //
+    // Reading the visual's own position instead means the camera tracks the
+    // arc and, because `spread` is computed from the same set, widens to keep
+    // both the winner and the departing loser in shot. `beyWorldPosition` maps
+    // sim (x, y) to world (x, height, z) one-to-one, so the visual's x/z drop
+    // straight back into the sim-space framing maths with no conversion.
+    const framed: { x: number; y: number }[] = [];
+    for (const b of beys) {
+      const v = this.visuals.get(b.id);
+      if (b.alive) {
+        framed.push({ x: b.pos.x, y: b.pos.y });
+      } else if (v?.group.visible) {
+        framed.push({ x: v.group.position.x, y: v.group.position.z });
+      }
+    }
+    const alive = framed;
 
     // ---------------------------------------------------------- framing ----
     // Damped to 0.55 of the way out to the midpoint rather than tracking it
@@ -1527,9 +1552,9 @@ export class ArenaRenderer {
     // absorbs.
     let mx = 0;
     let my = 0;
-    for (const b of alive) {
-      mx += b.pos.x;
-      my += b.pos.y;
+    for (const p of alive) {
+      mx += p.x;
+      my += p.y;
     }
     if (alive.length) {
       mx /= alive.length;
@@ -1545,7 +1570,7 @@ export class ArenaRenderer {
       for (let k = i + 1; k < alive.length; k++) {
         spread = Math.max(
           spread,
-          Math.hypot(alive[i].pos.x - alive[k].pos.x, alive[i].pos.y - alive[k].pos.y),
+          Math.hypot(alive[i].x - alive[k].x, alive[i].y - alive[k].y),
         );
       }
     }

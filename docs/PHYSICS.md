@@ -196,22 +196,33 @@ image. Competitively it is already over when it crosses the line.
 The same thing, and for the same reason. `resolveWall` lets a top in a pocket
 fly out, and the round logic sees it cross `EXIT_RADIUS`. There is no path back.
 
-### P4. Make it visible, not survivable
+### P4. Make it visible, not survivable — **DONE**
 
-Nothing to fix in the rules — our behaviour already matches the real one. What
-is missing is the *drama*: the exit is instant, and the moment a top is flung
-over the wall is the most cinematic thing that can happen in a round.
+Nothing to fix in the rules — our behaviour already matches the real one. The
+gap was that nothing *framed* the moment.
 
-A ballistic arc after the exit crossing, purely cosmetic, with the round already
-decided at the crossing. That keeps the rule exactly as it is (and as the real
-one is) while making the picture match the show. This belongs in the renderer,
-not `sim/`, and the sim/render boundary makes it safe: the sim has already
-returned its verdict before the arc begins.
+**And the first version of this proposal was wrong.** It said the exit was
+instant and proposed adding a ballistic arc. The arc already existed, in
+`playDefeat`: the top leaves on its exit bearing, rises at 2.2/s against 26/s²
+of gravity, and drops out of shot at 0.40s. Written from reading the plan
+instead of reading the code.
 
-Cost: small, renderer-only, no balance risk. **The best value-per-risk item in
-this document.**
+The actual bug was one level down, and subtler. The camera already knew to keep
+framing a defeated top — a previous pass fixed the framing SET, filmstripping
+`__moment('ringout')` to prove it. But it framed on `b.pos`, the **sim**
+position, which freezes the instant the top crosses `EXIT_RADIUS` because the
+sim has stopped touching it. The visual then flew on without it. The camera held
+a point the top had already left.
 
----
+Fixed by framing on the drawn position for any defeated top whose visual is
+still visible. `beyWorldPosition` maps sim (x, y) to world (x, height, z) one to
+one, so the visual's x/z drop straight into the framing maths. Because `spread`
+reads the same set, the camera also widens to keep winner and departing loser in
+one shot.
+
+Filmstripped before and after: the loser went from a grey speck at the top edge
+of frame to filling the lower third of it, sailing out of the dish. That is the
+shot people clip.
 
 ## 4. Near-vertical and banked launches
 
@@ -265,7 +276,8 @@ question "how does a player set it".
 
 ## Order
 
-1. **P4** — the ring-out arc. Renderer-only, no balance risk, biggest picture.
+1. ~~**P4** — the ring-out arc.~~ **Done.** The arc existed; the camera was
+   framing the sim's frozen exit point instead of the drawn one.
 2. **P1** — the rail as a rhythm. The largest gap measured, and the mechanic the
    arena is named for. Full sweep behind it.
 3. **P5** — launch tilt, physics first behind a fixed value, control after.
