@@ -490,10 +490,14 @@ export class Ui {
     // Three presets rather than a slider. The measured difference between them
     // is large and the difference within them is not, so a continuous control
     // would offer a precision that does not exist.
+    // The notes name the TRADE-OFF, not just the shape, because there is a
+    // real one and it is not obvious. Measured: any tilt costs rail access,
+    // because riding the rail needs a stable rim orbit and an oscillating top
+    // crosses the band instead of sitting in it. Flat is the rail launch.
     const tilts: [string, number, string][] = [
-      ['Dive', -0.7, 'in toward the centre, then back out'],
-      ['Flat', 0, 'settles into the middle and stays'],
-      ['Bank', 0.7, 'out to the rim, then back in'],
+      ['Dive', -0.7, 'in and back out — crosses the middle'],
+      ['Flat', 0, 'holds one orbit — best for the rail'],
+      ['Bank', 0.7, 'out and back in — wide, misses the rail'],
     ];
     const row = document.createElement('div');
     row.className = 'chips launch-tilt';

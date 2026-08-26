@@ -238,9 +238,21 @@ function updateRail(b: BeyState, rail: RailSpec, dt: number): void {
     // identical and the rail was a rare special event rather than a rhythm that
     // builds — see docs/PHYSICS.md.
     // Grip scales BOTH the drive and the ceiling, so a low-Dash tip gets a
-    // shorter, gentler dash rather than none. Floored at 0.55 of the rated
-    // values: even the weakest tip meshes with the teeth, it just is not thrown.
-    const gripK = 0.55 + 0.45 * grip;
+    // gentler dash rather than none.
+    //
+    // FLOORED AT 0.85, and the floor is load-bearing. The first version used
+    // 0.55, which gave a 45% spread across the catalogue and looked like a
+    // healthier decision — but measured, it weakened the rail for the two
+    // thirds of the roster that are not attack bottoms, and the rail's drive is
+    // what DESYNCHRONISES the two tops. X-Rail adjacency went from 35.4% to
+    // 45.6%, undoing the one thing that arena does better than every other
+    // floor (see docs/PLAN.md, the chase investigation).
+    //
+    // At 0.85 the rail is restored (36.3%) and Dash still separates cleanly
+    // into the three tiers the source publishes — peak dash speed 3.42 for the
+    // dash-40 tips, 3.30 for Rush at dash 30, 3.15 for the dash-10 tips. A
+    // smaller spread that preserves the arena beats a larger one that guts it.
+    const gripK = 0.85 + 0.15 * grip;
     const ceiling = railCeiling(b, rail) * gripK;
     const speed = Math.hypot(b.vel.x, b.vel.y);
     if (speed < ceiling) {

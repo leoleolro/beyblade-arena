@@ -205,6 +205,31 @@ export class AiController {
     if (reach <= LAUNCH_REACH && this.rng() < p.launchSkill) {
       power = nearest;
     }
+    // NO TILT FROM THE AI, and this is a measurement rather than an oversight.
+    //
+    // Giving the AI an archetype-chosen tilt looked obviously right — the
+    // player has the control, so the opponent should too. Measured across all
+    // seven arenas it made the game worse:
+    //
+    //                      close      round     close     round
+    //                      (no tilt)            (tilt 0.7)
+    //     standard         50.4%      9.9 s     47.9%     11.5 s
+    //     xrail            35.4%      6.6 s     42.5%     10.4 s
+    //
+    // Rounds got 25-60% longer and hits per second fell across the board, and
+    // the X-Rail — the arena tilt was supposed to help by throwing attackers at
+    // the wall — got notably WORSE. Halving the tilt did not rescue it.
+    //
+    // The reason is a genuine tension worth keeping: riding the rail wants a
+    // STABLE RIM ORBIT, and tilt makes a top oscillate THROUGH the rail band
+    // rather than sit in it. Tilt buys orbit variety at the cost of rail
+    // access. That is a real strategic trade-off, and it belongs to the player
+    // as a choice rather than to the AI as a default.
+    //
+    // So the AI launches flat until there is a tilt policy that measures
+    // better, which would have to be arena-aware — bank on a plain dish, flat
+    // on a rail floor. Recorded rather than shipped on the assumption.
+
     return {
       power,
       // Launch opposite the player so the round doesn't open on a collision.

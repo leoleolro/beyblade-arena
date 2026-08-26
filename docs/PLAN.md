@@ -390,6 +390,21 @@ the thing a previous burst effect broke.
   ARENA-IDEAS.md E3, which is a different coordinate system rather than a
   parameter.
 
+  **And tilt turned out to have a cost, which makes it a decision.** Giving the
+  AI an archetype-chosen tilt looked obviously right — the player has the
+  control, so the opponent should too. Measured across all seven arenas it made
+  the game worse: rounds 25-60% longer, hits per second down everywhere, and the
+  X-Rail (the arena tilt was supposed to help, by throwing attackers at the
+  wall) went from 35.4% adjacency to 42.5%. Halving the tilt did not rescue it.
+
+  The reason is a genuine tension worth keeping: **riding the rail wants a
+  stable rim orbit, and tilt makes a top oscillate THROUGH the rail band rather
+  than sit in it.** Tilt buys orbit variety at the cost of rail access. That is
+  a real strategic trade-off, and it belongs to the player as a choice rather
+  than to the AI as a default — so the AI launches flat until there is an
+  arena-aware tilt policy that measures better. The launch chips now name the
+  cost ("Flat — holds one orbit, best for the rail").
+
   **Shipped from this: launcher tilt as a player control.** Not because it
   fixes the chase — measured, it does not — but because the investigation
   confirmed the other half of the original diagnosis: the player had three
