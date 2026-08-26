@@ -433,8 +433,16 @@ export function nearestFoe(beys: BeyState[], self: BeyState): BeyState | null {
   return best;
 }
 
-/** Angular centre of each exit pocket, radians. */
-export const pocketAngles = (): number[] =>
+/**
+ * Angular centre of each exit pocket, radians.
+ *
+ * Takes the arena so a stadium can cluster its exits — the real ones do, and
+ * ours could not. Called with nothing it returns the default evenly spaced
+ * four, which is what every arena without a `pockets` list gets and what the
+ * geometry tests assert.
+ */
+export const pocketAngles = (arena?: ArenaSpec): number[] =>
+  arena?.pockets ??
   Array.from(
     { length: C.POCKET_COUNT },
     (_, i) => C.POCKET_OFFSET + (i * 2 * Math.PI) / C.POCKET_COUNT,
@@ -449,8 +457,8 @@ function angleDelta(a: number, b: number): number {
 }
 
 /** True if the given bearing lines up with one of the exit pockets. */
-export function inPocket(angle: number): boolean {
-  return pocketAngles().some((p) => angleDelta(angle, p) < C.POCKET_HALF_WIDTH);
+export function inPocket(angle: number, arena?: ArenaSpec): boolean {
+  return pocketAngles(arena).some((p) => angleDelta(angle, p) < C.POCKET_HALF_WIDTH);
 }
 
 /**
@@ -463,8 +471,8 @@ export function inPocket(angle: number): boolean {
  * regardless would score an Xtreme Finish for a top that left through the
  * opposite side of the dish.
  */
-export function pocketIndexAt(angle: number): number {
-  const angles = pocketAngles();
+export function pocketIndexAt(angle: number, arena?: ArenaSpec): number {
+  const angles = pocketAngles(arena);
   let best = -1;
   let bestDelta = C.POCKET_HALF_WIDTH;
   for (let i = 0; i < angles.length; i++) {
@@ -482,7 +490,7 @@ export function pocketIndexAt(angle: number): number {
  * lined up with an exit pocket and carrying enough outward speed, in which case
  * it sails through and gets ringed out.
  */
-function resolveWall(b: BeyState): void {
+function resolveWall(b: BeyState, arena: ArenaSpec): void {
   const r = len(b.pos);
   const limit = C.STADIUM_RADIUS - b.stats.radius;
   if (r <= limit) return;
@@ -491,7 +499,7 @@ function resolveWall(b: BeyState): void {
   const vn = dot(b.vel, n);
   const bearing = Math.atan2(b.pos.y, b.pos.x);
 
-  if (inPocket(bearing) && vn > C.POCKET_ESCAPE_SPEED) {
+  if (inPocket(bearing, arena) && vn > C.POCKET_ESCAPE_SPEED) {
     return; // let it fly out; the round logic sees it cross EXIT_RADIUS
   }
 
@@ -819,7 +827,7 @@ export function step(
 
   for (const b of beys) {
     if (!b.alive) continue;
-    resolveWall(b);
+    resolveWall(b, arena);
   }
 
   return hits;

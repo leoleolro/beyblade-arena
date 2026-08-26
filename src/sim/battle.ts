@@ -454,7 +454,13 @@ const SEVERITY: Record<Defeat, number> = {
 function isFinishPocket(arena: ArenaSpec, b: BeyState): boolean {
   const want = arena.finishPocket;
   if (want === undefined || want === null) return false;
-  return pocketIndexAt(Math.atan2(b.pos.y, b.pos.x)) === want;
+  // The ARENA's pockets, not the default four. `finishPocket` indexes whatever
+  // `pocketAngles` returns for this stadium, so a clustered floor whose exits
+  // are at 60/90/120 degrees would otherwise have its graded pocket resolved
+  // against bearings that do not exist there — a scoring rule that fires on the
+  // wrong exit, silently, which is exactly what the index-not-an-angle comment
+  // on ArenaSpec.finishPocket exists to prevent.
+  return pocketIndexAt(Math.atan2(b.pos.y, b.pos.x), arena) === want;
 }
 
 /** Why this top is out, or null if it is still in the game. */

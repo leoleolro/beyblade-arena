@@ -138,3 +138,56 @@ sweep behind it. E3 and E5 are noted, not planned.
 - [Beyblade X Database — BX-32 Wide Stadium](https://www.beybxdb.com/stadiums/stadiums/bx-32-wide-stadium)
 - [Mall of Toys — Speed Rails vs Standard Stadiums](https://malloftoys.com/blogs/news/speed-rails-vs-standard-stadiums)
 - [Hasbro — Xtreme Battle Set instructions](https://instructions.hasbro.com/en-us/instruction/beyblade-x-xtreme-battle-set-with-beystadium-2-right-spinning-top-toys-and-2-launchers)
+
+---
+
+## E2 revisited — **SHIPPED as "Three Sides Safe"**
+
+E2 above proposed clustering the pockets on one side and called it "the single
+biggest change to how the floor plays that does not require new physics". A
+later research pass found Takara Tomy's own regulation, which settles that it is
+not merely a good idea but **what the real stadium does**:
+
+> The Over Zone refers to the two pockets located at the front left and right of
+> the Xtreme Stadium. The Xtreme Zone refers to the hole located at the center
+> front of the Xtreme Stadium.
+
+All three exits on one wall; three of four walls solid. BX-32 Wide moves them
+and **inverts** which is worth 3 (centre becomes the 2-point Over Zone, the rear
+corners become the 3-point Xtreme Zones). The Infinity Stadium runs six in a 4+2
+arrangement down two long sides, so there is no safe back wall at all.
+
+### What it took
+
+`ArenaSpec.pockets` — an optional list of bearings, defaulting to the even four.
+Threading it turned out to matter in three places, and one of them was a latent
+scoring bug:
+
+- `pocketAngles(arena)` and `inPocket(angle, arena)` — the physics.
+- `pocketIndexAt(angle, arena)`, called by `isFinishPocket`. **This one would
+  have scored the wrong exit**: `finishPocket` is an index into
+  `pocketAngles()`, so a clustered floor would have resolved its graded pocket
+  against bearings that do not exist there. Silently, since every exit still
+  works and only the points differ.
+- `buildStadium(theme, pockets)` — the rim wall's gaps are geometry, cut at
+  build time, so the mesh has to be rebuilt rather than re-flagged. Keyed on the
+  bearings so the common case costs nothing.
+
+### Still owed
+
+Not balance-swept, and E2's original warning stands: this changes knockout rates
+and wants the full preset sweep. Shipped as a floor to play, not a tuned one.
+
+### The other two, not built
+
+**BX-37's motorised centre** — a floor section that drops on a cadence to expose
+a second, inner rail, then rises and flings the top outward. Reachable in
+principle (a timed `PitSpec` that becomes a `RailSpec`), and genuinely novel.
+The community view is that it adds randomness rather than depth, which is a
+reason to be careful rather than a reason not to.
+
+**Infinity's double-sided rail** — riding a rail in a continuous loop, sweeping
+through the centre and re-engaging on the far side. This is the mechanic that
+would actually close our engagement-rate gap (0.16/s against the real ~1.7/s),
+because it keeps a top on a rail almost permanently. Needs a non-circular rail,
+which the radial physics does not currently express.

@@ -110,6 +110,23 @@ export interface ArenaSpec {
    * where the outcome is the same. See docs/ARENA-IDEAS.md.
    */
   finishPocket?: number | null;
+  /**
+   * Exit pocket bearings in radians, or omitted for the default four at 90°.
+   *
+   * THE REAL STADIUMS DO NOT SPACE THEM EVENLY. Takara Tomy's own regulation
+   * for the Xtreme Stadium: "The Over Zone refers to the two pockets located at
+   * the front left and right... The Xtreme Zone refers to the hole located at
+   * the center front." All three exits are on ONE wall — three of the four
+   * walls are solid. BX-32 Wide moves them and inverts which is worth 3; the
+   * Infinity Stadium runs six in a 4+2 arrangement down two long sides.
+   *
+   * Ours were four identical exits at 45°, 135°, 225°, 315°, which means no
+   * part of the floor is safer than any other and there is never a reason to
+   * prefer one direction to shove someone. Clustering is the single biggest
+   * change to how a floor plays that needs no new physics — see
+   * docs/ARENA-IDEAS.md E2, written before the regulation confirmed it.
+   */
+  pockets?: number[];
 }
 
 export const STANDARD: ArenaSpec = {
@@ -308,7 +325,42 @@ export const TIGHT_DISH: ArenaSpec = {
   },
 };
 
-export const ARENAS: ArenaSpec[] = [STANDARD, XRAIL, SPIKE_PIT, GAUNTLET, SUDDEN_DEATH, TIGHT_DISH];
+/**
+ * Three Sides Safe — every exit on one wall, straight from BX-10.
+ *
+ * Two "Over Zone" pockets flanking a central "Xtreme Zone" worth more, all
+ * within a 90° arc, and solid wall everywhere else. The rest of the dish
+ * becomes genuinely safe ground, so position stops being a consequence and
+ * starts being a decision: there is a direction you want your opponent facing
+ * and three quarters of the floor where a shove achieves nothing.
+ *
+ * The graded pocket is index 1 — the middle of the three, as on the real
+ * stadium, so the best exit is also the hardest to line up.
+ *
+ * NOT balance-swept. Clustering exits is a large change to knockout rates and
+ * this ships as a floor to play rather than a tuned one; ARENA-IDEAS.md E2
+ * flagged it as needing the full preset sweep and that is still true.
+ */
+export const THREE_SIDES: ArenaSpec = {
+  id: 'threesides',
+  name: 'Three Sides Safe',
+  blurb: 'every exit on one wall — the rest of the floor is safe',
+  suggestedTheme: 'anime',
+  rail: null,
+  // 60°, 90°, 120° — a 60° spread, tight enough that the safe arc dominates.
+  pockets: [Math.PI / 3, Math.PI / 2, (2 * Math.PI) / 3],
+  finishPocket: 1,
+};
+
+export const ARENAS: ArenaSpec[] = [
+  STANDARD,
+  XRAIL,
+  SPIKE_PIT,
+  GAUNTLET,
+  SUDDEN_DEATH,
+  TIGHT_DISH,
+  THREE_SIDES,
+];
 
 export const arenaById = (id: string): ArenaSpec =>
   ARENAS.find((a) => a.id === id) ?? STANDARD;

@@ -117,7 +117,14 @@ export function markFinishPocket(
  * `bowlHeight` profile the physics uses, so what the player sees is exactly the
  * surface the tops are being pushed around on — including the tornado ridge.
  */
-export function buildStadium(theme: Theme): StadiumHandles {
+/**
+ * @param pockets Exit bearings for this arena, or undefined for the default
+ *   four. The rim wall's gaps are cut at build time, so a stadium whose exits
+ *   are clustered has to be REBUILT rather than re-flagged — a floor whose
+ *   holes do not line up with where the sim lets tops leave is the worst kind
+ *   of mismatch, because everything still works and nothing looks right.
+ */
+export function buildStadium(theme: Theme, pockets?: number[]): StadiumHandles {
   const group = new THREE.Group();
   const guides: THREE.MeshBasicMaterial[] = [];
   const posts: THREE.MeshStandardMaterial[] = [];
@@ -175,7 +182,7 @@ export function buildStadium(theme: Theme): StadiumHandles {
   // ---- rim wall, with a gap at every exit pocket ---------------------------
   const rimHeight = 0.13;
   const rimY = bowlHeight(C.STADIUM_RADIUS) + rimHeight / 2;
-  const pockets = pocketAngles().sort((a, b) => a - b);
+  const exits = (pockets ?? pocketAngles()).slice().sort((a, b) => a - b);
   const wallMat = (
     theme.toon
       ? toonMaterial(theme.wallColour)
@@ -188,9 +195,9 @@ export function buildStadium(theme: Theme): StadiumHandles {
   ) as THREE.MeshStandardMaterial;
   wallMat.side = THREE.DoubleSide;
 
-  for (let i = 0; i < pockets.length; i++) {
-    const start = pockets[i] + C.POCKET_HALF_WIDTH;
-    const end = pockets[(i + 1) % pockets.length] - C.POCKET_HALF_WIDTH;
+  for (let i = 0; i < exits.length; i++) {
+    const start = exits[i] + C.POCKET_HALF_WIDTH;
+    const end = exits[(i + 1) % exits.length] - C.POCKET_HALF_WIDTH;
     let sweep = end - start;
     while (sweep <= 0) sweep += Math.PI * 2;
 
@@ -217,7 +224,7 @@ export function buildStadium(theme: Theme): StadiumHandles {
   }
 
   // Glowing markers either side of each pocket, so exits are obvious.
-  for (const angle of pockets) {
+  for (const angle of exits) {
     for (const side of [-1, 1]) {
       const a = angle + side * C.POCKET_HALF_WIDTH;
       const postMat = (

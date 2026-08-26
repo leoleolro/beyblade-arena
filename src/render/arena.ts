@@ -290,6 +290,8 @@ export class ArenaRenderer {
   private rimB!: THREE.PointLight;
   private readonly shockwaves = new Shockwave();
   private readonly clashPools = new ClashPool();
+  /** Which pocket layout the current stadium mesh was cut for. */
+  private pocketKey = '';
   private composer: EffectComposer | null = null;
   /**
    * Inverted-hull outline pass. Created lazily on first toon use and then kept:
@@ -517,6 +519,19 @@ export class ArenaRenderer {
     // Remembered so a later theme switch can re-apply it: `applyStadiumTheme`
     // repaints every post, so the marking has to be re-stated after it rather
     // than set once here.
+    // Rebuild if this arena cuts its exits somewhere else. The rim wall's gaps
+    // are geometry, not a flag, so a clustered floor needs new geometry — see
+    // buildStadium. Keyed on the bearings themselves so the common case (same
+    // layout, different rail or pit) still costs nothing.
+    const key = (arena.pockets ?? []).join(',');
+    if (key !== this.pocketKey) {
+      this.pocketKey = key;
+      this.scene.remove(this.stadium.group);
+      disposeTree(this.stadium.group);
+      this.stadium = buildStadium(this.theme, arena.pockets);
+      this.scene.add(this.stadium.group);
+    }
+
     this.finishPocket = arena.finishPocket ?? null;
     markFinishPocket(this.stadium, this.finishPocket, this.theme);
 
