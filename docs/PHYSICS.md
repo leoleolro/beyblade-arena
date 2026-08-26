@@ -85,7 +85,7 @@ ride starts from the same ceiling, and `railRides` is counted but never read by
 the physics. Our rail is a **rare special event**; the real one is a **rhythm
 that builds**.
 
-### P1. Make the rail a rhythm — **the highest-value change here**
+### P1. Make the rail a rhythm — **SHIPPED, see the rebuild section below**
 
 Cut `cooldown` hard (1.6 → ~0.35) and shorten `duration` (0.55 → ~0.3), so a top
 holding the outer orbit dashes repeatedly instead of once. Then make it
@@ -391,3 +391,57 @@ Carried forward rather than dropped: the stadiums and spectacle dives never ran,
 the fact-check stage never ran, and 50 of the numbers gathered are single-source
 wiki figures. Anything from this pass that is about to drive a *balance* change
 should be re-checked first.
+
+
+---
+
+# The rail rebuild, and what the sweep actually said
+
+P1 is built. The headline: **the median gap between one top's consecutive rides
+falls from 3.93 s to 1.00 s**, rides now chain into escalating streaks of three,
+and round length and knockout rate land within a whisker of where they were.
+
+## The first attempt was wrong, and the sweep caught it
+
+The plan in P1 said to cut `cooldown` **and** `duration`. That is what I did
+first, and it was a mistake with an obvious cause in hindsight: shortening the
+ride also shortens the *drive*. Tops left the band slower, returned less often,
+and mean round length went from 5.73 s to **10.4 s** — an 80% slower game for no
+gain in engagement at all.
+
+Sweeping the two independently:
+
+    dur 0.55  cd 1.60    gap 3.93 s   round  5.73 s   ko 49.1%   (before)
+    dur 0.30  cd 0.35    gap 0.70 s   round 10.40 s   ko   --
+    dur 0.45  cd 0.35    gap 0.88 s   round  6.88 s   ko 46.7%
+    dur 0.50  cd 0.35    gap 1.00 s   round  6.31 s   ko 51.7%   <- shipped
+
+**The lever was the cooldown alone.** The ride wants to stay long.
+
+## The escalation
+
+`RailSpec` gains `escalation`, `escalationMax` and `streakWindow`; `BeyState`
+gains `railStreak` and `railIdle`. Each consecutive ride raises the speed
+ceiling — 3.4, 3.75, 4.1, capped at 4.45 — and a top that leaves the band for
+longer than the window drops back to a small bump.
+
+Measured streaks reach **3**, so the ramp is reachable in play rather than
+theoretical. `escalation: 0` reproduces the old flat behaviour exactly, so an
+arena can opt out; the Gauntlet takes a shallower ramp because it already drives
+tops to the wall with its pit and should not also hand them the steepest reward
+for going there.
+
+## What did NOT get closer, and why it is not a tuning problem
+
+Engagements per second per top sit at **0.16**, against the real toy's ~1.7.
+Essentially unchanged.
+
+That gap is not in the rail's constants. It is that **our tops rarely reach the
+wall at all** — they fight in the middle and touch the rim occasionally, where a
+real flat-bit top rides the wall almost continuously. Closing it needs the orbit
+shape to change, which is P5: launch tilt producing the flower pattern, whose
+whole character is repeated excursions from centre to rim and back.
+
+So the rail now has the right *rhythm* when it fires, and the wrong *frequency*
+of firing, and the second half belongs to a different change. Recorded rather
+than tuned around.

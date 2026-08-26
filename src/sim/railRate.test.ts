@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { Battle } from './battle';
 import type { Fighter } from './battle';
 import { arenaById } from './arena';
+import { railCeiling } from './physics';
+import type { BeyState } from './types';
 import { AiController } from '../ai';
 import { PRESETS } from './parts';
 import { makeRng } from './math';
@@ -110,5 +112,48 @@ describe('the X-Rail fires often enough to be a mechanic', () => {
     // Not a stochastic claim: zero, always.
     const { rides } = play('standard', 40);
     expect(rides).toBe(0);
+  });
+});
+
+/**
+ * The escalation — "small bumps then big bumps".
+ *
+ * The half of the real gimmick that was entirely missing: the dash has no cap
+ * on engagements and each leaves the top faster. Before this every ride topped
+ * out at the same ceiling no matter how well the orbit was held.
+ */
+describe('consecutive rides escalate', () => {
+  const rail = arenaById('xrail').rail;
+  const at = (streak: number): number =>
+    railCeiling({ railStreak: streak } as BeyState, rail!);
+
+  it('leaves the first ride at the base ceiling', () => {
+    // A top that touches the rail once gets no bonus at all — the reward is for
+    // HOLDING the outer orbit, not for reaching it.
+    expect(at(1)).toBeCloseTo(rail!.maxSpeed, 6);
+  });
+
+  it('raises the ceiling on each consecutive ride', () => {
+    expect(at(2)).toBeGreaterThan(at(1));
+    expect(at(3)).toBeGreaterThan(at(2));
+  });
+
+  it('caps, so a long streak cannot run away with the round', () => {
+    const capped = at(50);
+    expect(capped).toBe(rail!.escalationMax);
+    // And the cap is a real ceiling, not merely a large number.
+    expect(capped).toBeLessThan(rail!.maxSpeed * 2);
+  });
+
+  it('beats the old flat ceiling only after several rides', () => {
+    // The base came DOWN nowhere, but the shape matters: a single ride must not
+    // be better than it was, or the escalation is a free upgrade rather than a
+    // reward. Ride one equals the old value; the gain is strictly in the chain.
+    expect(at(1)).toBeLessThan(at(4));
+  });
+
+  it('is opt-out — an arena with no escalation gets a flat ceiling', () => {
+    const flat = { ...rail!, escalation: 0 };
+    expect(railCeiling({ railStreak: 9 } as BeyState, flat)).toBe(rail!.maxSpeed);
   });
 });

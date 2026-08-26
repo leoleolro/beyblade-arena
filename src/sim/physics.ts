@@ -205,6 +205,7 @@ function updatePit(b: BeyState, pit: PitSpec, dt: number): void {
 
 function updateRail(b: BeyState, rail: RailSpec, dt: number): void {
   b.railCooldown = Math.max(0, b.railCooldown - dt);
+  b.railIdle += dt;
 
   const r = len(b.pos);
   if (r < 1e-6) return;
@@ -225,9 +226,16 @@ function updateRail(b: BeyState, rail: RailSpec, dt: number): void {
     b.vel.x -= outX * radial;
     b.vel.y -= outY * radial;
 
-    // Drive it along the rail, up to the ceiling.
+    // Drive it along the rail, up to the ceiling — which RISES with the streak.
+    //
+    // This is the "small bumps then big bumps" half of the mechanic. The first
+    // ride of a burst tops out at the spec's `maxSpeed`; each consecutive one
+    // adds `escalation` until `escalationMax`. Without this every ride was
+    // identical and the rail was a rare special event rather than a rhythm that
+    // builds — see docs/PHYSICS.md.
+    const ceiling = railCeiling(b, rail);
     const speed = Math.hypot(b.vel.x, b.vel.y);
-    if (speed < rail.maxSpeed) {
+    if (speed < ceiling) {
       b.vel.x += tanX * rail.accel * dt;
       b.vel.y += tanY * rail.accel * dt;
     }
@@ -256,7 +264,28 @@ function updateRail(b: BeyState, rail: RailSpec, dt: number): void {
   if (inBand && b.railCooldown === 0 && tangential >= rail.engageSpeed) {
     b.railTime = rail.duration;
     b.railRides += 1;
+    // A streak only continues if the top came back promptly. Being knocked off
+    // the wall — or choosing to leave it — costs the accumulated speed, which
+    // is what keeps the escalation a reward for holding the orbit rather than a
+    // ratchet that only ever goes up.
+    if (b.railIdle > (rail.streakWindow ?? 1.2)) b.railStreak = 0;
+    b.railStreak += 1;
+    b.railIdle = 0;
   }
+}
+
+/**
+ * The speed ceiling for this ride, given how many consecutive rides precede it.
+ *
+ * Exported so the renderer can size the dash effect to the bump rather than
+ * flashing identically every time — a visual that does not escalate alongside
+ * a mechanic that does would flatten the thing being built here.
+ */
+export function railCeiling(b: BeyState, rail: RailSpec): number {
+  const step = rail.escalation ?? 0;
+  if (step <= 0) return rail.maxSpeed;
+  const extra = step * Math.max(0, b.railStreak - 1);
+  return Math.min(rail.maxSpeed + extra, rail.escalationMax ?? rail.maxSpeed + step * 3);
 }
 
 /** Advance one top by dt, ignoring collisions. */

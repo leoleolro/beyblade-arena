@@ -89,6 +89,8 @@ function makeBey(f: Fighter, launch: LaunchParams): BeyState {
     railTime: 0,
     railCooldown: 0,
     railRides: 0,
+    railStreak: 0,
+    railIdle: 99,
     pitTime: 0,
     pitDrained: 0,
     perfectLaunch: perfect,

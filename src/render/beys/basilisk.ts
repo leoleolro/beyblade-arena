@@ -20,14 +20,22 @@ export const entry: BeyEntry = {
   anime: {
     layerId: 'basilisk',
     canonName: 'Basilisk Coil',
-    primary: 0xf59e0b,
-    secondary: 0x7c4a03,
-    accent: 0xffe9b8,
+    primary: 0xc9c2ad,
+    secondary: 0xb45309,
+    accent: 0xffd98a,
     emblem: coilEmblem,
     letter: 'B',
     spinDir: 1,
+    // CHROME RIM, COLOURED BODY — taken from product photographs of the real
+    // tops rather than from the type tables. Every produced Beyblade X blade
+    // puts BARE METAL on the outer blades and the identity colour underneath:
+    // DranSword is chrome blades over a blue disc, ImpactDrake is chrome over
+    // red accents over a violet disc. Colouring the blades themselves — which
+    // is what this roster did — is the single thing that made our tops read as
+    // moulded plastic toys instead of the real article.
+    metal: true,
     chip: 'sticker',
-    underRing: 0x7c4a03,
+    underRing: 0xb45309,
     surface: 'wave',
     // The roundest top in the roster. Root very high, belly almost nothing —
     // five lobes that are barely lobes.

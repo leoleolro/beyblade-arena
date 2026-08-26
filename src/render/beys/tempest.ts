@@ -22,14 +22,22 @@ export const entry: BeyEntry = {
   anime: {
     layerId: 'tempest',
     canonName: 'Tempest Lance',
-    primary: 0x2563eb,
-    secondary: 0x0f2a6b,
-    accent: 0xdbe7ff,
+    primary: 0xb9c2cc,
+    secondary: 0x1d4ed8,
+    accent: 0x7dd3fc,
     emblem: xswordEmblem,
     letter: 'T',
     spinDir: 1,
+    // CHROME RIM, COLOURED BODY — taken from product photographs of the real
+    // tops rather than from the type tables. Every produced Beyblade X blade
+    // puts BARE METAL on the outer blades and the identity colour underneath:
+    // DranSword is chrome blades over a blue disc, ImpactDrake is chrome over
+    // red accents over a violet disc. Colouring the blades themselves — which
+    // is what this roster did — is the single thing that made our tops read as
+    // moulded plastic toys instead of the real article.
+    metal: true,
     chip: 'dark',
-    underRing: 0x0f2a6b,
+    underRing: 0x1d4ed8,
     // Low root so the two keels stand a long way out of the body, a deep cut
     // behind each so the gap between them reads as deliberately empty.
     blade: { root: 0.58, belly: 0.46, cut: 0.34, edge: 'blade' },

@@ -23,14 +23,22 @@ export const entry: BeyEntry = {
   anime: {
     layerId: 'golem',
     canonName: 'Golem Bastion',
-    primary: 0x16a34a,
-    secondary: 0x14532d,
-    accent: 0xd6f5df,
+    primary: 0xaebbb2,
+    secondary: 0x15803d,
+    accent: 0x86efac,
     emblem: shieldEmblem,
     letter: 'G',
     spinDir: 1,
+    // CHROME RIM, COLOURED BODY — taken from product photographs of the real
+    // tops rather than from the type tables. Every produced Beyblade X blade
+    // puts BARE METAL on the outer blades and the identity colour underneath:
+    // DranSword is chrome blades over a blue disc, ImpactDrake is chrome over
+    // red accents over a violet disc. Colouring the blades themselves — which
+    // is what this roster did — is the single thing that made our tops read as
+    // moulded plastic toys instead of the real article.
+    metal: true,
     chip: 'dark',
-    underRing: 0x14532d,
+    underRing: 0x15803d,
     surface: 'wave',
     blade: { root: 0.9, belly: 0.2, cut: 0.14, edge: 'wave' },
   },

@@ -23,14 +23,22 @@ export const entry: BeyEntry = {
   anime: {
     layerId: 'solaris',
     canonName: 'Solaris Halo',
-    primary: 0xdc2626,
-    secondary: 0x611010,
+    primary: 0xcbbfae,
+    secondary: 0xdc2626,
     accent: 0xffd76b,
     emblem: flameEmblem,
     letter: 'S',
     spinDir: 1,
+    // CHROME RIM, COLOURED BODY — taken from product photographs of the real
+    // tops rather than from the type tables. Every produced Beyblade X blade
+    // puts BARE METAL on the outer blades and the identity colour underneath:
+    // DranSword is chrome blades over a blue disc, ImpactDrake is chrome over
+    // red accents over a violet disc. Colouring the blades themselves — which
+    // is what this roster did — is the single thing that made our tops read as
+    // moulded plastic toys instead of the real article.
+    metal: true,
     chip: 'sticker',
-    underRing: 0x611010,
+    underRing: 0xdc2626,
     blade: { root: 0.78, belly: 0.33, cut: 0.22, edge: 'flame' },
   },
   preset: { name: 'Solaris Halo', discId: 'gravity', driverId: 'orbit', spinDir: 1, skinId: 'ember' },

@@ -23,14 +23,22 @@ export const entry: BeyEntry = {
   anime: {
     layerId: 'chimera',
     canonName: 'Chimera Maw',
-    primary: 0x7c3aed,
-    secondary: 0x2e1065,
-    accent: 0xe9d5ff,
+    primary: 0xb3adc4,
+    secondary: 0x7c3aed,
+    accent: 0xd8b4fe,
     emblem: twinfaceEmblem,
     letter: 'C',
     spinDir: -1,
+    // CHROME RIM, COLOURED BODY — taken from product photographs of the real
+    // tops rather than from the type tables. Every produced Beyblade X blade
+    // puts BARE METAL on the outer blades and the identity colour underneath:
+    // DranSword is chrome blades over a blue disc, ImpactDrake is chrome over
+    // red accents over a violet disc. Colouring the blades themselves — which
+    // is what this roster did — is the single thing that made our tops read as
+    // moulded plastic toys instead of the real article.
+    metal: true,
     chip: 'dark',
-    underRing: 0x2e1065,
+    underRing: 0x7c3aed,
     blade: { root: 0.82, belly: 0.26, cut: 0.18, edge: 'hook' },
   },
   preset: { name: 'Chimera Maw', discId: 'spread', driverId: 'needle', spinDir: -1, skinId: 'venom' },

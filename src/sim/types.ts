@@ -150,6 +150,18 @@ export interface BeyState {
   railCooldown: number;
   /** Rail engagements this round — shown in the breakdown. */
   railRides: number;
+  /**
+   * Consecutive rides in the current burst, and seconds since the last one.
+   *
+   * Separate from `railRides`, which is a per-round total for the HUD and the
+   * balance suite. This pair is what makes a dash ESCALATE: the real gimmick
+   * has no cap on engagements and each one leaves the top faster, so a bey that
+   * holds the outer orbit gets "small bumps then big bumps". A top that leaves
+   * the band long enough for `railIdle` to pass the spec's window drops back to
+   * a small bump, which is what stops the escalation being permanent.
+   */
+  railStreak: number;
+  railIdle: number;
   /** Unbroken seconds spent inside the Spike Pit, if the arena has one. */
   pitTime: number;
   /** Total spin the pit has taken off this top — shown in the breakdown. */

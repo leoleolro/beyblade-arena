@@ -33,6 +33,25 @@ export interface RailSpec {
   /** Seconds before the same top can engage again. */
   cooldown: number;
   /**
+   * How much `maxSpeed` rises per consecutive ride, and the ceiling on that.
+   *
+   * The escalation is the point of the whole mechanic. Measured against the
+   * real toy, our rail fired about a tenth as often AND every ride was
+   * identical — the owner's description of the real one is "5 times under 3
+   * seconds, small bumps then big bumps", and the second half was entirely
+   * missing. `escalation` 0 reproduces the old flat behaviour exactly, so an
+   * arena can opt out.
+   */
+  escalation?: number;
+  escalationMax?: number;
+  /**
+   * Seconds off the band before a streak resets.
+   *
+   * Long enough to survive the cooldown plus a lap, short enough that being
+   * knocked off the wall genuinely costs the built-up speed.
+   */
+  streakWindow?: number;
+  /**
    * Fraction of the exit velocity redirected toward the centre. This is the
    * slingshot: the point of the rail is where it throws you, not the speed.
    */
@@ -113,9 +132,35 @@ export const XRAIL: ArenaSpec = {
     halfWidth: 0.08,
     engageSpeed: 1.9,
     accel: 3.0,
+    // A RHYTHM, NOT A RARE EVENT — and the lever was the COOLDOWN alone.
+    //
+    // Measured, the old duration 0.55 + cooldown 1.6 put a 2.15 s floor on one
+    // top's ride-to-ride cycle, and the median gap between a top's consecutive
+    // rides was 3.93 s against the real toy's ~0.6. The first attempt at this
+    // cut BOTH numbers, on the theory that short rides would come thick and
+    // fast. That was wrong and the sweep said so: shortening the ride also
+    // shortens the drive, so tops left the band slower, returned less often,
+    // and mean round length went from 5.73 s to 10.4 s — an 80% slower game for
+    // no gain in engagement.
+    //
+    // Cooldown alone, with the ride left long:
+    //     dur 0.30 cd 0.35   gap 0.70   round 10.4 s   ko  --
+    //     dur 0.45 cd 0.35   gap 0.88   round  6.9 s   ko 46.7%
+    //     dur 0.50 cd 0.35   gap 1.00   round  6.3 s   ko 51.7%   <- here
+    //     dur 0.55 cd 1.60   gap 3.93   round  5.7 s   ko 49.1%   (before)
+    //
+    // Round length and knockout rate land within a whisker of where they were,
+    // and the gap between a top's rides drops fourfold.
     maxSpeed: 3.4,
-    duration: 0.55,
-    cooldown: 1.6,
+    duration: 0.5,
+    cooldown: 0.35,
+    // Each consecutive ride raises the ceiling: 3.4, 3.75, 4.1, capped at 4.45.
+    // Measured streaks reach 3, so the top of the ramp is reachable in play
+    // rather than theoretical. This is the "small bumps then big bumps" half —
+    // before it, every ride was identical no matter how well the orbit was held.
+    escalation: 0.35,
+    escalationMax: 4.45,
+    streakWindow: 1.2,
     releaseInward: 0.85,
   },
   // The rail already throws tops across the dish on a bearing the rider does
@@ -187,8 +232,14 @@ export const GAUNTLET: ArenaSpec = {
     engageSpeed: 1.9,
     accel: 2.6,
     maxSpeed: 3.1,
-    duration: 0.5,
-    cooldown: 1.7,
+    duration: 0.3,
+    cooldown: 0.5,
+    // Shallower escalation than the X-Rail's: the Gauntlet already taxes the
+    // middle, so a top driven to the wall by the pit should not also be handed
+    // the steepest ramp in the game for going there.
+    escalation: 0.22,
+    escalationMax: 3.6,
+    streakWindow: 1.1,
     releaseInward: 0.8,
   },
   pit: {
