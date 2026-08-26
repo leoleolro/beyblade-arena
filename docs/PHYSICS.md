@@ -161,7 +161,7 @@ without an absorber layer.
 **Rubber is not represented.** Friction at the contact is a property of the
 layer material in the real game and a flat constant here.
 
-### P3. Equalisation as the base rule
+### P3. Equalisation as the base rule — **BUILT, MEASURED, REVERTED**
 
 Make opposite-spin contact move a small fraction of the *difference* in spin
 rather than a fixed rate from B to A, with `spinSteal` becoming a multiplier on
@@ -500,3 +500,48 @@ toy's ~1.7.
 Kept rather than removed, because it is what the source describes and it becomes
 real the moment engagement improves. Recorded here so it is a known-masked
 mechanic rather than a mystery later.
+
+
+---
+
+# P3 tested: equalisation is real physics and a worse game
+
+Built it, measured it, reverted it. The finding is the deliverable.
+
+**What it was.** Opposite-spin contact moved a fraction of the spin DIFFERENCE
+from the faster top to the slower — `SPIN_EQUALISE = 0.03`, scaled by each
+side's own `spinSteal` so an absorber still did it harder. That is what the
+sources describe: counter-rotating contact meshes the angular-momentum vectors
+and runs the exchange toward parity, rather than one top robbing another at a
+rate set by its own parts.
+
+**The claim I made for it** was that it "makes the comeback real" — a top that
+has lost the spin race gets a route back, so choosing opposite spin against a
+faster opponent becomes a strategy.
+
+**The measurement says the opposite.** 160 forced opposite-spin rounds, champion
+AI both sides, counting rounds where a meaningful spin gap (>5% of launch spin)
+had opened by 2.5 seconds, and how often the top that was behind went on to win:
+
+                        rounds with a gap    comeback rate
+    without equalise           36                63.9%
+    with equalise              18                50.0%
+
+**It halves the number of rounds that ever develop a gap**, and the gaps that do
+open reverse *less* often. Mean mid-round gap falls from 0.030 to 0.022.
+
+The mechanism is obvious in hindsight: a rule that continuously pulls two tops
+toward parity prevents the very gaps a comeback would reverse. It does not
+create drama, it removes the conditions for it. Opposite-spin matchups become
+flat attrition races decided at the end.
+
+**So realism and game feel diverge here, and this project ships the game.** The
+one-way `spinSteal` model stays: it concentrates the comeback into the parts
+that are *about* comebacks, which is a design that has an opinion, where
+equalisation is a physical law that flattens everyone.
+
+Worth noting the first measurement was wrong and said so more strongly —
+comebacks appeared to fall 14.4% to 5.6%. That was an artifact: equalisation
+shrinks gaps, so fewer rounds passed the ">5% gap" filter at all and the
+denominator was counting rounds that could not qualify. Fixing the denominator
+changed the size of the effect but not its direction.
