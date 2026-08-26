@@ -177,7 +177,53 @@ export const DISCS: DiscPart[] = [
   // strong combination rather than a trade-off — matching the source, which
   // calls it outclassing.
   { id: 'outer',   name: 'Outer',   kind: 'disc', mass: 0.66, stability: 1.15, spinRetention: 1.32, colour: 0xb0b6bd },
+
+  // THE BEYBLADE X RATCHET CATALOGUE, transcribed with published stat blocks.
+  //
+  // The naming system is the data: `4-60` is four protrusions at 6.0 mm. Both
+  // numbers are carried on the part, because the blade/ratchet alignment rule
+  // needs the count — see DiscPart.protrusions.
+  //
+  // Published stats (Attack / Defense / Stamina) and grams:
+  //
+  //     1-60   6.0 g   17 /  9 /  4     fewest protrusions, most attack
+  //     3-60   6.4 g   15 /  9 /  6
+  //     4-60   6.3 g   11 / 13 /  6     the defence peak
+  //     5-60   6.6 g   12 /  9 /  9     the stamina peak
+  //     9-80   6.9 g   13 / 10 /  7     tallest, most protrusions
+  //
+  // The pattern is legible and worth stating: FEWER protrusions concentrate
+  // contact and score attack; MORE spread it and score stamina; four is the
+  // defence sweet spot. Taller ratchets weigh more and trade defence for
+  // stamina, because height moves mass away from the floor.
+  //
+  // Mapping onto this sim:
+  //     mass           0.40 + (grams - 6.0) / 1.1 * 0.34
+  //     stability      0.70 + defense / 13 * 0.75
+  //     spinRetention  0.88 + stamina /  9 * 0.32
+  { id: 'r160', name: '1-60', kind: 'disc', mass: 0.40, stability: 0.92, spinRetention: 1.02, colour: 0xd6dbe2, protrusions: 1, heightMm: 6.0 },
+  { id: 'r360', name: '3-60', kind: 'disc', mass: 0.52, stability: 0.92, spinRetention: 1.09, colour: 0xc7ced7, protrusions: 3, heightMm: 6.0 },
+  { id: 'r460', name: '4-60', kind: 'disc', mass: 0.49, stability: 1.45, spinRetention: 1.09, colour: 0xb8c1cc, protrusions: 4, heightMm: 6.0 },
+  { id: 'r560', name: '5-60', kind: 'disc', mass: 0.59, stability: 0.92, spinRetention: 1.20, colour: 0xaab5c2, protrusions: 5, heightMm: 6.0 },
+  { id: 'r980', name: '9-80', kind: 'disc', mass: 0.68, stability: 1.28, spinRetention: 1.13, colour: 0x9ba7b6, protrusions: 9, heightMm: 8.0 },
 ];
+
+/**
+ * True when a blade's contact-point count matches a ratchet's protrusion count.
+ *
+ * The real design rule, stated on SphinxCowl: its nine "Barrage Blade"
+ * protrusions are "intended to align with the 9 protrusions of the 9-80
+ * Ratchet". A matched pair stacks into one coherent silhouette; a mismatched
+ * one reads as two unrelated rims.
+ *
+ * Purely cosmetic advice — it returns a fact, and nothing in the sim consumes
+ * it. Kept deliberately inert: making alignment grant a stat would invent a
+ * mechanic the source does not describe, and the roster's stats are supposed to
+ * come from published numbers rather than from rules invented here.
+ */
+export function alignsWith(layer: LayerPart, disc: DiscPart): boolean {
+  return disc.protrusions !== undefined && disc.protrusions === layer.blades;
+}
 
 export const DRIVERS: DriverPart[] = [
   { id: 'xtreme',   name: 'Xtreme',   kind: 'driver', archetype: 'attack',  mass: 0.20, friction: 0.55, spinRetention: 0.85, wander: 1.55, burstResist: 0.92, railGrip: 0.80 },

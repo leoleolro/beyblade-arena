@@ -52,6 +52,20 @@ export interface DiscPart {
   /** Heavier outer weight sustains spin. Multiplies spin retention. */
   spinRetention: number;
   colour: number;
+  /**
+   * Protrusion count and height in millimetres, for the ones transcribed from
+   * real Ratchets. The naming system encodes both: `4-60` is four protrusions
+   * at 6.0 mm.
+   *
+   * WHY THE COUNT IS DATA AND NOT DECORATION. Real blades are designed so the
+   * blade's protrusion count MATCHES the ratchet's, producing one coherent
+   * stacked silhouette rather than two unrelated rims — SphinxCowl's nine
+   * "Barrage Blade" protrusions are stated to be "intended to align with the 9
+   * protrusions of the 9-80 Ratchet". Carrying the number here is what makes
+   * that rule expressible; `alignsWith` reads it.
+   */
+  protrusions?: number;
+  heightMm?: number;
 }
 
 export interface DriverPart {
