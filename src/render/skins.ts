@@ -87,7 +87,7 @@ export function pickContrastingSkin(playerSkin: Skin): Skin {
 export function skinMaterial(
   skin: Skin,
   colour: number,
-  opts: { emissiveBoost?: number; toon?: boolean; metal?: boolean } = {},
+  opts: { emissiveBoost?: number; toon?: boolean; metal?: boolean; facets?: boolean } = {},
 ): THREE.Material {
   const boost = opts.emissiveBoost ?? 1;
 
@@ -101,7 +101,15 @@ export function skinMaterial(
     // rather than moulded plastic. The finish still decides the emissive lift,
     // so a neon skin on a metal layer stays a neon metal layer.
     return opts.metal
-      ? metalToonMaterial(colour, { emissive, gloss: 34, specular: 0.3, rim: 0.32 })
+      ? metalToonMaterial(colour, {
+          emissive,
+          gloss: 34,
+          specular: 0.3,
+          rim: 0.32,
+          // Faceted for the blade walls, smooth everywhere else — see
+          // MetalToonOptions.facets. A real blade is cut metal, not a lathe.
+          facets: opts.facets === true,
+        })
       : toonMaterial(colour, emissive);
   }
 

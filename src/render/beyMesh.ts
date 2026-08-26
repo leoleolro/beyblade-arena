@@ -454,6 +454,13 @@ function buildToonBey(build: BeyBuild, skin: Skin): THREE.Group {
     skinMaterial(skin, design.primary, {
       toon: true,
       metal: design.metal === true || wavy,
+      // FACETS ON THE BLADE WALLS. The wall is the surface a real blade shows
+      // most of, and on the real thing it is die-cast metal cut into dozens of
+      // small angled planes rather than a lathed curve. Flat-shading turns the
+      // extrusion's existing contour segments into exactly those planes at no
+      // geometry cost. Only where the design declares itself metal — a moulded
+      // plastic tier is genuinely smooth and faceting it would be a lie.
+      facets: design.metal === true,
     }),
     { thickness: BEY_OUTLINE },
   );

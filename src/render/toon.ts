@@ -122,6 +122,25 @@ export interface MetalToonOptions {
   specTint?: number;
   /** Rim colour. Defaults to the base barely lifted, so it keeps the metal's hue. */
   rimTint?: number;
+  /**
+   * Flat-shade the surface, so a curved wall reads as many small angled facets.
+   *
+   * TAKEN FROM PRODUCT PHOTOGRAPHS. A real Beyblade blade is die-cast metal cut
+   * into facets — DranSword's chrome arms and KnightShield's rim are dozens of
+   * small flat planes, each catching the light at its own angle. Ours were
+   * smooth lathed extrusions with one continuous highlight sweeping across
+   * them, which is the single clearest "toy render" tell next to the real
+   * thing, and it is geometry-shading rather than colour: no palette change
+   * fixes a surface that has no facets to catch light on.
+   *
+   * `flatShading` gets this without new geometry. three derives the face normal
+   * per fragment, so the existing extrusion's contour segments BECOME the
+   * facets — a wall built from 20 contour points reads as 20 angled plates.
+   *
+   * Only on metal. A moulded plastic tier is genuinely smooth and faceting it
+   * would be wrong.
+   */
+  facets?: boolean;
   /** Diffuse band count. 3 is the house look; 5 is for moulded surfaces. */
   bands?: number;
 }
@@ -233,6 +252,14 @@ export function metalToonMaterial(
     gradientMap: toonRamp(opts.bands ?? 3),
     emissive: base.clone().multiplyScalar(opts.emissive ?? 0),
   });
+
+  // Set after construction, and through a cast, because r185's typings do not
+  // declare `flatShading` on MeshToonMaterial — but the RENDERER reads it off
+  // any material regardless. WebGLPrograms.js:317 gates the FLAT_SHADED define
+  // on `material.flatShading === true` with no type check, so a toon material
+  // honours it exactly like a standard one. Verified in that source rather than
+  // assumed from the typings, which are narrower than the behaviour.
+  (mat as unknown as { flatShading: boolean }).flatShading = opts.facets === true;
 
   // Built here, not inside onBeforeCompile, for two reasons: the callback does
   // not run until the material's first frame, and three clones the uniform set
