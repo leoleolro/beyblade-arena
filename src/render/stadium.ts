@@ -193,6 +193,45 @@ export function buildStadium(
     group.add(ring);
   }
 
+  // RADIAL TICKS around the outer floor.
+  //
+  // The other half of "the arena looks bare bone". The dish had three
+  // concentric rings and nothing else across a large pale surface, so the floor
+  // read as a blank bowl however much detail the rim gained. Real stadium
+  // floors are moulded in radial segments and every seam shows.
+  //
+  // Placed on the OUTER floor only, between the tornado ridge and the rim.
+  // That band is the part a player watches — it is where the rail sits, where
+  // orbits ride, and where the exits are — and it is also the only part wide
+  // enough to take marks without crowding the tops. The calm centre stays
+  // clean, which is what makes the ridge read as a boundary.
+  const tickMat = new THREE.MeshBasicMaterial({
+    color: guideColour,
+    transparent: true,
+    // Slightly under the guide rings, with a FLOOR.
+    //
+    // First attempt was a flat `guideOpacity * 0.5` on the reasoning that many
+    // short marks should be lighter than three long ones. Measured on the
+    // Anime theme that landed at 0.11 and the ticks were invisible — which is
+    // worse than not adding them, since the complaint being answered is that
+    // the floor looks bare. The floor keeps them legible on the themes whose
+    // guides are already faint, without letting them outshine the rings on the
+    // themes whose guides are strong.
+    opacity: Math.max(0.2, theme.guideOpacity * 0.75),
+  });
+  const tickInner = C.RIDGE_RADIUS + 0.03;
+  const tickOuter = C.STADIUM_RADIUS - 0.02;
+  const tickGeo = new THREE.PlaneGeometry(tickOuter - tickInner, 0.006);
+  for (let i = 0; i < 24; i++) {
+    const a = (i / 24) * Math.PI * 2;
+    const mid = (tickInner + tickOuter) / 2;
+    const tick = new THREE.Mesh(tickGeo, tickMat);
+    tick.position.set(Math.cos(a) * mid, bowlHeight(mid) + 0.004, Math.sin(a) * mid);
+    tick.rotation.x = -Math.PI / 2;
+    tick.rotation.z = -a;
+    group.add(tick);
+  }
+
   // ---- rim wall, with a gap at every exit pocket ---------------------------
   const rimHeight = 0.13;
   const rimY = bowlHeight(C.STADIUM_RADIUS) + rimHeight / 2;
