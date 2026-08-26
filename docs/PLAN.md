@@ -346,13 +346,34 @@ the thing a previous burst effect broke.
 
 - **The controls are not fun.** Reported directly: "clicking the charge button
   and the battle becomes cat chase mouse, one is just following the other
-  beyblade." That is an accurate description of what Charge does — it steers
-  toward the opponent and holds — so the move triangle plays out as a pursuit
-  rather than an exchange. The fix is not a tuning pass on Charge; it is that
-  the player has three buttons and no *positional* input at all, so there is
-  nothing to do between commitments. This is the same hole the launch-tilt work
-  (docs/PHYSICS.md P5) opens from the other side: give the player a steering or
-  angle input and the chase becomes a duel. Treat them as one piece of work.
+  beyblade."
+
+  **One hypothesis tested and rejected, with the numbers.** The obvious suspect
+  was Charge's homing: `applySeek` turns the charger's velocity toward its
+  target at `seek * 0.8 * spinNorm`, and Charge's seek of 8.5 allows 6.8 rad/s
+  — about 390 degrees per second, enough to reverse heading in half a second.
+  Capping that at 1.9 rad/s drops the seek's turn authority from ~312 deg/s to
+  ~87 deg/s, which sounds decisive.
+
+  Measured across 100 AI-played rounds, mean heading change while charging:
+
+      uncapped   324 deg/s     round 10.05 s
+      capped     303 deg/s     round  9.84 s
+
+  **A 6% difference.** The seek was rarely the binding constraint: a charging
+  top's heading is dominated by orbital motion and the bowl's inward slope, not
+  by how hard it is allowed to steer. So the cap was reverted — it changes
+  balance without changing the thing it was meant to change, and shipping it
+  would have been a fix justified by a hypothesis its own measurement refutes.
+
+  **What that leaves.** Two candidates remain, in order of suspicion: the direct
+  closing push (`mv.seek * 0.45`, which shortens distance regardless of
+  heading), and the absence of any *positional* input for the player — three
+  buttons and no way to influence WHERE anything happens, so the only variable
+  is when to press. The second is the same hole the launch-tilt work
+  (docs/PHYSICS.md P5) opens from the other side, and the next experiment should
+  measure time-spent-in-close-range-without-contact rather than heading, since
+  that is what "chasing" actually describes.
 
 - **Epic beys are not detailed enough.** Measured against product photographs,
   four things are missing: faceted chrome (real blades are many small angled
