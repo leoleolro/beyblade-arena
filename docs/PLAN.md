@@ -241,11 +241,14 @@ the thing a previous burst effect broke.
 
 ### Named by the owner, not yet started
 
-- **Real beyblade physics.** Jumping out of and back into the stadium, spin
-  stealing under load, near-vertical launches, and how the X-rail actually
-  accelerates — "five times under three seconds, small bumps then big bumps".
-  Research first, in the shape of `docs/ARENA-IDEAS.md`: what the real thing
-  does, what this sim can support, what each idea would cost.
+- **Real beyblade physics — researched, see `docs/PHYSICS.md`.** Five proposals
+  with costs and an order. Headline finding: our X-Rail fires **0.17 times per
+  second per top** against the real toy's ~1.7, a tenfold gap that is
+  arithmetic rather than tuning — `duration + cooldown` is 2.15 s, so "five
+  dashes in three seconds" is unreachable without changing those constants. And
+  our rail does not escalate at all, where the real one's whole character is
+  that it does. Cheapest first move is the ring-out arc (renderer-only, no
+  balance risk); biggest is making the rail a rhythm.
 - **A second look for Beyblade Arena mode.** See `docs/UX-FLOW.md`, "Known gap".
 
 
