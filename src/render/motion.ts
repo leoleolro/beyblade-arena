@@ -160,3 +160,68 @@ export function poolBrightness(t: number): number {
   if (c < POOL_ATTACK) return c / POOL_ATTACK;
   return Math.pow(1 - (c - POOL_ATTACK) / (1 - POOL_ATTACK), 1.7);
 }
+
+/* ------------------------------------------------- imported model uprighting */
+
+/**
+ * Which way up an imported beyblade arrived, from its bounding box alone.
+ *
+ * THE BUG THIS EXISTS FOR, reported as: "victory valkyrie and mage jab is
+ * spinning on the wrong axis, and the beyblades are placed vertically rather
+ * than horizontally."
+ *
+ * Both were exported Z-up. Blender's default is Z-up and glTF's is Y-up, and an
+ * export that skips the conversion arrives standing on its edge. Measured:
+ *
+ *     valkyrie   x 47.98   y 47.46   z 32.49    <- z is shortest: Z-up
+ *     magejab    x 49.79   y 49.91   z 38.31    <- z is shortest: Z-up
+ *     dsycther   x 44.22   y 24.60   z 45.12    <- y is shortest: correct
+ *     dransword  x  0.47   y  0.36   z  0.48    <- y is shortest: correct
+ *
+ * THE RULE. A beyblade is a flat disc — much wider than it is tall, always,
+ * across every generation and every type. So the SHORTEST bounding-box axis is
+ * the spin axis, and that axis has to end up as Y. This needs no per-model
+ * configuration and works for the next import as well as these four, which is
+ * the whole reason to derive it rather than hand-flag each file.
+ *
+ * WHERE IT FAILS, so nobody trusts it further than it goes: a model that is not
+ * disc-shaped. A near-spherical or cubic export has no meaningful shortest axis
+ * and this will pick one arbitrarily. `dominance` reports how confident the
+ * reading is so a caller can refuse rather than guess — see `uprightAxis`.
+ */
+export type UpAxis = 'x' | 'y' | 'z';
+
+export interface Upright {
+  /** Which authored axis is the spin axis. */
+  axis: UpAxis;
+  /** Radians to rotate about X to bring that axis to Y. 0 when already Y-up. */
+  rotateX: number;
+  /**
+   * How much flatter the shortest axis is than the mean of the other two.
+   * 1 = perfectly flat disc, 0 = no flatter at all. Below ~0.15 the model is
+   * not disc-shaped and the reading should not be trusted.
+   */
+  dominance: number;
+}
+
+export function uprightAxis(sx: number, sy: number, sz: number): Upright {
+  const dims: Array<[UpAxis, number]> = [
+    ['x', Math.abs(sx)],
+    ['y', Math.abs(sy)],
+    ['z', Math.abs(sz)],
+  ];
+  dims.sort((a, b) => a[1] - b[1]);
+  const [axis, shortest] = dims[0];
+  const others = (dims[1][1] + dims[2][1]) / 2;
+  const dominance = others > 1e-9 ? Math.max(0, 1 - shortest / others) : 0;
+
+  // Rotating about X maps +Z onto +Y (and +Y onto -Z), which is exactly the
+  // Z-up to Y-up conversion. An X-up model is a case nobody has produced; it is
+  // handled rather than thrown for, because refusing to draw a bey is worse
+  // than drawing it on its side, and `dominance` is how a caller knows.
+  const rotateX = axis === 'z' ? -Math.PI / 2 : axis === 'x' ? 0 : 0;
+  return { axis, rotateX, dominance };
+}
+
+/** True when a bounding box is flat enough for `uprightAxis` to be trusted. */
+export const isDiscLike = (u: Upright): boolean => u.dominance >= 0.15;

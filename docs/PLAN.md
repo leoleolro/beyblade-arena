@@ -104,6 +104,37 @@ push on a burst.
 Research the real X-Accelerator rail stadium and produce concrete proposals for
 arena mechanics and layout. Design output, not code.
 
+## F2. Process — the verification failure of the model import
+
+Worth its own entry because the bug was not in the code, it was in the checking,
+and the checking is supposed to be this project's strength.
+
+Four models were imported. **One was looked at, in one viewer, at one angle**,
+and the import declared verified. Two of the four were exported Z-up and stood
+vertically in the dish; the owner found them in under a minute of play.
+
+`docs/` already contains a written rule against exactly this — the contact sheet
+exists so a rendering change is checked against every asset rather than the one
+in front of you — and the rule was not applied to models because models did not
+feel like "a rendering change".
+
+Three things changed as a result:
+
+1. **`uprightAxis` in motion.ts.** A beyblade is a flat disc, so the shortest
+   bounding-box axis IS the spin axis. Derived rather than hand-flagged per
+   model, so the next import is covered too, and it reports a confidence
+   (`dominance`) so a non-disc shape is refused rather than guessed at.
+2. **It runs inside `normaliseToRadius`, not beside it.** Five call sites need
+   it; a preparation step each of them must remember is a parallel list waiting
+   to drift, and four would have looked right while the fifth shipped a bey on
+   its side.
+3. **Regression tests built from the four real bounding boxes**, so the two
+   that were broken stay pinned by their actual measured dimensions.
+
+The general lesson, which is now in the `game-visual-qa` skill: **N assets
+imported means N assets checked.** One is a spot check, and a spot check on
+asset one of four has a 25% chance of finding a per-asset bug.
+
 ## F. Process
 
 `docs/design-targets/` — done. Screenshot approved states as they happen.
@@ -240,6 +271,25 @@ the thing a previous burst effect broke.
 - The shelf restocks per match but does not rotate on a clock.
 
 ### Named by the owner, not yet started
+
+- **The controls are not fun.** Reported directly: "clicking the charge button
+  and the battle becomes cat chase mouse, one is just following the other
+  beyblade." That is an accurate description of what Charge does — it steers
+  toward the opponent and holds — so the move triangle plays out as a pursuit
+  rather than an exchange. The fix is not a tuning pass on Charge; it is that
+  the player has three buttons and no *positional* input at all, so there is
+  nothing to do between commitments. This is the same hole the launch-tilt work
+  (docs/PHYSICS.md P5) opens from the other side: give the player a steering or
+  angle input and the chase becomes a duel. Treat them as one piece of work.
+
+- **Epic beys are not detailed enough.** Measured against product photographs,
+  four things are missing: faceted chrome (real blades are many small angled
+  facets, ours are one smooth extrusion), concentric rings on the face (real
+  ones have four or five, ours has an emblem on a flat disc), visible fasteners,
+  and translucent jewel plastic under the chrome. The first two are geometry,
+  apply to all fifteen Epic beys at once, and do not fight the cel look — start
+  there. The fourth needs transmission materials and is a real cost.
+
 
 - **Real beyblade physics — researched, see `docs/PHYSICS.md`.** Five proposals
   with costs and an order. Headline finding: our X-Rail fires **0.17 times per

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   drawnSpinRate,
+  isDiscLike,
+  uprightAxis,
   poolBrightness,
   poolScale,
   SPEED_HI,
@@ -199,5 +201,82 @@ describe('the clash pool reads as a flash, not a wave', () => {
       expect(s).toBeGreaterThanOrEqual(0.8);
       expect(s).toBeLessThanOrEqual(1);
     }
+  });
+});
+
+/**
+ * Imported models arriving on their side.
+ *
+ * The regression test for a bug that shipped and was reported by the owner:
+ * "victory valkyrie and mage jab is spinning on the wrong axis, and the
+ * beyblades are placed vertically rather than horizontally."
+ *
+ * Both were exported Z-up — Blender's default, against glTF's Y-up — and
+ * nothing in the pipeline noticed. The real failure was not the models; it was
+ * that four models were imported and only ONE was looked at, in one viewer, at
+ * one angle. These are the measured boxes from the four files as they shipped.
+ */
+describe('uprighting an imported model', () => {
+  const REAL = {
+    valkyrie: [47.979, 47.463, 32.488],
+    magejab: [49.79, 49.913, 38.313],
+    dsycther: [44.225, 24.597, 45.123],
+    dransword: [0.466, 0.362, 0.479],
+  } as const;
+
+  it('spots the two Z-up models and leaves the two Y-up ones alone', () => {
+    expect(uprightAxis(...REAL.valkyrie).axis).toBe('z');
+    expect(uprightAxis(...REAL.magejab).axis).toBe('z');
+    expect(uprightAxis(...REAL.dsycther).axis).toBe('y');
+    expect(uprightAxis(...REAL.dransword).axis).toBe('y');
+  });
+
+  it('rotates only the ones that need it', () => {
+    expect(uprightAxis(...REAL.valkyrie).rotateX).toBeCloseTo(-Math.PI / 2, 6);
+    expect(uprightAxis(...REAL.magejab).rotateX).toBeCloseTo(-Math.PI / 2, 6);
+    expect(uprightAxis(...REAL.dsycther).rotateX).toBe(0);
+    expect(uprightAxis(...REAL.dransword).rotateX).toBe(0);
+  });
+
+  it('trusts all four, because a beyblade is a disc', () => {
+    for (const [name, dims] of Object.entries(REAL)) {
+      expect(isDiscLike(uprightAxis(...(dims as unknown as [number, number, number]))), name).toBe(
+        true,
+      );
+    }
+  });
+
+  it('refuses to guess at a shape that is not a disc', () => {
+    // A cube has no meaningful shortest axis. Silently rotating something the
+    // rule did not understand is worse than leaving it as the modeller left it,
+    // so the caller is told rather than served a coin toss.
+    expect(isDiscLike(uprightAxis(10, 10, 10))).toBe(false);
+    expect(isDiscLike(uprightAxis(10, 9.5, 10))).toBe(false);
+  });
+
+  it('after uprighting, the spin axis is always the shortest', () => {
+    // The property the whole thing exists for, stated directly: whatever comes
+    // in, the axis it ends up spinning about is the flat one.
+    const cases: Array<[number, number, number]> = [
+      [40, 40, 20],
+      [40, 20, 40],
+      [20, 40, 40],
+      [1, 0.3, 1],
+    ];
+    for (const [x, y, z] of cases) {
+      const up = uprightAxis(x, y, z);
+      const dims = { x, y, z };
+      const shortest = Math.min(x, y, z);
+      expect(dims[up.axis]).toBeCloseTo(shortest, 6);
+    }
+  });
+
+  it('is stable under uniform scale', () => {
+    // Models arrive at wildly different scales — 0.47 units and 48 units among
+    // these four — so the reading must not depend on absolute size.
+    const a = uprightAxis(47.979, 47.463, 32.488);
+    const b = uprightAxis(0.47979, 0.47463, 0.32488);
+    expect(b.axis).toBe(a.axis);
+    expect(b.dominance).toBeCloseTo(a.dominance, 6);
   });
 });

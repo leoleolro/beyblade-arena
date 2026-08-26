@@ -1960,3 +1960,18 @@ body.theme-anime .coach.on {
   line-height: 1.5;
   opacity: 0.7;
 }
+
+/* Class headings in the garage picker — Legendary / Epic. Matches the
+   inspector's, so the same categorisation reads the same on both screens. */
+.class-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 12px 0 6px;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.class-head b { color: var(--accent); font-weight: 700; }
+.class-head span { color: var(--dim); font-size: 11px; letter-spacing: 0.04em; text-transform: none; }
+.slot .class-head:first-of-type { margin-top: 4px; }

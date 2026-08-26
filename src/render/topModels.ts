@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { isDiscLike, uprightAxis } from './motion';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
@@ -178,7 +179,42 @@ async function loadObj(url: string): Promise<THREE.Object3D> {
  * Horizontal extent only. A top's height is a style choice; its RADIUS is the
  * one dimension the sim can feel.
  */
+/**
+ * Stand an imported model the right way up before anything measures it.
+ *
+ * Must run BEFORE `normaliseToRadius`, which reads x and z to find the widest
+ * span — on a Z-up model that measures the top's diameter against its edge and
+ * scales it wrongly as well as leaving it standing vertical.
+ *
+ * See `uprightAxis` in motion.ts for the rule and the measurements behind it.
+ * A model too round for the rule to read is left alone and reported, because
+ * silently rotating a shape the heuristic did not understand is worse than
+ * leaving it as the modeller exported it.
+ */
+export function uprightModel(obj: THREE.Object3D): boolean {
+  obj.updateMatrixWorld(true);
+  const size = new THREE.Vector3();
+  new THREE.Box3().setFromObject(obj).getSize(size);
+  const up = uprightAxis(size.x, size.y, size.z);
+  if (!isDiscLike(up)) return false;
+  if (up.rotateX !== 0) obj.rotateX(up.rotateX);
+  return true;
+}
+
 export function normaliseToRadius(obj: THREE.Object3D, radius: number): void {
+  // Upright FIRST, and from in here rather than at the five call sites.
+  //
+  // It has to happen before the measurement below, because that reads x and z
+  // to find the widest span — on a Z-up model it measures the top's diameter
+  // against its edge and scales it wrongly as well as leaving it vertical.
+  //
+  // Inside rather than beside: `normaliseToRadius` is called from the arena,
+  // the garage, the inspector, the contact sheet and the thumbnail renderer,
+  // and a preparation step that every one of them must remember is a parallel
+  // list waiting to fall out of sync. Four of the five would have looked right
+  // and the fifth would have shipped a bey on its side.
+  uprightModel(obj);
+
   obj.updateMatrixWorld(true);
   const size = new THREE.Vector3();
   new THREE.Box3().setFromObject(obj).getSize(size);

@@ -11,6 +11,7 @@ import { SKINS, skinById } from './render/skins';
 import type { Channel } from './audio';
 import { THEMES, themeById } from './render/theme';
 import { MODES, modeById, stadiumsByLook } from './modes';
+import { groupByClass } from './render/beyClass';
 import { GarageView } from './render/garageView';
 import { LADDER } from './ladder';
 import type { BeyState, MoveKind } from './sim/types';
@@ -1095,9 +1096,23 @@ export class Ui {
     presetRow.className = 'slot';
     presetRow.innerHTML =
       '<h4>Beyblade — pick a whole top, or build your own below</h4>';
+    // GROUPED BY CLASS, like the inspector already was.
+    //
+    // The inspector got Legendary/Epic headings and the garage did not, so the
+    // one screen a player actually picks from stayed a flat run of twenty-one
+    // chips with the two imported models buried somewhere in the middle. A
+    // categorisation that exists only on the page nobody plays from is not a
+    // categorisation.
+    for (const group of groupByClass(BEY_PRESETS, (p) => p.layerId)) {
+    const head = document.createElement('div');
+    head.className = 'class-head';
+    head.style.setProperty('--accent', hex(group.info.colour));
+    head.innerHTML =
+      `<b>${escapeHtml(group.info.label)}</b> <span>${escapeHtml(group.info.blurb)}</span>`;
+    presetRow.appendChild(head);
     const presetChips = document.createElement('div');
     presetChips.className = 'chips';
-    for (const p of BEY_PRESETS) {
+    for (const p of group.items) {
       const owned =
         g.progress.has('layers', p.layerId) &&
         g.progress.has('discs', p.discId) &&
@@ -1159,6 +1174,7 @@ export class Ui {
       presetChips.appendChild(chip);
     }
     presetRow.appendChild(presetChips);
+    }
     collection.appendChild(presetRow);
     // Match settings sit directly under the bey, before the parts.
     //
