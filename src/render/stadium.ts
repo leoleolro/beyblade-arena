@@ -4,6 +4,8 @@ import { bowlHeight, pocketAngles } from '../sim/physics';
 import type { Theme } from './theme';
 import type { ArenaLook } from '../sim/arena';
 import { dishMaterial, noOutline, toonMaterial } from './toon';
+import { DETAIL_PALETTE, arenaFloorTexture, paintedPalette } from './arenaFloor';
+import { buildFurniture } from './arenaFurniture';
 
 /**
  * Handles onto every themed material in the stadium.
@@ -21,6 +23,33 @@ export interface StadiumHandles {
   wall: THREE.MeshStandardMaterial;
   posts: THREE.MeshStandardMaterial[];
   skirt: THREE.MeshStandardMaterial;
+  /**
+   * Greyscale surface map for the LIT dish, or null where this arena has no
+   * treatment. Held rather than merely assigned because a theme that refuses
+   * arena palettes has to be able to drop it and get it back — see
+   * `applyStadiumTheme`.
+   */
+  floorDetail: THREE.Texture | null;
+  /** Structural metalwork: struts, pylons, rim cap, grilles, kerb. */
+  frames: THREE.MeshStandardMaterial[];
+  /** Wall signage. */
+  signs: THREE.MeshBasicMaterial[];
+}
+
+/**
+ * Repaint anything carrying an `arenaTint`.
+ *
+ * Every furniture material is built holding BOTH the colour its arena asked for
+ * and the colour to fall back to under a theme that refuses arena palettes, so
+ * switching theme is a choice between two known hexes rather than a rebuild.
+ * See `FurnitureOptions.frameNeutral` for why they cannot be looked up here.
+ */
+function retint(mats: THREE.Material[], accepts: boolean): void {
+  for (const m of mats) {
+    const tint = m.userData.arenaTint as { arena: number; neutral: number } | undefined;
+    if (!tint) continue;
+    (m as THREE.MeshStandardMaterial).color.setHex(accepts ? tint.arena : tint.neutral);
+  }
 }
 
 /** Push a theme's values onto an already-built stadium. */
@@ -32,7 +61,20 @@ export function applyStadiumTheme(h: StadiumHandles, t: Theme): void {
     h.floor.color.setHex(t.dishColour);
     h.floor.metalness = t.dishMetalness;
     h.floor.roughness = t.dishRoughness;
+    // The surface treatment is colourless (see DETAIL_PALETTE) but it is still
+    // the arena's opinion about its own floor, so a theme that has refused
+    // arena looks drops it. Assigning `map` is the whole switch — the texture
+    // stays alive on the handles, so toggling back costs nothing and leaks
+    // nothing.
+    const wanted = t.acceptsArenaLook ? h.floorDetail : null;
+    if (h.floor.map !== wanted) {
+      h.floor.map = wanted;
+      h.floor.needsUpdate = true;
+    }
   }
+
+  retint(h.frames, t.acceptsArenaLook);
+  retint(h.signs, t.acceptsArenaLook);
 
   h.ridge.color.setHex(t.ridgeColour);
   h.ridge.opacity = t.ridgeOpacity;
@@ -144,9 +186,21 @@ export function buildStadium(
   const ridgeColour = paint?.ridge ?? theme.ridgeColour;
   const guideColour = paint?.guide ?? theme.guideColour;
   const postColour = paint?.post ?? theme.postColour;
+  // Livery and metalwork. `neutral` is what a refusing theme gets, resolved now
+  // because a theme switch never rebuilds this — see FurnitureOptions.
+  const frameNeutral = new THREE.Color(theme.wallColour).multiplyScalar(0.68).getHex();
+  const accentColour = paint?.accent ?? theme.postColour;
+  const frameColour = paint?.frame ?? frameNeutral;
   const group = new THREE.Group();
   const guides: THREE.MeshBasicMaterial[] = [];
   const posts: THREE.MeshStandardMaterial[] = [];
+
+  // Hoisted above the floor because the floor is painted FROM it: the arenas
+  // that mark their exits on the ground (Sudden Death's approach wedges, Three
+  // Sides' danger arc) have to take those bearings from the same list the rim
+  // wall is cut with. Two sources would drift, and a hazard stripe painted
+  // where there is no hole is worse than no stripe at all.
+  const exits = (pockets ?? pocketAngles()).slice().sort((a, b) => a - b);
 
   // ---- dish floor ----------------------------------------------------------
   const profile: THREE.Vector2[] = [];
@@ -156,16 +210,46 @@ export function buildStadium(
     profile.push(new THREE.Vector2(Math.max(r, 0.0001), bowlHeight(r)));
   }
 
+  // How this arena's floor is surfaced. `plain` under a theme that has refused
+  // arena palettes, which is what keeps Overdrive's near-black dish its own.
+  const floorStyle = look?.floor ?? 'plain';
+
+  // The greyscale relief map for the LIT dish. Built from `look` rather than
+  // `paint` on purpose: it carries no colour at all, so it is safe to have
+  // ready even under a theme that is currently refusing arena palettes, and
+  // that theme can then be switched away from without a rebuild.
+  const floorDetail =
+    floorStyle === 'plain' ? null : arenaFloorTexture(floorStyle, DETAIL_PALETTE, exits);
+
   // The dish is rebuilt on a toon switch rather than re-parameterised, because
   // MeshToonMaterial is a different material class — the one place the
   // "assign, never rebuild" rule genuinely can't hold.
   const floorMat = (
     theme.toon
       ? // Unlit and painted — see `dishMaterial` for why this one surface
-        // opts out of lighting entirely.
-        dishMaterial(dishColour)
+        // opts out of lighting entirely. When the arena has an opinion the
+        // paint is its own; otherwise the stock Beystadium art stands.
+        paint
+        ? noOutline(
+            new THREE.MeshBasicMaterial({
+              map: arenaFloorTexture(
+                floorStyle,
+                paintedPalette({
+                  dish: dishColour,
+                  ridge: ridgeColour,
+                  guide: guideColour,
+                  wall: wallColour,
+                  accent: accentColour,
+                }),
+                exits,
+              ),
+              side: THREE.DoubleSide,
+            }),
+          )
+        : dishMaterial(dishColour)
       : new THREE.MeshStandardMaterial({
           color: dishColour,
+          map: theme.acceptsArenaLook ? floorDetail : null,
           metalness: theme.dishMetalness,
           roughness: theme.dishRoughness,
           side: THREE.DoubleSide,
@@ -224,11 +308,19 @@ export function buildStadium(
     // themes whose guides are strong.
     opacity: Math.max(0.2, theme.guideOpacity * 0.75),
   });
+  //
+  // NOT IN EVERY ARENA, which is the whole argument of this change in
+  // miniature. These ticks say "moulded in radial segments", and two floors
+  // here are explicitly saying something else: Sudden Death earns its identity
+  // by being nearly empty, and the Crater is the one surface in the game that
+  // was never manufactured at all. Adding detail to those two would cost them
+  // the thing that makes them distinct.
+  const tickCount = floorStyle === 'severe' || floorStyle === 'cracked' ? 0 : 24;
   const tickInner = C.RIDGE_RADIUS + 0.03;
   const tickOuter = C.STADIUM_RADIUS - 0.02;
   const tickGeo = new THREE.PlaneGeometry(tickOuter - tickInner, 0.006);
-  for (let i = 0; i < 24; i++) {
-    const a = (i / 24) * Math.PI * 2;
+  for (let i = 0; i < tickCount; i++) {
+    const a = (i / tickCount) * Math.PI * 2;
     const mid = (tickInner + tickOuter) / 2;
     const tick = new THREE.Mesh(tickGeo, tickMat);
     tick.position.set(Math.cos(a) * mid, bowlHeight(mid) + 0.004, Math.sin(a) * mid);
@@ -240,7 +332,6 @@ export function buildStadium(
   // ---- rim wall, with a gap at every exit pocket ---------------------------
   const rimHeight = 0.13;
   const rimY = bowlHeight(C.STADIUM_RADIUS) + rimHeight / 2;
-  const exits = (pockets ?? pocketAngles()).slice().sort((a, b) => a - b);
   const wallMat = (
     theme.toon
       ? toonMaterial(wallColour)
@@ -380,6 +471,31 @@ export function buildStadium(
   skirt.receiveShadow = true;
   group.add(skirt);
 
+  // ---- structural furniture ------------------------------------------------
+  //
+  // Built from `look` rather than from `paint`, and the distinction is
+  // deliberate. `acceptsArenaLook` is a theme's veto on arena COLOUR — see the
+  // note on it in theme.ts, which is entirely about Overdrive's frame being
+  // black and a bright palette destroying that. Struts, pylons and buttresses
+  // are not colour, they are the arena's SHAPE, and eight identical silhouettes
+  // are eight identical arenas in any palette. So the geometry is built either
+  // way and only its tint answers to the theme.
+  const furniture = buildFurniture({
+    structure: look?.structure ?? 'none',
+    signs: look?.signs ?? 'none',
+    rim: look?.rim ?? 'none',
+    kerb: look?.kerb === true,
+    frameColour,
+    accentColour,
+    frameNeutral,
+    accentNeutral: theme.postColour,
+    exits,
+    rimHeight,
+    rimY,
+    toon: theme.toon,
+  });
+  group.add(furniture.group);
+
   return {
     group,
     floor: floorMat,
@@ -388,6 +504,9 @@ export function buildStadium(
     wall: wallMat,
     posts,
     skirt: skirtMat,
+    floorDetail,
+    frames: furniture.frame,
+    signs: furniture.sign,
   };
 }
 

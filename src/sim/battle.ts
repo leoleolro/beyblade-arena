@@ -119,6 +119,8 @@ function makeBey(f: Fighter, launch: LaunchParams): BeyState {
     biggestHit: 0,
     movesUsed: 0,
     strikeSpent: false,
+    aimX: 0,
+    aimY: 0,
   };
 }
 
@@ -264,8 +266,13 @@ export class Battle {
    * Spend meter on a move. Returns false when it can't be afforded or another
    * move is already running, so the UI can play a rejection cue rather than
    * silently eating the input.
+   *
+   * `aim` is where the player pointed, in dish coordinates, and is optional in
+   * the strict sense: omitting it is the old behaviour, not a degraded one.
+   * The AI omits it and every existing caller — the whole balance suite
+   * included — keeps working untouched.
    */
-  activateMove(id: string, kind: MoveKind): boolean {
+  activateMove(id: string, kind: MoveKind, aim?: { x: number; y: number }): boolean {
     const bey = this.beys.find((b) => b.id === id);
     if (!bey || !bey.alive || bey.moveTime > 0) return false;
 
@@ -276,6 +283,11 @@ export class Battle {
     bey.move = kind;
     bey.moveTime = profile.duration;
     bey.strikeSpent = false;
+    // Normalised here rather than at the call site so the sim never has to
+    // trust a caller's vector length.
+    const alen = aim ? Math.hypot(aim.x, aim.y) : 0;
+    bey.aimX = alen > 1e-6 ? aim!.x / alen : 0;
+    bey.aimY = alen > 1e-6 ? aim!.y / alen : 0;
     bey.movesUsed += 1;
 
     if (profile.speedKick > 0) this.applyKick(bey, profile);

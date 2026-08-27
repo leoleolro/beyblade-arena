@@ -179,6 +179,15 @@ export interface BeyState {
   /** Seconds of the active move remaining. */
   moveTime: number;
   /**
+   * Where the player pointed this move, as a unit vector, or (0,0) for none.
+   *
+   * Only Charge reads it. A zero aim means "steer at the opponent", which is
+   * what the AI and a player who has not touched the pointer both get, so the
+   * game plays exactly as before for anyone who ignores it.
+   */
+  aimX: number;
+  aimY: number;
+  /**
    * True once the active move has landed its blow.
    *
    * Only Charge reads it, and only to stop steering. See `applySeek`: the

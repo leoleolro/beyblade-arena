@@ -17,6 +17,7 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { applyStadiumTheme, beyWorldPosition, buildStadium, markFinishPocket } from './stadium';
+import { AimLine } from './aimLine';
 import type { StadiumHandles } from './stadium';
 import { ARENA, THEMES, loadImpactFrames, themeById } from './theme';
 import type { Theme } from './theme';
@@ -206,6 +207,14 @@ export class ArenaRenderer {
   readonly camera: THREE.PerspectiveCamera;
   private readonly renderer: THREE.WebGLRenderer;
   private readonly sparks = new SparkBurst();
+  /** Where a Charge would go. See `aimLine.ts` — this is the mechanic's only feedback. */
+  private readonly aimLine = new AimLine();
+  /** Aim direction in dish space, or null when the player is not aiming. */
+  private aimDir: { x: number; y: number } | null = null;
+  /** Whose top the line grows from. */
+  private aimOwner: string | null = null;
+  /** False while the move is unaffordable, so the line dims instead of lying. */
+  private aimReady = false;
   /**
    * The manga cut.
    *
@@ -358,6 +367,7 @@ export class ArenaRenderer {
     // Sparks draw over the ribbons (1) and blur discs (2) in every theme.
     this.sparks.points.renderOrder = 3;
     this.scene.add(this.shockwaves.group);
+    this.scene.add(this.aimLine.group);
     this.scene.add(this.clashPools.group);
     this.addLights();
     this.resize();
@@ -996,6 +1006,87 @@ export class ArenaRenderer {
   }
 
   /** Mirror one frame of sim state. `dt` is real elapsed seconds. */
+  /**
+   * The camera's bearing around the dish, in radians.
+   *
+   * Exposed so keyboard aiming can be screen-relative. The camera orbits
+   * during a round, so without this "up" would mean a different direction on
+   * the dish every second and the arrow keys would be unusable.
+   */
+  cameraYaw(): number {
+    return this.cameraAngle;
+  }
+
+  /**
+   * Set the aim the line should draw, in dish coordinates.
+   *
+   * `ready` is whether the move can actually be paid for. A line that looks
+   * the same whether or not you can afford the move teaches the wrong thing on
+   * the press that gets rejected.
+   */
+  setAim(ownerId: string | null, dir: { x: number; y: number } | null, ready: boolean): void {
+    this.aimOwner = ownerId;
+    this.aimDir = dir;
+    this.aimReady = ready;
+  }
+
+  /**
+   * Turn a pointer position into a point on the dish.
+   *
+   * Two passes, and the second one matters. The floor is a bowl, so a ray cast
+   * against the flat plane y=0 lands short of where the eye says it is
+   * pointing — the error grows with radius and is roughly a top's width out at
+   * the rim, which is exactly the range where aiming decides a ring-out. So
+   * pass one finds a rough point, and pass two re-casts against the bowl's
+   * actual height there. Returns null when the ray never meets the floor,
+   * which happens whenever the pointer is above the horizon.
+   */
+  pointerToDish(clientX: number, clientY: number): { x: number; y: number } | null {
+    const rect = this.canvas.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return null;
+    const ndc = new THREE.Vector2(
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -((clientY - rect.top) / rect.height) * 2 + 1,
+    );
+    const ray = new THREE.Raycaster();
+    ray.setFromCamera(ndc, this.camera);
+
+    const castAt = (height: number): THREE.Vector3 | null => {
+      const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -height);
+      const out = new THREE.Vector3();
+      return ray.ray.intersectPlane(plane, out) ? out : null;
+    };
+
+    const first = castAt(0);
+    if (!first) return null;
+    const h = beyWorldPosition(first.x, first.z).y;
+    const second = castAt(h) ?? first;
+    return { x: second.x, y: second.z };
+  }
+
+  /**
+   * Grow the aim line from its owner's current position.
+   *
+   * Driven from the render loop rather than from `setAim` because the top it
+   * starts at is moving: pinning the line at the position the pointer last
+   * moved would leave it trailing behind the top by however long the player
+   * held still.
+   */
+  private driveAimLine(beys: BeyState[]): void {
+    const owner = this.aimOwner ? beys.find((b) => b.id === this.aimOwner && b.alive) : undefined;
+    if (!owner || !this.aimDir) {
+      this.aimLine.aim(0, 0, 1, 0, false);
+      return;
+    }
+    // Only ever one run of chevrons on the dish — the player's — so it does
+    // not need a per-top tint to be unambiguous. What it does need is to say
+    // whether the move is affordable: an aim that looks identical when you
+    // cannot pay for the charge teaches the wrong thing on the press that gets
+    // rejected.
+    this.aimLine.setReady(this.aimReady);
+    this.aimLine.aim(owner.pos.x, owner.pos.y, this.aimDir.x, this.aimDir.y, true);
+  }
+
   update(
     beys: BeyState[],
     hits: HitEvent[],
@@ -1003,6 +1094,7 @@ export class ArenaRenderer {
     contacts: readonly ContactEvent[] = EMPTY_CONTACTS,
   ): void {
     this.elapsed += dt;
+    this.driveAimLine(beys);
     this.frameCooldown = Math.max(0, this.frameCooldown - dt);
     this.drainCooldown = Math.max(0, this.drainCooldown - dt);
     this.grindCooldown = Math.max(0, this.grindCooldown - dt);

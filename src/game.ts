@@ -226,12 +226,84 @@ export class Game {
 
   private events: GameEvents;
 
+  /**
+   * A keyboard aim, held between frames.
+   *
+   * Null is not a failure state — it is the default, and it means the charge
+   * homes exactly as it always did. Everything about aiming is additive: a
+   * player who never touches the pointer plays the game that shipped.
+   *
+   * Kept separate from the pointer aim rather than folded into it because the
+   * two are resolved differently — the pointer names a POINT on the dish and
+   * has to be re-projected as the top moves, while the keys name a DIRECTION
+   * that is already final. See `resolveAim`.
+   */
+  private keyAim: { x: number; y: number } | null = null;
+
+  /** Last pointer position in client pixels, for re-projection each frame. */
+  private pointer: { x: number; y: number } | null = null;
+
   constructor(canvas: HTMLCanvasElement, events: GameEvents) {
     this.events = events;
     this.renderer = new ArenaRenderer(canvas);
     this.renderer.setTheme(this.themeId);
     this.battle = this.makeBattle(this.playerBuild, this.ai.chooseBuild(null).build);
     window.addEventListener('resize', () => this.renderer.resize());
+
+    // Pointer aiming. `pointermove` rather than `mousemove` so a touch drag
+    // aims too — on a phone there is no hover, and dragging a finger across
+    // the dish is the only aiming gesture available.
+    canvas.addEventListener('pointermove', (e) => {
+      this.pointer = { x: e.clientX, y: e.clientY };
+      this.keyAim = null;
+    });
+    // Leaving the canvas stops aiming rather than freezing the last aim, which
+    // would leave a stale line pointing at wherever the cursor happened to
+    // exit.
+    canvas.addEventListener('pointerleave', () => {
+      this.pointer = null;
+    });
+  }
+
+  /**
+   * Aim with the keyboard, in screen terms.
+   *
+   * `sx, sy` is a direction on the SCREEN — (0,-1) is "away from me". The
+   * camera orbits, so that has to be rotated into dish space or the arrow keys
+   * would mean something different every second. Pass null to stop.
+   */
+  setKeyAim(sx: number, sy: number): void {
+    if (sx === 0 && sy === 0) {
+      this.keyAim = null;
+      return;
+    }
+    const yaw = this.renderer.cameraYaw();
+    const c = Math.cos(yaw);
+    const sn = Math.sin(yaw);
+    this.keyAim = { x: sx * c - sy * sn, y: sx * sn + sy * c };
+    this.pointer = null;
+  }
+
+  /**
+   * The aim to hand the sim this frame, or null.
+   *
+   * The pointer names a point, so the direction has to be recomputed from
+   * wherever the player's top is NOW — aiming at a spot and then drifting past
+   * it should reverse the aim, because that is what the player is looking at.
+   */
+  private resolveAim(): { x: number; y: number } | null {
+    if (this.keyAim) return this.keyAim;
+    if (!this.pointer) return null;
+    const me = this.battle.beys.find((b) => b.id === PLAYER_ID);
+    if (!me || !me.alive) return null;
+    const at = this.renderer.pointerToDish(this.pointer.x, this.pointer.y);
+    if (!at) return null;
+    const dx = at.x - me.pos.x;
+    const dy = at.y - me.pos.y;
+    const d = Math.hypot(dx, dy);
+    // Too close to mean anything: pointing AT your own top is not a direction.
+    if (d < 0.03) return null;
+    return { x: dx / d, y: dy / d };
   }
 
   private makeBattle(playerBuild: BeyBuild, aiBuild: BeyBuild): Battle {
@@ -335,7 +407,11 @@ export class Game {
   /** Player used a move. Returns false if it couldn't be afforded. */
   useMove(kind: MoveKind): boolean {
     if (this.screen !== 'battle') return false;
-    const ok = this.battle.activateMove(PLAYER_ID, kind);
+    // Only Charge is aimed. Block does not move and Dodge already has its own
+    // rule — it aims AWAY from the opponent, and letting the player point a
+    // dodge would mostly be a way to dodge into a pocket.
+    const aim = kind === 'charge' ? (this.resolveAim() ?? undefined) : undefined;
+    const ok = this.battle.activateMove(PLAYER_ID, kind, aim);
     if (ok) this.audio.move(kind);
     else this.audio.reject();
     return ok;
@@ -637,6 +713,18 @@ export class Game {
     // driven by hits from a round that is actually running.
     const hits = this.screen === 'battle' ? this.battle.hits : EMPTY_HITS;
     const contacts = this.screen === 'battle' ? this.battle.contacts : EMPTY_HITS;
+    // The aim line, resolved fresh every frame. See `resolveAim` — the
+    // pointer names a point, so the DIRECTION changes as the top moves under
+    // a stationary cursor, and a line computed once on pointermove would be
+    // wrong within a tenth of a second.
+    const me = this.battle.beys.find((b) => b.id === PLAYER_ID);
+    const aiming = this.screen === 'battle' && !!me?.alive && me.moveTime <= 0;
+    this.renderer.setAim(
+      aiming ? PLAYER_ID : null,
+      aiming ? this.resolveAim() : null,
+      !!me && me.meter >= C.MOVES.charge.cost,
+    );
+
     this.renderer.update(this.battle.beys, hits, renderDt, contacts);
     this.events.onFrame();
     if (this.running) requestAnimationFrame(this.tick);

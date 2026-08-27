@@ -363,6 +363,34 @@ export const MOVES: Record<'charge' | 'block' | 'dodge', MoveProfile> = {
  * value with real margin, so this is the top of the range, not a waypoint.
  */
 export const METER_GAIN_PER_SEC = 0.20;
+/**
+ * Half-angle, in radians, inside which an aimed Charge is helped onto an
+ * intercept course.
+ *
+ * WHY THERE IS AN ASSIST AT ALL. A beyblade orbits, precesses and is shoved by
+ * the bowl, so "point at where they are" is never the same as "point at where
+ * they will be" — a player aiming honestly and well would still miss most of
+ * the time, and would have no way to learn why. The assist is not aim
+ * correction so much as lead correction: inside the cone, the strike is bent
+ * toward the intercept the player was clearly trying to take.
+ *
+ * 25 degrees. Wide enough that a good read lands, narrow enough that pointing
+ * at the far wall does what you asked and misses. Outside the cone there is no
+ * help at all, which is what keeps a deliberate feint a real option — you can
+ * aim past someone on purpose.
+ */
+export const AIM_ASSIST_CONE = 0.44;
+
+/**
+ * How much of the way an in-cone aim is bent toward the true intercept.
+ *
+ * Not 1: at 1 the assist is just the old auto-homing wearing a costume, and
+ * aiming well and aiming nearly-well would feel identical. At 0.55 a sloppy
+ * aim inside the cone still lands late and shallow, and a clean one lands
+ * square, so the difference between them is visible in the hit.
+ */
+export const AIM_ASSIST_PULL = 0.55;
+
 /** Landing a clash banks extra charge, rewarding aggression. */
 export const METER_GAIN_PER_HIT = 0.11;
 

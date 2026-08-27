@@ -199,6 +199,89 @@ export interface ArenaSpec {
   look?: ArenaLook;
 }
 
+/**
+ * How the dish floor is surfaced.
+ *
+ * A COLOUR SWAP IS NOT A PLACE, which is what the first pass at `look` got
+ * wrong. Eight bowls in eight tints are still eight of the same bowl: the
+ * silhouette, the surface treatment and the furniture were identical, so the
+ * eye — which reads structure long before it reads hue — went on seeing one
+ * arena. These are surface *treatments*, and each one is chosen to say
+ * something true about the floor it is painted on.
+ *
+ * A string union rather than an enum because tsconfig sets `erasableSyntaxOnly`
+ * and enums emit runtime code.
+ */
+export type ArenaFloorStyle =
+  /** The original painted bowl. The fallback, and what a themed arena gets. */
+  | 'plain'
+  /** Concentric machined rings and lathe ticks — a precision tournament dish. */
+  | 'machined'
+  /** Painted race sectors and direction arrows around the rail lane. */
+  | 'circuit'
+  /** Blast-scarred plate: scorch rings, burn streaks, hazard hatching. */
+  | 'scorched'
+  /** Kerbed lane with flow arrows and a dead, unpainted middle. */
+  | 'channel'
+  /** Stark, near-empty floor with heavy approach wedges at the exits. */
+  | 'severe'
+  /** Steel grating over the dead middle, one bright machined fighting ring. */
+  | 'grate'
+  /** Numbered sectors, with the arc that holds the exits hatched as danger. */
+  | 'sector'
+  /** Fractured stone with radiating fault lines and rubble. */
+  | 'cracked';
+
+/**
+ * The furniture standing around and under the rim.
+ *
+ * This is the half of the complaint that no floor texture can answer. Every
+ * stadium had exactly one silhouette — a bowl, a band, a skirt — so from any
+ * distance at all they were the same object. Struts, pylons, bars and
+ * buttresses change the *outline*, which is the first thing read and the last
+ * thing a recolour touches.
+ */
+export type ArenaStructureStyle =
+  | 'none'
+  /** Tidy bolted brackets: neat, unremarkable, tournament-issue. */
+  | 'brackets'
+  /** Angled race-frame trusses with a cable run around them. */
+  | 'trusses'
+  /** Heavy warning pylons that stand proud of the rim. */
+  | 'pylons'
+  /** Close-set vertical bars: the rim reads as a cage. */
+  | 'cage'
+  /** Sparse tall fins, sharpened — severe rather than industrial. */
+  | 'fins'
+  /** Thick clamps and vent grilles bolted to the housing. */
+  | 'clamps'
+  /** Solid slab buttresses, placed only on the walls with no exit in them. */
+  | 'bulwark'
+  /** Broken, uneven rock props at irregular sizes. */
+  | 'rubble';
+
+/** Markings applied around the inside face of the rim wall. */
+export type ArenaSignStyle =
+  | 'none'
+  /** Numbered sector plates. */
+  | 'sectors'
+  /** Direction chevrons running with the rail. */
+  | 'chevrons'
+  /** Diagonal hazard stripes. */
+  | 'hazard';
+
+/** The capping treatment on top of the rim wall. */
+export type ArenaRimStyle =
+  | 'none'
+  /** A plain machined lip. */
+  | 'flat'
+  /** A lip notched with blocks, like a rack. */
+  | 'toothed'
+  /** A thick double lip. */
+  | 'heavy'
+  /** Broken arcs with chunks missing. */
+  | 'broken';
+
 export interface ArenaLook {
   /** The bowl. */
   dish?: number;
@@ -210,11 +293,54 @@ export interface ArenaLook {
   guide?: number;
   /** The exit posts. */
   post?: number;
+  /**
+   * Signage, hazard hatching and painted markings.
+   *
+   * Separate from `post` because the two do opposite jobs: a post marks ONE
+   * pocket and wants to stand apart from the floor, while this is the arena's
+   * own livery and wants to belong to it.
+   */
+  accent?: number;
+  /** Structural metalwork — struts, pylons, rim cap, grilles. */
+  frame?: number;
+  /** How the floor is surfaced. */
+  floor?: ArenaFloorStyle;
+  /** What stands around and under the rim. */
+  structure?: ArenaStructureStyle;
+  /** What is painted around the inside of the wall. */
+  signs?: ArenaSignStyle;
+  /** How the top of the wall is capped. */
+  rim?: ArenaRimStyle;
+  /**
+   * Draw a raised kerb on the tornado ridge.
+   *
+   * HONEST, which is the only reason it is allowed. `bowlHeight` really does
+   * put a 0.035 gaussian bump at `RIDGE_RADIUS` in every arena, so this is an
+   * emphasis on geometry that exists rather than a wall drawn where the sim has
+   * none. An arena that wants to read as a channel or as a cramped ring says so
+   * here; the rest leave the ridge as the painted line it has always been.
+   */
+  kerb?: boolean;
 }
 
 export const STANDARD: ArenaSpec = {
   id: 'standard',
-  look: { dish: 0xdfe7f2, wall: 0xf2f5fa, ridge: 0x8fb4e8, guide: 0xb9c9e4, post: 0xe2544a },
+  look: {
+    dish: 0xdfe7f2,
+    wall: 0xf2f5fa,
+    ridge: 0x8fb4e8,
+    guide: 0xb9c9e4,
+    post: 0xe2544a,
+    accent: 0x3f6fb0,
+    frame: 0xc2ccdb,
+    // The reference floor: nothing dramatic, everything precise. This is the
+    // arena the others are read against, so its identity is *tidiness* — fine
+    // lathe rings, neat brackets, numbered sectors, a plain machined lip.
+    floor: 'machined',
+    structure: 'brackets',
+    signs: 'sectors',
+    rim: 'flat',
+  },
   name: 'Standard Dish',
   blurb: 'the plain bowl — no archetype favoured',
   suggestedTheme: 'arena',
@@ -223,7 +349,22 @@ export const STANDARD: ArenaSpec = {
 
 export const XRAIL: ArenaSpec = {
   id: 'xrail',
-  look: { dish: 0xd8e6f6, wall: 0xeef3fa, ridge: 0xe0b23c, guide: 0xc3d4ea, post: 0xe2544a },
+  look: {
+    dish: 0xd8e6f6,
+    wall: 0xeef3fa,
+    ridge: 0xe0b23c,
+    guide: 0xc3d4ea,
+    post: 0xe2544a,
+    accent: 0xe0b23c,
+    frame: 0xb4bfd0,
+    // A racetrack, because that is what the rail turns the outer orbit into.
+    // The floor carries a painted lane under the rail with arrows running the
+    // way the teeth throw you, and the frame outside is motorsport trussing.
+    floor: 'circuit',
+    structure: 'trusses',
+    signs: 'chevrons',
+    rim: 'toothed',
+  },
   name: 'X-Rail Stadium',
   blurb: 'outer rail slingshots fast tops — faster, deadlier rounds',
   suggestedTheme: 'anime',
@@ -273,7 +414,23 @@ export const XRAIL: ArenaSpec = {
 
 export const SPIKE_PIT: ArenaSpec = {
   id: 'spikepit',
-  look: { dish: 0xf0dcd6, wall: 0xf7ece8, ridge: 0xd4644e, guide: 0xdcb6a8, post: 0xb8342a },
+  look: {
+    dish: 0xf0dcd6,
+    wall: 0xf7ece8,
+    ridge: 0xd4644e,
+    guide: 0xdcb6a8,
+    post: 0xb8342a,
+    accent: 0xf0a828,
+    frame: 0x8f5f52,
+    // MUST LOOK DANGEROUS BEFORE IT BITES. The hazard disc already marks where
+    // the drain is; what was missing is any sign that the floor has been living
+    // with it — so the plate around the pit is scorched, the burn streaks run
+    // outward, and the wall wears hazard stripes rather than livery.
+    floor: 'scorched',
+    structure: 'pylons',
+    signs: 'hazard',
+    rim: 'heavy',
+  },
   name: 'Spike Pit',
   blurb: 'the centre bites — camping the middle bleeds spin',
   suggestedTheme: 'anime',
@@ -324,7 +481,25 @@ export const SPIKE_PIT: ArenaSpec = {
  */
 export const GAUNTLET: ArenaSpec = {
   id: 'gauntlet',
-  look: { dish: 0xd9d3e8, wall: 0xe9e4f4, ridge: 0x8b6fd0, guide: 0xbdb2da, post: 0x6d3fc4 },
+  look: {
+    dish: 0xd9d3e8,
+    wall: 0xe9e4f4,
+    ridge: 0x8b6fd0,
+    guide: 0xbdb2da,
+    post: 0x6d3fc4,
+    accent: 0x9a7ce0,
+    frame: 0x6f6490,
+    // A CHANNEL, which is exactly what "rail outside, spikes inside" makes of
+    // the floor: the only place worth standing is the annulus between them. So
+    // the middle is left dead and unpainted, the usable ring is kerbed on both
+    // edges and carries flow arrows, and close-set bars around the rim make it
+    // read as somewhere you are being funnelled rather than somewhere you play.
+    floor: 'channel',
+    structure: 'cage',
+    signs: 'chevrons',
+    rim: 'heavy',
+    kerb: true,
+  },
   name: 'The Gauntlet',
   blurb: 'rail outside, spikes inside — nowhere neutral to stand',
   suggestedTheme: 'anime',
@@ -373,7 +548,24 @@ export const GAUNTLET: ArenaSpec = {
  */
 export const SUDDEN_DEATH: ArenaSpec = {
   id: 'sudden',
-  look: { dish: 0xd6e8dd, wall: 0xeaf4ee, ridge: 0x3fa06a, guide: 0xb2d4c0, post: 0x2f8f5c },
+  look: {
+    dish: 0xd6e8dd,
+    wall: 0xeaf4ee,
+    ridge: 0x3fa06a,
+    guide: 0xb2d4c0,
+    post: 0x2f8f5c,
+    accent: 0x2f8f5c,
+    frame: 0x9aa8a0,
+    // SEVERE MEANS EMPTY, not busy. Every other arena here earns its identity
+    // by adding; this one earns it by taking away. A near-bare floor with
+    // heavy dark wedges laid down the approach to each exit, no signage on the
+    // wall at all, and six tall sharpened fins outside — the visual argument
+    // being that there is nothing to look at except where you can be thrown.
+    floor: 'severe',
+    structure: 'fins',
+    signs: 'none',
+    rim: 'flat',
+  },
   name: 'Sudden Death',
   blurb: 'the plain bowl, but one exit is worth more',
   suggestedTheme: 'arena',
@@ -402,7 +594,25 @@ export const SUDDEN_DEATH: ArenaSpec = {
  */
 export const TIGHT_DISH: ArenaSpec = {
   id: 'tight',
-  look: { dish: 0xe8e4d8, wall: 0xf5f2e9, ridge: 0xb99a4a, guide: 0xd2c9ae, post: 0x9a7a2c },
+  look: {
+    dish: 0xe8e4d8,
+    wall: 0xf5f2e9,
+    ridge: 0xb99a4a,
+    guide: 0xd2c9ae,
+    post: 0x9a7a2c,
+    accent: 0xd9a327,
+    frame: 0x8b8371,
+    // CRAMPED AND INDUSTRIAL. The pit here is not a hazard you avoid, it is
+    // dead ground you are never allowed onto, so it is drawn as floor plate
+    // rather than as danger: steel grating over the whole middle, one bright
+    // machined band where the fight actually happens, and a raised kerb at the
+    // ridge so the usable ring reads as a channel with walls.
+    floor: 'grate',
+    structure: 'clamps',
+    signs: 'hazard',
+    rim: 'heavy',
+    kerb: true,
+  },
   name: 'Tight Dish',
   blurb: 'the middle is dead ground — fight happens in the ring',
   suggestedTheme: 'arena',
@@ -432,7 +642,24 @@ export const TIGHT_DISH: ArenaSpec = {
  */
 export const THREE_SIDES: ArenaSpec = {
   id: 'threesides',
-  look: { dish: 0xdcdfe6, wall: 0xf0f2f6, ridge: 0x4a5570, guide: 0xbcc3d2, post: 0x3d4863 },
+  look: {
+    dish: 0xdcdfe6,
+    wall: 0xf0f2f6,
+    ridge: 0x4a5570,
+    guide: 0xbcc3d2,
+    post: 0x3d4863,
+    accent: 0x3d4863,
+    frame: 0x8e97a8,
+    // The one arena whose geography is ASYMMETRIC, and the floor should say so
+    // without a word of UI. The arc holding the three exits is hatched as
+    // danger; the rest is calm numbered sectors. The buttresses outside stand
+    // only on the walls that have no exit in them, so even the silhouette is
+    // heavy on three sides and open on the fourth.
+    floor: 'sector',
+    structure: 'bulwark',
+    signs: 'sectors',
+    rim: 'flat',
+  },
   name: 'Three Sides Safe',
   blurb: 'every exit on one wall — the rest of the floor is safe',
   suggestedTheme: 'anime',
@@ -511,7 +738,24 @@ export const CRATER: ArenaSpec = {
     offsetAngle: Math.PI * 0.25,
     push: 6.0,
   },
-  look: { dish: 0xe3dbd2, wall: 0xf4efe9, ridge: 0x9a6b4a, guide: 0xcdbcae, post: 0x8a4b2a },
+  look: {
+    dish: 0xe3dbd2,
+    wall: 0xf4efe9,
+    ridge: 0x9a6b4a,
+    guide: 0xcdbcae,
+    post: 0x8a4b2a,
+    accent: 0xc0632a,
+    frame: 0x8a6b52,
+    // NOT MANUFACTURED. Every other floor here is a moulding; this one is
+    // ground that something happened to. Fault lines radiate through fractured
+    // stone, the rim cap is missing chunks, and the props outside are uneven
+    // rubble rather than struts — the only arena in the game that does not look
+    // like it was made in a factory.
+    floor: 'cracked',
+    structure: 'rubble',
+    signs: 'none',
+    rim: 'broken',
+  },
 };
 
 export const ARENAS: ArenaSpec[] = [

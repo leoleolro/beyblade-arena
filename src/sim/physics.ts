@@ -467,10 +467,32 @@ function applySeek(beys: BeyState[], dt: number): void {
     const foe = nearestFoe(beys, b);
     if (!foe) continue;
 
-    const dx = foe.pos.x - b.pos.x;
-    const dy = foe.pos.y - b.pos.y;
+    let dx = foe.pos.x - b.pos.x;
+    let dy = foe.pos.y - b.pos.y;
     const d = Math.hypot(dx, dy);
     if (d < 1e-6) continue;
+
+    // AIMED, IF THE PLAYER AIMED IT.
+    //
+    // With no aim this is unchanged: the strike goes at the opponent, which is
+    // what the AI gets and what a player who never touches the pointer gets.
+    // With an aim, the player's direction REPLACES the target — you can drive
+    // into open dish, cut someone off, or deliberately miss.
+    //
+    // The assist only bends an aim that was already close. See
+    // AIM_ASSIST_CONE for why lead correction is necessary at all when
+    // everything on the floor is orbiting.
+    if (b.aimX !== 0 || b.aimY !== 0) {
+      const want = Math.atan2(b.aimY, b.aimX);
+      const truth = Math.atan2(dy, dx);
+      let off = (truth - want) % (Math.PI * 2);
+      if (off > Math.PI) off -= Math.PI * 2;
+      if (off < -Math.PI) off += Math.PI * 2;
+      const bend = Math.abs(off) <= C.AIM_ASSIST_CONE ? off * C.AIM_ASSIST_PULL : 0;
+      const heading = want + bend;
+      dx = Math.cos(heading);
+      dy = Math.sin(heading);
+    }
 
     const sn = spinNorm(b);
 
@@ -500,9 +522,12 @@ function applySeek(beys: BeyState[], dt: number): void {
 
     // A smaller direct push on top, so a charge also closes rather than merely
     // orbiting at the same radius pointed inward.
+    // `dx, dy` is a bearing, not a displacement, once an aim has replaced it —
+    // so normalise by its own length rather than by the distance to the foe.
+    const dlen = Math.hypot(dx, dy) || 1;
     const push = mv.seek * 0.45 * sn * dt;
-    b.vel.x += (dx / d) * push;
-    b.vel.y += (dy / d) * push;
+    b.vel.x += (dx / dlen) * push;
+    b.vel.y += (dy / dlen) * push;
   }
 }
 

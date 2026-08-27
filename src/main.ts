@@ -44,7 +44,64 @@ const MOVE_KEYS: Record<string, MoveKind> = {
   KeyS: 'dodge',
 };
 
+/**
+ * Keyboard aiming, as a fallback for the pointer.
+ *
+ * Arrow keys rather than WASD, because A and S are already Block and Dodge —
+ * the move keys were placed under the left hand deliberately and moving them
+ * to make room for aiming would trade a control people have learnt for one
+ * they have not.
+ *
+ * These are SCREEN directions. `setKeyAim` rotates them into dish space using
+ * the camera's bearing, so "up" always means away from the viewer even while
+ * the camera orbits.
+ */
+const AIM_KEYS: Record<string, [number, number]> = {
+  ArrowUp: [0, -1],
+  ArrowDown: [0, 1],
+  ArrowLeft: [-1, 0],
+  ArrowRight: [1, 0],
+};
+
+/** Which aim keys are down. Held so diagonals work. */
+const aimHeld = new Set<string>();
+
+function pushAim(): void {
+  let x = 0;
+  let y = 0;
+  for (const code of aimHeld) {
+    const d = AIM_KEYS[code];
+    if (d) {
+      x += d[0];
+      y += d[1];
+    }
+  }
+  game.setKeyAim(x, y);
+}
+
+window.addEventListener('keyup', (e) => {
+  if (aimHeld.delete(e.code)) pushAim();
+});
+
+// A window that loses focus mid-press never delivers the keyup, which would
+// leave an aim stuck on until the next press.
+window.addEventListener('blur', () => {
+  if (aimHeld.size) {
+    aimHeld.clear();
+    pushAim();
+  }
+});
+
 window.addEventListener('keydown', (e) => {
+  if (AIM_KEYS[e.code] && game.screen === 'battle') {
+    e.preventDefault();
+    if (!e.repeat) {
+      aimHeld.add(e.code);
+      pushAim();
+    }
+    return;
+  }
+
   if (e.repeat) return;
   // Any real key press counts as the gesture that unblocks audio.
   game.audio.resume();
