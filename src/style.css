@@ -2015,3 +2015,91 @@ body.theme-anime .coach.on {
   padding: 6px 10px;
   margin: 8px 0 0;
 }
+
+/* --------------------------------------------------------------- volume ---
+ *
+ * The master level, under the four channel switches. A native range input
+ * rather than a custom control: it is already keyboard-operable, already
+ * announces its value to a screen reader, and already behaves correctly under
+ * a touch drag — three things a div with a pointermove handler has to earn.
+ * Only the furniture is restyled.
+ */
+.volume {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.volume > span {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--dim);
+  flex: 0 0 auto;
+}
+
+.volume > b {
+  /* Tabular figures and a fixed width, so the track does not shuffle
+     sideways as the readout crosses 9% and 99%. */
+  font-variant-numeric: tabular-nums;
+  min-width: 42px;
+  text-align: right;
+  color: var(--dim);
+  font-weight: 600;
+}
+
+.volume input[type='range'] {
+  flex: 1 1 auto;
+  min-width: 120px;
+  appearance: none;
+  -webkit-appearance: none;
+  height: 22px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.volume input[type='range']::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--line);
+}
+
+.volume input[type='range']::-moz-range-track {
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--line);
+}
+
+.volume input[type='range']::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: none;
+  /* The track is 4px plus 2px of border; centring a 14px thumb on it needs
+     the difference back, and WebKit will not do it for a styled track. */
+  margin-top: -6px;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2);
+}
+
+.volume input[type='range']::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: none;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2);
+}
+
+.volume input[type='range']:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+  border-radius: 999px;
+}

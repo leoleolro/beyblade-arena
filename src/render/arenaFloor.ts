@@ -383,6 +383,36 @@ function scorched(ctx: Ctx, p: FloorPalette): void {
     if (u - w / 2 < 0) ctx.fillRect(u - w / 2 + W, from * H, w, (to - from) * H);
   }
   ctx.globalAlpha = 1;
+  // Blast scars where something landed hard.
+  //
+  // The streaks alone were too even to read as damage — in the browser they
+  // came out as a soft grey blur ring, which is what forty marks of the same
+  // shape at the same radius always look like. A handful of dark, uneven
+  // craters is what makes the rest of it read as scorch rather than as dirt.
+  for (let i = 0; i < 9; i++) {
+    const u = r() * W;
+    const v = (0.5 + r() * 0.26) * H;
+    const w = 26 + r() * 64;
+    // Alpha drawn once and reused across the three wrap copies: pulling a new
+    // random inside the shift loop would give the same scar a different tone at
+    // each end of the seam, and the join would show as a visible edge.
+    const dark = 0.3 + r() * 0.16;
+    for (const shift of [-W, 0, W]) {
+      ctx.globalAlpha = dark;
+      ctx.fillStyle = p.shade;
+      ctx.beginPath();
+      ctx.ellipse(u + shift, v, w / 2, w * 0.19, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // A pale lip above it: a crater has a rim, and the highlight is what
+      // stops the dark patch reading as a hole punched in the texture.
+      ctx.globalAlpha = 0.22;
+      ctx.fillStyle = p.light;
+      ctx.beginPath();
+      ctx.ellipse(u + shift, v - w * 0.13, w * 0.42, w * 0.08, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.globalAlpha = 1;
   // The line the drain starts at, called out in hazard hatching.
   ctx.globalAlpha = 0.7;
   hatch(ctx, 0.44, 0.5, p.accent, 30);
@@ -391,9 +421,12 @@ function scorched(ctx: Ctx, p: FloorPalette): void {
   ringLine(ctx, 0.5, 3, p.ink);
   // Cracked plate joins out on the working band.
   spokes(ctx, 16, 0.54, RIDGE_V - 0.1, 3, p.ink);
-  ctx.globalAlpha = 0.75;
-  chevrons(ctx, 16, 0.56, 0.66, p.accent, false, 0.4);
-  ctx.globalAlpha = 1;
+  // NO SECOND RING OF ARROWS HERE. There used to be sixteen chevrons pointing
+  // inward at v 0.56-0.66, and `pit.ts` draws twenty-four more pointing inward
+  // at the pit's own edge just below them. Seen together in the browser the two
+  // read as one enormous starburst and neither said anything: the hazard's own
+  // marks are the ones that have to carry, since they are the ones that move
+  // with the zone. The plate around it says "burnt", not "this way".
 }
 
 /** A running channel: dead middle, kerbed lane, flow arrows. */
@@ -405,12 +438,32 @@ function channel(ctx: Ctx, p: FloorPalette): void {
   band(ctx, 0, 0.42, p.outer);
   ctx.globalAlpha = 1;
   spokes(ctx, 6, 0, 0.42, 2, p.ink);
-  // Lane edges.
+  // Lane edges, kerbed on both sides. Two painted lines make a band; blocks
+  // running along them make a CHANNEL, which is the word the arena uses about
+  // itself — the same trick `circuit` uses at the rail, applied to both edges
+  // because here you are enclosed rather than guided.
   ringLine(ctx, 0.42, 6, p.accent);
   ringLine(ctx, RIDGE_V - 0.02, 6, p.accent);
-  // Flow arrows down the usable ring, plus dashes to give it length.
+  ctx.fillStyle = p.accent;
+  for (let i = 0; i < 40; i += 2) {
+    ctx.fillRect((i / 40) * W, 0.42 * H, W / 40, 0.016 * H);
+    ctx.fillRect(((i + 1) / 40) * W, (RIDGE_V - 0.036) * H, W / 40, 0.016 * H);
+  }
+  // Flow arrows down the usable ring.
+  //
+  // WIDE AND FLAT, and they were the opposite: 18 chevrons spanning v 0.50 to
+  // 0.72 are as deep radially as they are wide tangentially, which the browser
+  // showed as a ring of spikes — a sunburst, not a current. An arrow only reads
+  // as a DIRECTION when it is much wider across than it is long, because that
+  // is the axis the eye takes the direction from.
+  //
+  // AND THEY HAVE TO NOT TOUCH. The correction after this one: at 14 wide
+  // chevrons the round line caps met end to end and the ring closed into a
+  // continuous zigzag — a crown, which is one shape rather than fourteen
+  // arrows. Twelve at a third of the spacing leaves a clear gap between marks,
+  // and a gap is what makes each one a separate instruction.
   ctx.globalAlpha = 0.8;
-  chevrons(ctx, 18, 0.5, 0.72, p.accent, true, 0.42);
+  chevrons(ctx, 12, 0.56, 0.65, p.accent, true, 0.3);
   ctx.globalAlpha = 1;
   ctx.fillStyle = p.ink;
   for (let i = 0; i < 36; i += 2) {
@@ -431,17 +484,34 @@ function channel(ctx: Ctx, p: FloorPalette): void {
  * opposite.
  */
 function severe(ctx: Ctx, p: FloorPalette, exits: number[]): void {
+  // NARROW AND OUTBOARD, and the first version was neither — this is the one
+  // treatment here that got worse the harder it tried. Four wedges 40° wide
+  // running from r = 0.34 to the rim cover most of the floor, and on Sudden
+  // Death's green palette the browser showed a white-and-green pinwheel: busy,
+  // cheerful, and arguing the exact opposite of the arena it is painted on.
+  //
+  // An approach lane is a lane. 20° wide, starting outboard of the calm middle,
+  // so the wedges read as four marked runs at the exits and the rest of the
+  // floor reads as the empty thing the arena is named for.
+  const from = 0.56;
   for (const a of exits) {
     // Twice, deliberately: `shade` carries its own alpha and one pass is a
     // grey suggestion. Severe wants the wedge to read as a decision.
-    wedge(ctx, a, 0.055, 0.34, 1, p.shade);
-    wedge(ctx, a, 0.055, 0.34, 1, p.shade);
-    wedge(ctx, a, 0.012, 0.34, 1, p.accent);
+    wedge(ctx, a, 0.028, from, 1, p.shade);
+    wedge(ctx, a, 0.028, from, 1, p.shade);
+    // The centre line, in `light` rather than `accent`. Sudden Death paints its
+    // accent a mid green and its shade a dark green, so an accent spine on a
+    // shaded lane was one green on another and vanished; white is the only tone
+    // guaranteed to read against a wedge whose whole job is to be the darkest
+    // thing on the floor. Thin enough to be a marking rather than a third tone,
+    // and starting outboard of the wedge's own head so it reads as pointing OUT.
+    wedge(ctx, a, 0.006, from + 0.06, 1, p.light);
   }
-  ringLine(ctx, 0.34, 4, p.ink);
+  // One heavy ring, at the tornado ridge. Severe earns its identity by taking
+  // away, so the floor gets exactly one line on it and no others.
   ringLine(ctx, RIDGE_V - 0.1, 7, p.ink);
-  ctx.globalAlpha = 0.6;
-  ringLine(ctx, 0.5, 2, p.ink);
+  ctx.globalAlpha = 0.5;
+  ringLine(ctx, from, 2, p.ink);
   ctx.globalAlpha = 1;
 }
 
@@ -490,12 +560,20 @@ function sector(ctx: Ctx, p: FloorPalette, exits: number[]): void {
   ctx.globalAlpha = 1;
   ringLine(ctx, 0.22, 4, p.ink);
   // The danger arc, one span per exit plus the ground between them.
+  //
+  // AT HALF STRENGTH, because Three Sides paints it in a near-navy accent and
+  // a solid fill of that on a near-white dish is not a warning, it is a stain —
+  // the browser showed a third of the floor gone black with no legible pattern
+  // in it. Dropping the alpha lets the hatching underneath do the talking,
+  // which is the part that actually says "danger" rather than "dirt".
+  ctx.globalAlpha = 0.4;
   for (const a of exits) {
     wedge(ctx, a, 0.075, RIDGE_V - 0.1, 1, p.accent);
   }
+  ctx.globalAlpha = 1;
   for (const a of exits) {
     ctx.save();
-    ctx.globalAlpha = 0.5;
+    ctx.globalAlpha = 0.34;
     const u = uOf(a) * W;
     const halfU = 0.075 * W;
     ctx.beginPath();
@@ -503,7 +581,7 @@ function sector(ctx: Ctx, p: FloorPalette, exits: number[]): void {
       ctx.rect(u - halfU + shift, (RIDGE_V - 0.1) * H, halfU * 2, (1 - RIDGE_V + 0.1) * H);
     }
     ctx.clip();
-    hatch(ctx, RIDGE_V - 0.1, 1, p.ink, 22);
+    hatch(ctx, RIDGE_V - 0.1, 1, p.ink, 26);
     ctx.restore();
   }
   ringLine(ctx, RIDGE_V - 0.1, 4, p.ink);
@@ -527,17 +605,24 @@ function cracked(ctx: Ctx, p: FloorPalette): void {
   ctx.globalAlpha = 1;
   // Fault lines: radial, but each one wanders in u as it climbs so it reads as
   // a fracture rather than as a mould seam.
+  //
+  // THE WANDER HAD EATEN THE RADIAL, which the browser made obvious: ±17 px per
+  // step over nineteen steps is up to a third of the way round the dish, so the
+  // "fractures" arrived as thick circumferential squiggles draped across the
+  // floor like branches. A fault radiates. Half the wander keeps each line
+  // clearly heading outward while still refusing to be a straight seam, and the
+  // thinner pen stops them reading as ink doodles on a light dish.
   ctx.strokeStyle = p.ink;
   ctx.lineCap = 'round';
   for (let i = 0; i < 26; i++) {
     const start = 0.06 + r() * 0.5;
     const end = Math.min(1, start + 0.25 + r() * 0.6);
     let u = r() * W;
-    ctx.lineWidth = 2 + r() * 4;
+    ctx.lineWidth = 1.6 + r() * 3;
     ctx.beginPath();
     ctx.moveTo(u, start * H);
     for (let v = start; v < end; v += 0.05) {
-      u += (r() - 0.5) * 34;
+      u += (r() - 0.5) * 16;
       ctx.lineTo(u, v * H);
     }
     ctx.stroke();

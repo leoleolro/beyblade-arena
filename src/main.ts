@@ -36,6 +36,44 @@ ui = new Ui(uiRoot, game);
 ui.render();
 game.start();
 
+/**
+ * The audio gate: the first real gesture anywhere on the page.
+ *
+ * The individual buttons that begin play call `resume()` themselves, and that
+ * is the path that matters — but this is the one listener that cannot go stale.
+ * Every other gesture site is a button that a UI change can move, rename or
+ * delete, and the failure mode when one does is a game that is simply silent
+ * with nothing in the console to say why. `resume()` is idempotent and cheap
+ * after the first call, so the cost of the belt and braces is one listener that
+ * removes itself.
+ *
+ * `pointerdown` rather than `click` so a touch counts, and `capture` so a
+ * handler that stops propagation cannot swallow the gesture on the way down.
+ */
+addEventListener('pointerdown', () => game.audio.resume(), {
+  once: true,
+  capture: true,
+});
+
+/**
+ * A hidden tab is a room nobody is in.
+ *
+ * requestAnimationFrame stops when the tab is hidden but the audio thread does
+ * not — the music scheduler runs on `setInterval` against the audio clock by
+ * design, precisely so it survives throttling, which means that without this it
+ * plays on to an empty room while the game itself is frozen.
+ */
+document.addEventListener('visibilitychange', () => {
+  // Guarded on `ready`, because visibilitychange is NOT a user gesture: calling
+  // resume() before one has happened would build the whole graph around a
+  // context the browser starts suspended, which is the one thing the audio
+  // layer is written to avoid. Coming back to a tab you never clicked on should
+  // leave it exactly as silent as it was.
+  if (!game.audio.ready) return;
+  if (document.hidden) game.audio.suspend();
+  else game.audio.resume();
+});
+
 // Space locks the launch meter, then becomes Charge. A and S are the other two
 // moves, sitting under the same hand.
 const MOVE_KEYS: Record<string, MoveKind> = {

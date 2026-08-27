@@ -184,12 +184,51 @@ export function buildBeyMesh(build: BeyBuild, skin: Skin, toon = false): THREE.G
 // Exported so `beyThumb` draws the picker chip at the proportions the mesh is
 // actually built at — a thumbnail that carries its own copy of these numbers is
 // a second implementation, and it drifts.
+/**
+ * Classic proportions, as fractions of the layer radius.
+ *
+ * THE CHESS-PIECE PROBLEM. The toon path already carries this note: "The
+ * classic stack is ~2.3 radii tall, which under this camera reads as a chess
+ * piece; the toon stack tops out at 1.15 radii so the layer dominates." That
+ * lesson was learnt for one theme and never applied to the other, and Classic
+ * is the DEFAULT theme — the one the owner was looking at when he said, twice,
+ * that the beys "still don't look detailed enough".
+ *
+ * Measured on the old numbers: the layer occupied 0.34 of a 2.20-radius stack,
+ * so the one part that carries a bey's identity was 15% of its silhouette. The
+ * other 85% was a driver cone and a disc that every bey in the game shares.
+ * Worse, `discScale` was 0.92 against a `layerScale` of 0.94 — the disc was
+ * within 2% of the layer's width, so the two stacked into a smooth drum and the
+ * blade contour had nothing to stand proud of. Two beys as different as
+ * PhoenixWing (3 lobes, 0.418 radial depth) and BlackShell (8 lobes, 0.142)
+ * rendered as the same octagonal cylinder in different colours.
+ *
+ * So the stack is compressed and the disc is pulled in. The layer is now 26% of
+ * a 1.5-radius stack — the same share the toon path gives it — and it overhangs
+ * the disc by about a third of a radius, which is what puts the silhouette back
+ * in the outline where the camera can see it. Nothing about the DESIGNS
+ * changed; they were always distinct. They were being drawn underneath a shared
+ * cylinder.
+ */
 export const CLASSIC = {
   layerScale: 0.94,
-  layerDepth: 0.34,
+  /** Up from 0.34. The identity gets more of the silhouette. */
+  layerDepth: 0.4,
   bevelT: 0.02,
-  bossH: 0.24,
-  discScale: 0.92,
+  /** Down from 0.24: the crown was the tallest thing on an already-tall stack. */
+  bossH: 0.16,
+  /**
+   * Down from 0.92, and this is the single most important number here. The
+   * disc must be visibly NARROWER than the layer or the blade contour has
+   * nothing to overhang and the pair reads as one drum.
+   */
+  discScale: 0.8,
+  /** Driver cone height. Down from 1.05, which was half the stack on its own. */
+  tipH: 0.62,
+  /** Shaft height, sitting between the cone and the disc. Down from 0.40. */
+  shaftH: 0.22,
+  /** Disc height. Down from 0.46. */
+  discH: 0.34,
 } as const;
 
 function buildClassicBey(build: BeyBuild, skin: Skin): THREE.Group {
@@ -216,7 +255,7 @@ function buildClassicBey(build: BeyBuild, skin: Skin): THREE.Group {
   const layerScale = design.layerScale ?? CLASSIC.layerScale;
 
   // ---- driver: a slim cone that meets the floor at the group origin --------
-  const tipHeight = r * 1.05;
+  const tipHeight = r * CLASSIC.tipH;
   const tip = new THREE.Mesh(
     new THREE.ConeGeometry(r * 0.22, tipHeight, 16),
     new THREE.MeshStandardMaterial({
@@ -234,23 +273,24 @@ function buildClassicBey(build: BeyBuild, skin: Skin): THREE.Group {
     metalness: 0.7,
     roughness: 0.45,
   });
+  const shaftY = tipHeight + r * CLASSIC.shaftH * 0.5;
   const shaft = new THREE.Mesh(
-    new THREE.CylinderGeometry(r * 0.3, r * 0.3, r * 0.4, 16),
+    new THREE.CylinderGeometry(r * 0.3, r * 0.3, r * CLASSIC.shaftH, 16),
     driverMat,
   );
-  shaft.position.y = tipHeight + r * 0.1;
+  shaft.position.y = shaftY;
   driverGroup.add(shaft);
 
   // Fins on the shaft. A plain cylinder is rotationally symmetric, so spinning
   // it produces no visible change at all — the driver looked frozen while it
   // was in fact turning faster than anything else on the top.
-  const finGeo = new THREE.BoxGeometry(r * 0.26, r * 0.3, r * 0.07);
+  const finGeo = new THREE.BoxGeometry(r * 0.26, r * CLASSIC.shaftH * 0.8, r * 0.07);
   for (let i = 0; i < 4; i++) {
     const angle = (i / 4) * Math.PI * 2;
     const fin = new THREE.Mesh(finGeo, driverMat);
     fin.position.set(
       Math.cos(angle) * r * 0.3,
-      tipHeight + r * 0.1,
+      shaftY,
       Math.sin(angle) * r * 0.3,
     );
     fin.rotation.y = -angle;
@@ -258,8 +298,11 @@ function buildClassicBey(build: BeyBuild, skin: Skin): THREE.Group {
   }
 
   // ---- disc: the heavy middle ---------------------------------------------
-  const discHeight = r * 0.46;
-  const discY = tipHeight + r * 0.36;
+  const discHeight = r * CLASSIC.discH;
+  // Sits directly on the shaft, with a little interpenetration so no daylight
+  // shows at the joint. The fins stay BELOW it and therefore stay visible —
+  // they are the only thing on the driver that makes its rotation readable.
+  const discY = tipHeight + r * CLASSIC.shaftH + discHeight * 0.5 - r * 0.02;
   // Six radial segments rather than 24: the flat faces catch the light
   // differently as it turns, which is what makes the rotation readable.
   const discMat = skinMaterial(skin, design.secondary);
@@ -288,7 +331,7 @@ function buildClassicBey(build: BeyBuild, skin: Skin): THREE.Group {
   }
 
   // ---- layer: the contact ring, plus one blade per contact point ----------
-  const layerY = discY + discHeight * 0.5 + r * 0.2;
+  const layerY = discY + discHeight * 0.5 + r * 0.1;
   // The layer carries the *design's* colour; the skin still owns the hit ring
   // and the trail, so "which bey is that" and "whose is it" stay separable.
   const layerMat = skinMaterial(skin, design.primary);
@@ -356,15 +399,31 @@ function buildClassicBey(build: BeyBuild, skin: Skin): THREE.Group {
   // is exactly why swapping designs now changes the shape in this theme.
 
   // A faint energy ring at the exact collision radius — reads as the hitbox.
+  //
+  // FAINT IS LOAD-BEARING, and it was not faint enough. At 0.32 opacity and a
+  // 0.05r tube this was a solid band, and because it is a PERFECT CIRCLE at
+  // radius r while the blade contour peaks at `layerScale` (0.94r), it was the
+  // widest thing on every top. So the outermost edge of every beyblade in the
+  // default theme was the same circle, and the silhouette underneath it —
+  // which genuinely differs, measured at 0.418 radial depth for PhoenixWing's
+  // three lobes against 0.142 for BlackShell's eight — was drawn inside a
+  // shared outline where nobody could see it. Hiding this ring and re-rendering
+  // the contact sheet was the A/B that proved it: with the ring off, three
+  // lobes read as a rounded triangle and eight read as scallops, immediately.
+  //
+  // It stays, because a contact cue at the exact collision radius is worth
+  // having and the sim's hitbox really is a circle — drawing a lobed ring would
+  // be a prettier lie. It is just no longer allowed to be the loudest edge on
+  // the model.
   const ringMat = new THREE.MeshBasicMaterial({
     color: skin.primary,
     transparent: true,
-    opacity: 0.32,
+    opacity: 0.14,
   });
   // No ink on the hitbox. A solid black line around a 32%-opacity guide turns a
   // hint into the loudest thing on the top.
   noOutline(ringMat);
-  const ring = new THREE.Mesh(new THREE.TorusGeometry(r, r * 0.05, 8, 40), ringMat);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(r, r * 0.022, 8, 40), ringMat);
   ring.rotation.x = Math.PI / 2;
   ring.position.y = layerY;
   layerGroup.add(ring);

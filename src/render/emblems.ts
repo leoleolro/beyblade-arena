@@ -501,3 +501,341 @@ export const batwingEmblem: EmblemDraw = (ctx, s, design) => {
     ctx.stroke();
   }
 };
+
+/**
+ * THE BOUND EVERY MARK BELOW RESPECTS, stated once so it stops being folklore.
+ *
+ * `beastEmblem` scales a dark-chip mark by 1.15 and the chip's inner gold band
+ * starts at radius 101.8, so an authored point at radius r paints at
+ * r * 1.15 + half the 5·s stroke. Keeping every point inside r = 84 lands at
+ * 99.1 and clears the bezel. batwingEmblem carries the full derivation and the
+ * story of the version that got it wrong by measuring x instead of hypot.
+ */
+
+export const seiryuEmblem: EmblemDraw = (ctx, s, design) => {
+  // Seiryu, the Azure Dragon of the East, in side profile — one of the Four
+  // Auspicious Beasts, and what CobaltDragoon's Gear Chip actually carries.
+  //
+  // A CHINESE dragon, which is the entire reason this is not `drakeheadEmblem`.
+  // That one is a western skull: bat horns, flame, a hinged jaw. This one is
+  // serpentine — a long coiling body, antler horns, trailing whiskers, no
+  // wings — and the two must not read as recolours of each other, because the
+  // roster already has both kinds of dragon in it.
+  //
+  // THE CALLER'S CEL LINE IS CAPTURED, NOT ASSUMED. `beastEmblem` sets the
+  // stroke to `ink` on a sticker chip and to the design's PRIMARY on a dark
+  // one, because ink on a near-black chip face is an invisible outline. The
+  // older marks hard-set `ink` and get away with it only because every bey
+  // using them happens to be a sticker chip — so this one keeps the value it
+  // was handed and restores it whenever it borrows the stroke for something
+  // else, and works under either treatment.
+  const line = ctx.strokeStyle;
+
+  // Body first, so the mane and head pin its near end and the coil reads as
+  // passing BEHIND the skull rather than butting into it.
+  ctx.lineCap = 'round';
+  ctx.lineWidth = 15 * s;
+  ctx.strokeStyle = hex(design.accent);
+  ctx.beginPath();
+  ctx.moveTo(-64 * s, 32 * s);
+  ctx.quadraticCurveTo(-22 * s, 54 * s, 2 * s, 14 * s);
+  ctx.quadraticCurveTo(22 * s, -18 * s, -10 * s, -28 * s);
+  ctx.stroke();
+
+  // Tail fin at the far end of the coil: three tapering barbs, so the body
+  // terminates in something rather than just stopping mid-stroke.
+  ctx.lineWidth = 4 * s;
+  ctx.strokeStyle = line;
+  ctx.fillStyle = hex(design.accent);
+  // Tips at radius 75-80: the coil's own stroke already reaches 79 with its
+  // 15-unit width, and the barbs must not push past it into the bezel.
+  for (const [tx, ty] of [
+    [-74, 12],
+    [-74, 30],
+    [-62, 44],
+  ] as const) {
+    ctx.beginPath();
+    ctx.moveTo(-62 * s, 26 * s);
+    ctx.lineTo(tx * s, ty * s);
+    ctx.lineTo(-56 * s, 40 * s);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  // Mane: five spines climbing the neck, each a little longer than the last, so
+  // the ridge reads as growing toward the skull.
+  for (const [bx, by, tx, ty] of [
+    [-26, 4, -44, -6],
+    [-22, -8, -42, -20],
+    [-16, -18, -36, -34],
+    [-8, -26, -26, -46],
+    [2, -32, -12, -54],
+  ] as const) {
+    ctx.beginPath();
+    ctx.moveTo(bx * s, by * s);
+    ctx.lineTo(tx * s, ty * s);
+    ctx.lineTo((bx + 8) * s, (by - 8) * s);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  // Antler horns, swept back over the mane: one long forked pair.
+  ctx.beginPath();
+  ctx.moveTo(6 * s, -42 * s);
+  ctx.quadraticCurveTo(-16 * s, -58 * s, -42 * s, -64 * s);
+  ctx.quadraticCurveTo(-14 * s, -50 * s, 0, -36 * s);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(-12 * s, -54 * s);
+  ctx.lineTo(-30 * s, -68 * s);
+  ctx.lineTo(-16 * s, -46 * s);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // Whiskers, trailing back past the mane. Thin and unfilled — they are the
+  // detail that says "eastern dragon" faster than the horns do.
+  ctx.lineWidth = 3.5 * s;
+  for (const [cy, ey] of [
+    [-14, -26],
+    [-4, -12],
+  ] as const) {
+    ctx.beginPath();
+    ctx.moveTo(8 * s, -28 * s);
+    ctx.quadraticCurveTo(-24 * s, cy * s, -54 * s, ey * s);
+    ctx.stroke();
+  }
+
+  // Skull and snout a step lighter than the body, so the head separates at
+  // chip size — the same trick the lion and the bat use. Three teeth are cut
+  // straight out of the jawline rather than drawn on top of it.
+  ctx.lineWidth = 4 * s;
+  ctx.fillStyle = lighten(design.accent, 0.24);
+  ctx.beginPath();
+  ctx.moveTo(-14 * s, -38 * s);
+  ctx.lineTo(18 * s, -50 * s);
+  ctx.lineTo(64 * s, -34 * s);
+  ctx.lineTo(46 * s, -23 * s);
+  ctx.lineTo(41 * s, -14 * s);
+  ctx.lineTo(36 * s, -23 * s);
+  ctx.lineTo(31 * s, -14 * s);
+  ctx.lineTo(26 * s, -23 * s);
+  ctx.lineTo(2 * s, -22 * s);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  // Lower jaw, dropped open on the roar.
+  ctx.beginPath();
+  ctx.moveTo(0, -18 * s);
+  ctx.lineTo(54 * s, -6 * s);
+  ctx.lineTo(8 * s, -2 * s);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = ink;
+  ctx.beginPath();
+  ctx.ellipse(16 * s, -34 * s, 6 * s, 4 * s, -0.2, 0, Math.PI * 2);
+  ctx.fill();
+};
+
+export const firebirdEmblem: EmblemDraw = (ctx, s, design) => {
+  // The phoenix spreading its wings, as PhoenixWing's Gear Chip carries it.
+  //
+  // Deliberately NOT `phoenixEmblem`, which the player-designed Crimson Phoenix
+  // already owns. Two beys sharing a beast is fine; two beys sharing a drawing
+  // is what made this roster read as recolours of itself. So this one is
+  // heraldic and frontal where that one is a rising firebird: the wings are
+  // built in two RANKS of feathers rather than one fan, and the tail splays
+  // into five plumes rather than three licks.
+  //
+  // Outer rank first, so the inner rank overlaps it and the wing reads as
+  // layered rather than as one flat sheet.
+  for (const dir of [-1, 1] as const) {
+    for (const [tx, ty, root] of [
+      [76, -20, 16],
+      [70, -40, 12],
+      [52, -60, 8],
+      [28, -70, 4],
+    ] as const) {
+      ctx.beginPath();
+      ctx.moveTo(dir * 8 * s, root * s);
+      ctx.quadraticCurveTo(dir * tx * 0.92 * s, ty * 0.18 * s, dir * tx * s, ty * s);
+      ctx.quadraticCurveTo(dir * tx * 0.34 * s, ty * 0.62 * s, dir * 6 * s, (root - 12) * s);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+  }
+
+  // Tail: five plumes, longest in the middle, so the fan is symmetric about the
+  // body rather than raked to one side.
+  for (const [dx, len, w] of [
+    [-34, 52, 7],
+    [-18, 66, 8],
+    [0, 76, 9],
+    [18, 66, 8],
+    [34, 52, 7],
+  ] as const) {
+    ctx.beginPath();
+    ctx.moveTo((dx - w) * s, 16 * s);
+    ctx.quadraticCurveTo((dx - w - 4) * s, len * 0.62 * s, dx * s, len * s);
+    ctx.quadraticCurveTo((dx + w + 4) * s, len * 0.58 * s, (dx + w) * s, 16 * s);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  // Body, then a three-plume head crest, then the skull — in that order so each
+  // one pins the roots of the last.
+  ctx.fillStyle = lighten(design.accent, 0.3);
+  ctx.beginPath();
+  ctx.ellipse(0, 2 * s, 16 * s, 26 * s, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  for (const [tx, ty] of [
+    [-22, -66],
+    [0, -74],
+    [22, -66],
+  ] as const) {
+    ctx.beginPath();
+    ctx.moveTo(-6 * s, -38 * s);
+    ctx.quadraticCurveTo(tx * 0.5 * s, ty * 0.8 * s, tx * s, ty * s);
+    ctx.quadraticCurveTo(tx * 0.3 * s, ty * 0.5 * s, 6 * s, -38 * s);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
+  // Beak before the skull, so the skull covers its base.
+  ctx.beginPath();
+  ctx.moveTo(0, -20 * s);
+  ctx.lineTo(9 * s, -36 * s);
+  ctx.lineTo(-9 * s, -36 * s);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(0, -42 * s, 13 * s, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  // Eyes in the contrasting secondary, raked inward for the glare.
+  ctx.fillStyle = hex(design.secondary);
+  for (const dir of [-1, 1] as const) {
+    ctx.beginPath();
+    ctx.moveTo(dir * 3 * s, -44 * s);
+    ctx.lineTo(dir * 11 * s, -48 * s);
+    ctx.lineTo(dir * 11 * s, -40 * s);
+    ctx.closePath();
+    ctx.fill();
+  }
+};
+
+export const wizardEmblem: EmblemDraw = (ctx, s, design) => {
+  // A fantasy wizard casting a spell — what WizardArrow's Gear Chip carries,
+  // and the only mark in this file that is a PERSON rather than a beast.
+  //
+  // That is why it gets a hat rather than a face: at chip size a human head is
+  // an oval with two dots and reads as nothing at all, whereas a wide brim over
+  // a shadowed face and a forked beard reads as "wizard" instantly. The whole
+  // silhouette is carried by three shapes — brim, cone, beard — and everything
+  // else is detail hung off them.
+  //
+  // Staff on the right, beard on the left of centre, so the mark balances
+  // across the chip instead of piling up on one side.
+  //
+  // The caller's cel line is captured rather than assumed, for the reason
+  // spelled out in `seiryuEmblem`: it is `ink` on a sticker chip and the
+  // design's primary on a dark one, and hard-setting ink would erase every
+  // outline on a black chip face.
+  const line = ctx.strokeStyle;
+  ctx.lineWidth = 5 * s;
+
+  // Staff first: a plain shaft, so the orb and its sparks sit on top of it.
+  ctx.fillStyle = lighten(design.accent, 0.15);
+  ctx.beginPath();
+  ctx.moveTo(50 * s, 60 * s);
+  ctx.lineTo(56 * s, 46 * s);
+  ctx.lineTo(44 * s, -22 * s);
+  ctx.lineTo(34 * s, -20 * s);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  // Six sparks radiating off the orb, drawn under it so they read as escaping.
+  ctx.lineWidth = 3.5 * s;
+  ctx.strokeStyle = hex(design.accent);
+  for (let i = 0; i < 6; i++) {
+    const ang = (i / 6) * Math.PI * 2 + 0.4;
+    ctx.beginPath();
+    ctx.moveTo((38 + Math.cos(ang) * 18) * s, (-36 + Math.sin(ang) * 18) * s);
+    ctx.lineTo((38 + Math.cos(ang) * 30) * s, (-36 + Math.sin(ang) * 30) * s);
+    ctx.stroke();
+  }
+  ctx.lineWidth = 5 * s;
+  ctx.strokeStyle = line;
+  ctx.fillStyle = hex(design.accent);
+  ctx.beginPath();
+  ctx.arc(38 * s, -36 * s, 15 * s, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  // Beard: a long forked fall, drawn before the face so the jaw covers its top.
+  ctx.beginPath();
+  ctx.moveTo(-30 * s, 2 * s);
+  ctx.quadraticCurveTo(-40 * s, 44 * s, -22 * s, 70 * s);
+  ctx.quadraticCurveTo(-8 * s, 46 * s, 0, 62 * s);
+  ctx.quadraticCurveTo(12 * s, 42 * s, 26 * s, 66 * s);
+  ctx.quadraticCurveTo(38 * s, 40 * s, 28 * s, 2 * s);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // Shadowed face, a step darker than the beard rather than lighter — the
+  // opposite of the beasts, because a wizard's face belongs UNDER the brim.
+  ctx.fillStyle = ink;
+  ctx.beginPath();
+  ctx.ellipse(0, 4 * s, 26 * s, 24 * s, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Hat: cone, then brim over it, so the brim's far edge cuts the cone's base.
+  ctx.fillStyle = hex(design.accent);
+  ctx.strokeStyle = line;
+  ctx.beginPath();
+  ctx.moveTo(-38 * s, -12 * s);
+  ctx.quadraticCurveTo(-28 * s, -52 * s, 4 * s, -74 * s);
+  ctx.quadraticCurveTo(24 * s, -50 * s, 34 * s, -12 * s);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.ellipse(0, -10 * s, 60 * s, 13 * s, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  // Four-point star on the cone, and the two eyes under the brim. Both in the
+  // contrasting secondary so they survive the black of the face and the flat
+  // of the hat at battle distance.
+  ctx.fillStyle = hex(design.secondary);
+  ctx.beginPath();
+  for (let i = 0; i < 8; i++) {
+    const ang = (i / 8) * Math.PI * 2 - Math.PI / 2;
+    const rad = (i % 2 === 0 ? 15 : 5) * s;
+    const x = -2 * s + Math.cos(ang) * rad;
+    const y = -40 * s + Math.sin(ang) * rad;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+  ctx.fill();
+  // Eyes go PALE rather than secondary: they sit on the ink hood, and a deep
+  // jewel tone on near-black is two dark shapes with no edge between them.
+  ctx.fillStyle = lighten(design.accent, 0.55);
+  for (const dir of [-1, 1] as const) {
+    ctx.beginPath();
+    ctx.ellipse(dir * 11 * s, 2 * s, 6 * s, 3.5 * s, dir * 0.25, 0, Math.PI * 2);
+    ctx.fill();
+  }
+};

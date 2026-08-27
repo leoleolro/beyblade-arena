@@ -45,6 +45,9 @@ export interface BeyEntry {
   };
 }
 
+import { entry as phoenixwing } from './phoenixwing';
+import { entry as cobaltdragoon } from './cobaltdragoon';
+import { entry as wizardarrow } from './wizardarrow';
 import { entry as tyrannobeat } from './tyrannobeat';
 import { entry as vipertail } from './vipertail';
 import { entry as dranbuster } from './dranbuster';
@@ -123,6 +126,9 @@ export const BEY_REGISTRY: BeyEntry[] = [
   leonclaw,
   tyrannobeat,
   vipertail,
+  phoenixwing,
+  cobaltdragoon,
+  wizardarrow,
 ];
 
 /** The anime design set — the projection beydex.ts used to hand-maintain. */

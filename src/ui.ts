@@ -8,7 +8,7 @@ import { shopSection } from './render/shopSection';
 import { topModelFor } from './render/topModelIndex';
 import * as C from './sim/constants';
 import { SKINS, skinById } from './render/skins';
-import type { Channel } from './audio';
+import type { Channel } from './audio/engine';
 import { THEMES, themeById } from './render/theme';
 import { MODES, modeById, stadiumsByLook } from './modes';
 import { groupByClass } from './render/beyClass';
@@ -642,6 +642,93 @@ export class Ui {
         'Oppose it for a longer run of violent exchanges where attack pays off.';
       spinRow.appendChild(spinNote);
     return spinRow;
+  }
+
+  /**
+   * Audio: one switch per bus, plus a master level.
+   *
+   * FOUR switches rather than one "sound" toggle, because the four fail
+   * differently and a player who wants three of them has to be able to say so.
+   * The two continuous channels are the reason the split exists at all: they are
+   * the only sounds in the game that never stop, so they are the only ones that
+   * can become fatiguing, and "turn the arena off but keep the hits" is a real
+   * preference that a single toggle cannot express. Music gets its own for the
+   * most common preference there is — something else is already playing.
+   *
+   * The level is a separate question from the switches and gets a separate
+   * control: which of these do I want to hear at all, versus how loud is this
+   * game against everything else on the machine.
+   *
+   * Persistence is the AudioEngine's own — it writes every change straight to
+   * localStorage under its settings key, the same shape as `saveThemeId` and
+   * `saveImpactFrames`, so there is nothing to save from here.
+   */
+  private audioSection(): HTMLElement {
+    const g = this.game;
+    const row = document.createElement('div');
+    row.className = 'slot';
+    row.style.marginTop = '20px';
+    row.innerHTML = '<h4>Audio</h4>';
+
+    const chips = document.createElement('div');
+    chips.className = 'chips';
+    const channels: [Channel, string, string][] = [
+      ['master', 'All sound', 'everything'],
+      ['effects', 'Impacts & cues', 'hits, launches, moves'],
+      ['spin', 'Arena bed', 'spin whine — pitch tracks spin left'],
+      ['music', 'Music', 'builds as the round gets close'],
+    ];
+    for (const [ch, label, note] of channels) {
+      const chip = document.createElement('button');
+      const set = (): void => {
+        chip.className = 'chip' + (g.audio.isOn(ch) ? ' on' : '');
+        chip.innerHTML = `<span>${escapeHtml(label)}<br><small>${escapeHtml(
+          g.audio.isOn(ch) ? note : 'off',
+        )}</small></span>`;
+      };
+      set();
+      chip.addEventListener('click', () => {
+        // The click IS the gesture, and for a player who opens the settings
+        // before ever pressing Play it is the first one — so unmuting has to
+        // build the context, or the switch reads as broken.
+        g.audio.resume();
+        g.audio.setChannel(ch, !g.audio.isOn(ch));
+        set();
+      });
+      chips.appendChild(chip);
+    }
+    row.appendChild(chips);
+
+    const vol = document.createElement('label');
+    vol.className = 'volume';
+    const readout = document.createElement('b');
+    readout.textContent = pct(g.audio.volume);
+    const slider = document.createElement('input');
+    slider.type = 'range';
+    slider.min = '0';
+    slider.max = '100';
+    // Whole percent. The gain is continuous underneath, but a step finer than
+    // this is a step nobody can hear and a slider nobody can land on.
+    slider.step = '1';
+    slider.value = String(Math.round(g.audio.volume * 100));
+    slider.setAttribute('aria-label', 'Master volume');
+    // 'input' rather than 'change' so the level moves under the thumb — a volume
+    // control that only applies on release cannot be set by ear, which is the
+    // only way anyone sets one.
+    slider.addEventListener('input', () => {
+      const v = Number(slider.value) / 100;
+      g.audio.resume();
+      g.audio.setVolume(v);
+      readout.textContent = pct(v);
+    });
+    const label = document.createElement('span');
+    label.textContent = 'Volume';
+    vol.appendChild(label);
+    vol.appendChild(slider);
+    vol.appendChild(readout);
+    row.appendChild(vol);
+
+    return row;
   }
 
   private explodedView(): HTMLElement {
@@ -1421,42 +1508,10 @@ export class Ui {
 
     panel.appendChild(row);
 
-    // Audio, split by channel. The sustained spin drone is the fatiguing one
-    // and is off by default, so it needs its own switch rather than being
-    // bundled under a single "sound" toggle.
-    const audioRow = document.createElement('div');
-    audioRow.className = 'slot';
-    audioRow.style.marginTop = '20px';
-    audioRow.innerHTML = '<h4>Audio</h4>';
-    const audioChips = document.createElement('div');
-    audioChips.className = 'chips';
-
-    const channels: [Channel, string, string][] = [
-      ['master', 'All sound', 'everything'],
-      ['effects', 'Impacts & cues', 'hits, launches, moves'],
-      ['drone', 'Spin drone', 'continuous — off by default'],
-    ];
-    for (const [ch, label, note] of channels) {
-      const chip = document.createElement('button');
-      const set = () => {
-        chip.className = 'chip' + (g.audio.isOn(ch) ? ' on' : '');
-        chip.innerHTML = `<span>${escapeHtml(label)}<br><small>${escapeHtml(
-          g.audio.isOn(ch) ? note : 'off',
-        )}</small></span>`;
-      };
-      set();
-      chip.addEventListener('click', () => {
-        g.audio.resume();
-        g.audio.setChannel(ch, !g.audio.isOn(ch));
-        set();
-      });
-      audioChips.appendChild(chip);
-    }
-    audioRow.appendChild(audioChips);
-    panel.appendChild(audioRow);
+    panel.appendChild(this.audioSection());
 
     // The manga cuts get their own switch beside the audio ones, for the same
-    // reason the spin drone does: it is the strongest, most repetitive device
+    // reason the arena bed does: it is the strongest, most repetitive device
     // in the game, and how much of it is too much is a matter of taste rather
     // than a number anyone can pick correctly for everybody.
     const fxRow = document.createElement('div');

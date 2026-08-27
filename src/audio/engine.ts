@@ -4,6 +4,7 @@ import {
   STING_ROOT_MIDI,
   STING_STEP,
   burstVoice,
+  clampUnit,
   countdownVoice,
   duckFor,
   duckForImpact,
@@ -82,6 +83,19 @@ export interface AudioSettings {
    * already playing — is one of the most common preferences there is.
    */
   music: boolean;
+  /**
+   * Master level, 0..1, multiplied into MASTER_GAIN.
+   *
+   * A continuous level ON TOP OF the per-channel switches, not instead of them.
+   * The switches answer "which of these do I want to hear at all", which is a
+   * different question from "how loud is this game against everything else on
+   * the machine", and collapsing the two costs the player one of the answers.
+   *
+   * Defaults to 1 rather than to something safer: MASTER_GAIN already carries
+   * the headroom, and a game that arrives quiet is a game whose first
+   * impression is that the audio is broken.
+   */
+  volume: number;
 }
 
 const SETTINGS_KEY = 'beyblade-arena.audio.v2';
@@ -91,6 +105,7 @@ const DEFAULT_SETTINGS: AudioSettings = {
   effects: true,
   spin: true,
   music: true,
+  volume: 1,
 };
 
 /** Headroom. Everything sums into this, so it is not 1.0. */
@@ -245,6 +260,22 @@ export class AudioEngine {
     return this.settings[channel];
   }
 
+  /** Master level, 0..1, always a real number even if storage says otherwise. */
+  get volume(): number {
+    // Guarded rather than trusted. `loadSettings` merges whatever JSON is in
+    // storage straight over the defaults, and `clampUnit(NaN)` is NaN — which,
+    // written into an AudioParam, silences the whole graph with no error and no
+    // way for the player to work out why.
+    const v = this.settings.volume;
+    return Number.isFinite(v) ? clampUnit(v) : 1;
+  }
+
+  setVolume(v: number): void {
+    this.settings.volume = Number.isFinite(v) ? clampUnit(v) : 1;
+    this.saveSettings();
+    this.applyChannelGains();
+  }
+
   setChannel(channel: Channel, on: boolean): void {
     this.settings[channel] = on;
     this.saveSettings();
@@ -264,7 +295,11 @@ export class AudioEngine {
     if (!ctx || !this.master || !this.fx || !this.spinBus || !this.musicBus) return;
     const t = ctx.currentTime;
     // 0.05 rather than an instant set: a step in a gain is a click.
-    this.master.gain.setTargetAtTime(this.settings.master ? MASTER_GAIN : 0, t, 0.05);
+    this.master.gain.setTargetAtTime(
+      this.settings.master ? MASTER_GAIN * this.volume : 0,
+      t,
+      0.05,
+    );
     this.fx.gain.setTargetAtTime(this.settings.effects ? 1 : 0, t, 0.05);
     this.spinBus.gain.setTargetAtTime(this.settings.spin ? 1 : 0, t, 0.05);
     this.musicBus.gain.setTargetAtTime(

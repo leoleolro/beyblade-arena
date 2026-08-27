@@ -53,7 +53,10 @@ export const LADDER: Rival[] = [
     skinId: 'ember',
     difficulty: 'rookie',
     line: 'All attack, no patience. Survive the opening and it burns itself out.',
-    unlocks: { layers: ['luinor', 'tempest', 'dransword', 'blackshell', 'dranbuster'], drivers: ['volcanic', 'rush'] },
+    // Flat rides with Nyx's all-attack theme: it is the plain Attack Bit the
+    // Xtreme Line was designed around, and the one the rest of the attack Bits
+    // are variations on, so it belongs on the rung that teaches attack.
+    unlocks: { layers: ['luinor', 'tempest', 'dransword', 'blackshell', 'dranbuster'], drivers: ['volcanic', 'rush', 'flat'] },
   },
   {
     id: 'orin',
@@ -75,7 +78,7 @@ export const LADDER: Rival[] = [
     skinId: 'solar',
     difficulty: 'blader',
     line: 'No weakness worth naming. Out-read it or lose slowly.',
-    unlocks: { layers: ['fafnir', 'golem', 'magejab', 'knightshield', 'silverwolf'], discs: ['blitz', 'r360'], drivers: ['accel'] },
+    unlocks: { layers: ['fafnir', 'golem', 'magejab', 'knightshield', 'silverwolf'], discs: ['blitz', 'r360', 'r960'], drivers: ['accel'] },
   },
   {
     id: 'kes',
@@ -86,7 +89,11 @@ export const LADDER: Rival[] = [
     skinId: 'void',
     difficulty: 'blader',
     line: 'Charging this is feeding it. Outlast it instead.',
-    unlocks: { layers: ['aegis', 'wyrm', 'dsycther', 'wizardrod', 'leonclaw'], discs: ['r560'], drivers: ['bastion', 'gearflat'], skins: ['void'] },
+    // Dot is the Iron Wall's own Bit — Defense 55, the highest of any Bit in
+    // the source data, and the most planted tip in the catalogue. WizardArrow
+    // ships on this rung rather than an earlier one because 5-60 does too, and
+    // its preset wants both at once.
+    unlocks: { layers: ['aegis', 'wyrm', 'dsycther', 'wizardrod', 'leonclaw', 'wizardarrow'], discs: ['r560'], drivers: ['bastion', 'gearflat', 'dot'], skins: ['void'] },
   },
   {
     id: 'rhea',
@@ -97,7 +104,7 @@ export const LADDER: Rival[] = [
     skinId: 'rose',
     difficulty: 'champion',
     line: 'Reads your move before you commit to it. Blocks are not free here.',
-    unlocks: { layers: ['ragnaruk', 'solaris', 'hellsscythe', 'orichalcum', 'tyrannobeat'], discs: ['wall', 'outer', 'r460'], drivers: ['octa'], skins: ['solar'] },
+    unlocks: { layers: ['ragnaruk', 'solaris', 'hellsscythe', 'orichalcum', 'tyrannobeat', 'phoenixwing'], discs: ['wall', 'outer', 'r460'], drivers: ['octa'], skins: ['solar'] },
   },
   {
     id: 'zeph',
@@ -112,7 +119,11 @@ export const LADDER: Rival[] = [
     // skin, and the only rival granting no layer. Nosferu is the right thing to
     // put here: it is the one layer whose mechanic changes how you launch, so
     // clearing the ladder hands over a new question rather than a spare part.
-    unlocks: { layers: ['nosferu', 'chimera', 'sphinxcowl', 'vipertail'], discs: ['r980'], drivers: ['orbit'], skins: ['rose'] },
+    // CobaltDragoon joins Nosferu here for the same reason Nosferu is here: it
+    // is the roster's only LEFT-SPIN transcribed attacker, so clearing the
+    // ladder hands over a new question — every spin-steal layer in the catalog
+    // only works against an opposite-spin opponent — rather than a spare part.
+    unlocks: { layers: ['nosferu', 'chimera', 'sphinxcowl', 'vipertail', 'cobaltdragoon'], discs: ['r980'], drivers: ['orbit'], skins: ['rose'] },
   },
 ];
 

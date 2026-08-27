@@ -34,7 +34,34 @@ export interface StadiumHandles {
   frames: THREE.MeshStandardMaterial[];
   /** Wall signage. */
   signs: THREE.MeshBasicMaterial[];
+  /**
+   * The arena's own colours, kept rather than applied once and forgotten.
+   *
+   * WHY. `applyStadiumTheme` runs on every theme switch and deliberately does
+   * not rebuild, so with no copy here it had nothing to repaint FROM and could
+   * only ever restore the THEME's hexes. Verified in the browser: standing in
+   * the X-Rail stadium and re-applying its own theme turned the gold tornado
+   * ring red, because that is the Anime theme's `ridgeColour`, and nothing put
+   * the gold back until the player changed arena. Every arena's palette was one
+   * theme click from being erased.
+   *
+   * Held as the raw `look` rather than as the resolved palette because the
+   * resolution depends on `Theme.acceptsArenaLook`, which is exactly the thing
+   * that changes underneath it — the same reason `floorDetail` is built from
+   * `look` and only *assigned* per theme.
+   */
+  look: ArenaLook | null;
 }
+
+/**
+ * The arena's colour where it has an opinion and the theme allows one.
+ *
+ * `undefined` and "the arena said nothing" are the same thing here, so a floor
+ * that sets only `dish` still inherits the theme's wall and posts rather than
+ * inheriting black.
+ */
+const pick = (accepts: boolean, arena: number | undefined, themed: number): number =>
+  accepts && arena !== undefined ? arena : themed;
 
 /**
  * Repaint anything carrying an `arenaTint`.
@@ -54,11 +81,14 @@ function retint(mats: THREE.Material[], accepts: boolean): void {
 
 /** Push a theme's values onto an already-built stadium. */
 export function applyStadiumTheme(h: StadiumHandles, t: Theme): void {
+  const accepts = t.acceptsArenaLook;
+  const look = h.look ?? undefined;
+
   // Under toon the dish colour lives in its painted texture and the material
   // tint is left at white; re-applying the hex here would multiply the colour
   // into itself and the dish would come out near-black.
   if (!t.toon) {
-    h.floor.color.setHex(t.dishColour);
+    h.floor.color.setHex(pick(accepts, look?.dish, t.dishColour));
     h.floor.metalness = t.dishMetalness;
     h.floor.roughness = t.dishRoughness;
     // The surface treatment is colourless (see DETAIL_PALETTE) but it is still
@@ -76,21 +106,26 @@ export function applyStadiumTheme(h: StadiumHandles, t: Theme): void {
   retint(h.frames, t.acceptsArenaLook);
   retint(h.signs, t.acceptsArenaLook);
 
-  h.ridge.color.setHex(t.ridgeColour);
+  // Opacity, metalness and roughness stay the THEME's in every line below.
+  // Those are what make Anime look like Anime; an arena reaches its colours
+  // only — see the note on ArenaSpec.look.
+  h.ridge.color.setHex(pick(accepts, look?.ridge, t.ridgeColour));
   h.ridge.opacity = t.ridgeOpacity;
 
+  const guideColour = pick(accepts, look?.guide, t.guideColour);
   for (const g of h.guides) {
-    g.color.setHex(t.guideColour);
+    g.color.setHex(guideColour);
     g.opacity = t.guideOpacity;
   }
 
-  h.wall.color.setHex(t.wallColour);
+  h.wall.color.setHex(pick(accepts, look?.wall, t.wallColour));
   h.wall.metalness = t.wallMetalness;
   h.wall.roughness = t.wallRoughness;
 
+  const postColour = pick(accepts, look?.post, t.postColour);
   for (const p of h.posts) {
-    p.color.setHex(t.postColour);
-    p.emissive.setHex(t.postColour);
+    p.color.setHex(postColour);
+    p.emissive.setHex(postColour);
     p.emissiveIntensity = t.postEmissive;
   }
 
@@ -142,9 +177,14 @@ export function markFinishPocket(
   index: number | null,
   theme: Theme,
 ): void {
+  // The arena's own post colour where it has one, for the same reason
+  // `applyStadiumTheme` takes it: this function repaints every post on every
+  // arena change, so restoring the theme's hex here would undo the arena's
+  // palette one frame after the rebuild set it.
+  const base = pick(theme.acceptsArenaLook, h.look?.post, theme.postColour);
   for (const p of h.posts) {
-    p.color.setHex(theme.postColour);
-    p.emissive.setHex(theme.postColour);
+    p.color.setHex(base);
+    p.emissive.setHex(base);
   }
   if (index === null) return;
   for (const side of [0, 1]) {
@@ -507,6 +547,10 @@ export function buildStadium(
     floorDetail,
     frames: furniture.frame,
     signs: furniture.sign,
+    // `look`, not `paint`: a theme that is refusing arena palettes right now
+    // may be switched away from without a rebuild, and the arena's colours have
+    // to survive that. Same argument as `floorDetail` two fields up.
+    look: look ?? null,
   };
 }
 

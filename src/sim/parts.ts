@@ -128,6 +128,35 @@ export const LAYERS: LayerPart[] = [
   // source supplies rather than one invented to patch the measured gap.
   { id: 'tyrannobeat',name: 'Tyranno Beat',   kind: 'layer', archetype: 'attack', mass: 0.516, radius: 0.1007, attack: 1.64, defense: 1.14, burstResist: 0.89, spinSteal: 0.0, blades: 4, colour: 0x166534 },
   { id: 'vipertail',  name: 'Viper Tail',     kind: 'layer', archetype: 'stamina', mass: 0.482, radius: 0.1065, attack: 1.08, defense: 0.96, burstResist: 1.16, spinSteal: 0.0, blades: 3, colour: 0x3f6212 },
+
+  // Three more transcriptions, chosen for what the roster's SILHOUETTE
+  // vocabulary was missing rather than for another stat extreme. Same mapping
+  // as the blocks above — nothing new was invented for these.
+  //
+  // PhoenixWing is the only blade in the data whose contact points break its
+  // own outline: "at the start of each of the three blades is a protruding
+  // 'Launcher Hook' — unlike other Blades, PhoenixWing's Launcher Hooks
+  // protrude past the perimeter of the Blade, creating contact points". It is
+  // also the heaviest blade the source line had at release, 38.0 g.
+  //
+  // CobaltDragoon is the roster's first LEFT-SPIN transcription — "a left-spin
+  // four-sided Attack Type Blade with four upward slanting blades" — so it is
+  // the first one whose ramps rake the opposite way from every blade already
+  // here. Spin direction is carried on the design and the preset, not on the
+  // LayerPart, so nothing in this row records it; see beys/cobaltdragoon.ts.
+  //
+  // WizardArrow is TWO-fold symmetric where every other stamina blade in the
+  // catalogue is three- or five-fold, and it is the reason the mass mapping
+  // reads the way it does: at 31.8 g it lands exactly on that formula's floor,
+  // because the formula was fitted to the lightest blade in the source data and
+  // this is that blade. Its own product copy states the stamina rule the whole
+  // archetype rests on — "two large blades create an outward center of gravity,
+  // which generates strong centrifugal force" — which is why the S/100 term
+  // widens the radius rather than narrowing it.
+  { id: 'phoenixwing',  name: 'Phoenix Wing',   kind: 'layer', archetype: 'attack',  mass: 0.531, radius: 0.1020, attack: 1.56, defense: 1.05, burstResist: 0.95, spinSteal: 0.0, blades: 3, colour: 0xb91c1c },
+  { id: 'cobaltdragoon',name: 'Cobalt Dragoon', kind: 'layer', archetype: 'attack',  mass: 0.528, radius: 0.1033, attack: 1.56, defense: 0.87, burstResist: 1.01, spinSteal: 0.0, blades: 4, colour: 0x0047ab },
+  { id: 'wizardarrow',  name: 'Wizard Arrow',   kind: 'layer', archetype: 'stamina', mass: 0.44,  radius: 0.1072, attack: 0.84, defense: 1.14, burstResist: 1.19, spinSteal: 0.0, blades: 2, colour: 0xeab308 },
+
   // The vampire. The one layer in the catalog with `sameSteal`: it absorbs in
   // *every* matchup, not only against an opposite-spin opponent, so there is no
   // launch that denies it its mechanic (see constants.ts, spin steal).
@@ -225,6 +254,21 @@ export const DISCS: DiscPart[] = [
   { id: 'r460', name: '4-60', kind: 'disc', mass: 0.49, stability: 1.45, spinRetention: 1.09, colour: 0xb8c1cc, protrusions: 4, heightMm: 6.0 },
   { id: 'r560', name: '5-60', kind: 'disc', mass: 0.59, stability: 0.92, spinRetention: 1.20, colour: 0xaab5c2, protrusions: 5, heightMm: 6.0 },
   { id: 'r980', name: '9-80', kind: 'disc', mass: 0.68, stability: 1.28, spinRetention: 1.13, colour: 0x9ba7b6, protrusions: 9, heightMm: 8.0 },
+
+  // 9-60 — nine protrusions that are deliberately NOT nine equal lugs, which is
+  // the one place the naming system undersells the part.
+  //
+  // "Compared to previous Ratchets, the protrusions of 9-60 are narrower and do
+  // not protrude outwards as much... Six of the nine protrusions are merely
+  // small nubs, while three are intended to line up with the Launcher Hooks of
+  // the PhoenixWing Blade, creating 'Attack Points'." That recessed perimeter
+  // is also why the source rates it the least burst-prone of the 60s.
+  //
+  // Published 13 / 10 / 7 at 6.2 g, through the same three formulas as the
+  // block above. It lands between 3-60 and 4-60 on defence and between 3-60 and
+  // 5-60 on stamina — which is exactly what a recessed nine-point rim should
+  // do: more points than any other 60, less of each one sticking out.
+  { id: 'r960', name: '9-60', kind: 'disc', mass: 0.462, stability: 1.277, spinRetention: 1.129, colour: 0xa4aebb, protrusions: 9, heightMm: 6.0 },
 ];
 
 /**
@@ -310,6 +354,41 @@ export const DRIVERS: DriverPart[] = [
   { id: 'accel',    name: 'Accel',    kind: 'driver', archetype: 'attack',  mass: 0.30, friction: 0.60, spinRetention: 0.89, wander: 1.21, burstResist: 1.31, railGrip: 1.00 },
   { id: 'rush',     name: 'Rush',     kind: 'driver', archetype: 'attack',  mass: 0.18, friction: 0.60, spinRetention: 1.03, wander: 1.21, burstResist: 1.31, railGrip: 0.75 },
   { id: 'ball',     name: 'Ball',     kind: 'driver', archetype: 'stamina', mass: 0.18, friction: 0.90, spinRetention: 1.45, wander: 0.22, burstResist: 0.96, railGrip: 0.25 },
+
+  // FLAT — the Bit the Xtreme Line was built for, and the plain one the whole
+  // attack half of the catalogue is a variation on: "an Attack Type Bit that
+  // features a flat tip with a shallow circular indentation in the center",
+  // 7.2 mm across and 29.6 mm tall. It is the only Bit page in the source data
+  // that carries a dimensions table at all.
+  //
+  // Published 40 / 15 / 10 / dash 35 / burst 80 at 2.2 g, through the same six
+  // formulas. It reads as Accel with the corners knocked off — same attack, so
+  // the same squared wander; more defence, so a grippier 0.70; and dash 35
+  // against 40, so it engages the rail slightly less surely. The 0.4 g it gives
+  // up to Accel is most of the difference between them.
+  { id: 'flat',     name: 'Flat',     kind: 'driver', archetype: 'attack',  mass: 0.207, friction: 0.70, spinRetention: 0.89, wander: 1.212, burstResist: 1.31, railGrip: 0.875 },
+
+  // DOT — the defence Bit, and the catalogue's new friction ceiling.
+  //
+  // Published 10 / 55 / 25 / dash 10 / burst 30 at 2.0 g. Defence 55 is the
+  // highest of any Bit in the source data and the friction formula turns it
+  // into 1.50, above Bastion's 1.35 — so the most planted tip in the game is
+  // now a two-gram plastic Bit rather than a driver, which is the sort of thing
+  // transcription produces and hand-tuning never would. It pays the published
+  // price: burst 30 is the softest of the transcribed Bits and dash 10 locks it
+  // out of the rail.
+  //
+  // 2.0 g lands exactly on the mass formula's floor, for the same reason
+  // WizardArrow lands on the blade formula's: the reference gram figure IS this
+  // part's weight, because it is the lightest Bit in the data.
+  //
+  // ITS SHAPE IS NOT RECORDED, and that is worth writing down rather than
+  // papering over. The fandom Description section is an explicit placeholder —
+  // "In-depth information for the Dot Bit will be placed here once drafting has
+  // been completed for it" — so every number above comes from the infobox,
+  // which IS filled in, and nothing here comes from the widely repeated
+  // "tip with many protrusions" line, which is third-party rather than wiki.
+  { id: 'dot',      name: 'Dot',      kind: 'driver', archetype: 'defense', mass: 0.16,  friction: 1.50, spinRetention: 1.10, wander: 0.132, burstResist: 0.96, railGrip: 0.25 },
 ];
 
 const byId = <T extends { id: string }>(list: T[], id: string): T => {

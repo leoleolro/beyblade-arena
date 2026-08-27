@@ -87,6 +87,18 @@ export class MusicDirector {
 
   private padOscs: OscillatorNode[] = [];
   private tensionOscs: OscillatorNode[] = [];
+  /**
+   * Whether the permanent oscillators have been started.
+   *
+   * An OscillatorNode can be started exactly ONCE in its life; a second
+   * `start()` throws InvalidStateError. The pad and tension voices are
+   * permanent by design (see `buildPad`), and `stop()` deliberately leaves them
+   * running at zero gain — so the *second* `start()` is not a hypothetical: it
+   * is what a player does the moment they toggle music off and back on again.
+   * Without this flag that toggle threw and took the rest of the click handler
+   * down with it.
+   */
+  private oscsStarted = false;
 
   private bar = 0;
   private chordIndex = 0;
@@ -137,7 +149,10 @@ export class MusicDirector {
     // scheduling it in the past by the time the call returns.
     this.startTime = now + 0.08;
     this.nextBarTime = this.startTime;
-    for (const o of [...this.padOscs, ...this.tensionOscs]) o.start(this.startTime);
+    if (!this.oscsStarted) {
+      for (const o of [...this.padOscs, ...this.tensionOscs]) o.start(this.startTime);
+      this.oscsStarted = true;
+    }
     this.applyChord(CHORDS[this.chordIndex], this.startTime);
     this.tick();
     this.timer = setInterval(this.tick, BAR_SECONDS * 500);

@@ -1,5 +1,6 @@
 import { AiController } from './ai';
-import { Audio } from './audio';
+import { AudioEngine } from './audio/engine';
+import type { Scene, TopAudioState } from './audio/engine';
 import { LADDER, endlessRival, rivalAt } from './ladder';
 import type { Rival, Unlocks } from './ladder';
 import { Progress } from './progress';
@@ -53,6 +54,37 @@ const EMPTY_HITS: never[] = [];
 
 const PLAYER_ID = 'player';
 const AI_ID = 'ai';
+
+/**
+ * Which mix each screen sits in. See AudioEngine.Scene.
+ *
+ * A table rather than a chain of ifs because the mapping is not one-to-one in
+ * either direction — five menu screens share one scene, and the two result
+ * screens share another — and a lookup makes an unmapped screen a compile
+ * error instead of a silent fall-through to whatever the last branch was.
+ */
+const SCREEN_SCENE: Record<Screen, Scene> = {
+  home: 'menu',
+  mode: 'menu',
+  howto: 'menu',
+  garage: 'menu',
+  stadium: 'menu',
+  launch: 'launch',
+  battle: 'battle',
+  'round-over': 'result',
+  'match-over': 'result',
+};
+
+/**
+ * Seconds left on the round clock that get a countdown pip.
+ *
+ * The pips exist because the clock is the one way to lose that the player
+ * cannot see coming — a top going out is on screen, a top running down is a bar
+ * they are not looking at, and "TIME UP" arriving unannounced reads as the game
+ * cutting the round short. Three is the whole of `COUNTDOWN_MIDI`'s pip range,
+ * so it is also all the design has notes for.
+ */
+const CLOCK_PIP_FROM = 3;
 
 /**
  * Owns the match: screen flow, the launch minigame, input, and pumping the sim
@@ -221,7 +253,24 @@ export class Game {
    */
   private finishHold = 0;
 
-  readonly audio = new Audio();
+  readonly audio = new AudioEngine();
+  /**
+   * Reused per-top audio states, mutated in place each frame.
+   *
+   * `frame()` runs every tick for the whole round, so building two fresh
+   * objects and an array for it is 120 allocations a second thrown away — the
+   * same reason `EMPTY_HITS` exists a few lines up. The engine only reads them
+   * synchronously and never keeps a reference, so reuse is safe.
+   */
+  private audioTops: TopAudioState[] = [];
+  /**
+   * The last whole second the clock countdown fired on, or 0 for none.
+   *
+   * `roundTime` advances in fixed steps, so the same whole second is crossed on
+   * several consecutive frames; without this the last three seconds of a round
+   * would be a pip per frame rather than a pip per second.
+   */
+  private lastClockPip = 0;
   private running = false;
 
   private events: GameEvents;
@@ -384,8 +433,19 @@ export class Game {
     // Purely visual: drops both tops into the dish and swings the camera round
     // to the player's entry side. Must follow setBeys, which clears it.
     this.renderer.start(playerAngle);
+    this.lastClockPip = 0;
     this.audio.resume();
     this.audio.launch(this.lockedPower);
+    // "GO", laid over the rip.
+    //
+    // The pips it belongs to are on the round CLOCK rather than here — nothing
+    // in this game counts you in, so 3-2-1 before a launch would be three
+    // seconds of new dead time invented for a sound. GO still earns its place
+    // on its own: it is an octave above the first pip, which the ear reads as
+    // "arrived" with or without having heard them, and it establishes the key
+    // everything else in the mix is written in at the one moment the player is
+    // listening rather than pressing.
+    this.audio.countdown(0);
 
     // Confirm a perfect launch.
     //
@@ -532,7 +592,7 @@ export class Game {
    */
   quitToGarage(): void {
     if (this.screen === 'home' || this.screen === 'garage') return;
-    this.audio.stopWhines();
+    this.audio.stopSpin();
     this.hitstop = 0;
     this.finishHold = 0;
     // Rebuild against the current rival so the garage's "next opponent" card
@@ -585,11 +645,66 @@ export class Game {
   }
 
   private setScreen(s: Screen): void {
-    // Leaving the arena silences anything sustained. Belt and braces against
-    // a drone outliving the round that spawned it.
-    if (s !== 'battle') this.audio.stopWhines();
+    // Moving the mix is the same call as leaving the arena: `setScene` silences
+    // every sustained voice for any scene that is not 'battle', which is the
+    // belt and braces against a spin bed outliving the round that spawned it.
+    this.audio.setScene(SCREEN_SCENE[s]);
     this.screen = s;
     this.events.onScreen(s);
+  }
+
+  /**
+   * Whether either fighter can take the match this round.
+   *
+   * Derived from the scoring table rather than written as a number: a knockout
+   * is the ordinary decisive finish, so "within one knockout of the target" is
+   * what match point actually means, and it stays true if either constant is
+   * retuned. The music reads this to arm its tension layer from the first
+   * second of the round rather than once something has happened.
+   */
+  private get matchPoint(): boolean {
+    const near = C.POINTS_TO_WIN - C.POINTS_KNOCKOUT;
+    return this.playerScore >= near || this.rivalScore >= near;
+  }
+
+  /**
+   * Hand the audio layer this frame of the round.
+   *
+   * One call covering the spin bed, the grind of two tops leaning on each
+   * other, and the music's intensity — see AudioEngine.frame. `live` is the
+   * round genuinely running rather than the screen being 'battle', because the
+   * screen stays 'battle' for the whole finish hold and the bed must stop when
+   * the fight does, not when the panel appears.
+   */
+  private pumpAudio(dt: number): void {
+    const beys = this.battle.beys;
+    for (let i = 0; i < beys.length; i++) {
+      const b = beys[i];
+      const slot = (this.audioTops[i] ??= { id: b.id, spinNorm: 0, alive: false });
+      slot.id = b.id;
+      // Normalised against SPIN_REF and NOT against this top's own
+      // `spinAtLaunch`, which is what the HUD bar uses. The bar answers "how
+      // much of what you started with is left", which is the right question for
+      // a percentage; the bed answers "how fast is this thing actually
+      // turning", which is the right question for a pitch. Per-top
+      // normalisation would make a weak launch and a strong one sound
+      // identical at the start and put two tops at genuinely different speeds
+      // on the same note.
+      slot.spinNorm = Math.abs(b.spin) / C.SPIN_REF;
+      slot.alive = b.alive;
+    }
+    this.audioTops.length = beys.length;
+
+    this.audio.frame(
+      {
+        tops: this.audioTops,
+        contacts: this.battle.contacts,
+        roundTime: this.battle.roundTime,
+        matchPoint: this.matchPoint,
+        live: this.screen === 'battle' && this.battle.phase === 'battle',
+      },
+      dt,
+    );
   }
 
   start(): void {
@@ -648,13 +763,19 @@ export class Game {
         // stays free of presentation concerns and replays identically.
         for (const b of this.battle.beys) {
           const was = this.railWas.get(b.id) ?? 0;
-          if (was === 0 && b.railTime > 0) this.audio.railEngage(b.railTime);
-          else if (was > 0 && b.railTime === 0) this.audio.railRelease();
+          // The tip's own Dash stat rides along: a Gear Flat's slingshot should
+          // not sound like a Ball's, and the sim already publishes the number.
+          if (was === 0 && b.railTime > 0) {
+            this.audio.railEngage(b.railTime, b.stats.railGrip);
+          } else if (was > 0 && b.railTime === 0) this.audio.railRelease();
           this.railWas.set(b.id, b.railTime);
         }
 
         for (const h of this.battle.hits) {
-          this.audio.impact(h.strength, h.opposite);
+          // The whole HitEvent, not two of its fields: strength picks the tier,
+          // `opposite` adds the bite, and `crit`/`perfectBlock` are what make a
+          // punish audibly different from an exchange. See design.impactVoice.
+          this.audio.hit(h);
           if (h.strength >= C.HITSTOP_THRESHOLD) {
             this.hitstop = C.HITSTOP_DURATION;
             if (this.renderer.wantsImpactFlash) {
@@ -662,13 +783,13 @@ export class Game {
             }
           }
         }
-        // Only while the round is genuinely running. `screen` stays 'battle'
-        // for the whole finish hold, so without this guard the drone is
-        // recreated on the frame after roundEnd() stopped it and then plays on
-        // through the result screen and menus, never stopping.
+        // The clock running out, announced. Ceil rather than floor so the pip
+        // named "1" plays with a second still to go rather than as time expires.
         if (this.battle.phase === 'battle') {
-          for (const b of this.battle.beys) {
-            this.audio.updateWhine(b.id, Math.abs(b.spin) / C.SPIN_REF, b.alive);
+          const pip = Math.ceil(C.ROUND_TIME_LIMIT - this.battle.roundTime);
+          if (pip >= 1 && pip <= CLOCK_PIP_FROM && pip !== this.lastClockPip) {
+            this.lastClockPip = pip;
+            this.audio.countdown(pip);
           }
         }
       }
@@ -676,13 +797,28 @@ export class Game {
       // The round is decided, but hold on the stadium for a beat first.
       if (this.battle.phase !== 'battle' && this.finishHold <= 0) {
         this.finishHold = C.FINISH_HOLD_TIME;
-        this.audio.roundEnd(this.battle.lastRound?.winnerId === PLAYER_ID);
+        // How the round ENDED, on the frame it ended.
+        //
+        // Burst and ring-out are worth the same 2 points and a player who
+        // cannot tell which rule just paid out cannot learn the rules, so they
+        // get two different envelope shapes rather than two pitches of one —
+        // one crack then debris, against a single continuous fall. The verdict
+        // sting is deliberately NOT played here; see the finish-hold block.
+        // A spin finish and a timeout get nothing here on purpose: the bed
+        // winding down to a low, muffled wobble IS the sound of that ending,
+        // and `pumpAudio` fades it out on this same frame now the phase has
+        // left 'battle'. Firing a one-shot over it would talk across the one
+        // cue the spin loop exists to deliver.
+        const last = this.battle.lastRound;
+        if (last?.reason === 'burst') this.audio.burst();
+        else if (last?.reason === 'knockout') {
+          this.audio.ringOut(last.xtremeFinish === true);
+        }
         this.renderer.finish();
         // An Xtreme Finish is a knockout, but it must not be ANNOUNCED as one:
         // being handed 3 points and told "ring out" teaches the player that the
         // arena is arbitrary, which is the opposite of what a graded pocket is
         // for. The card is the only place the rule is ever explained.
-        const last = this.battle.lastRound;
         this.events.onFinish(
           last?.xtremeFinish ? 'xtreme' : (last?.reason ?? 'timeout'),
           last?.winnerId === PLAYER_ID,
@@ -701,10 +837,26 @@ export class Game {
     if (this.finishHold > 0) {
       this.finishHold = Math.max(0, this.finishHold - dt);
       if (this.finishHold === 0) {
+        // The verdict, at the end of the hold rather than at the start of it.
+        //
+        // The finish sound and the sting are two different statements — "it
+        // burst" and "you won" — and stacking them on the same frame turns both
+        // into mush, because the finish duck drops the music to near-silence for
+        // 0.9 s precisely so the finish can ring out alone. Landing the sting as
+        // the result panel appears puts it on the thing it is describing.
+        this.audio.roundEnd(this.battle.lastRound?.winnerId === PLAYER_ID);
         if (this.battle.phase === 'round-over') this.setScreen('round-over');
         else if (this.battle.phase === 'match-over') this.setScreen('match-over');
       }
     }
+
+    // The spin bed, the grind and the music's intensity, once per frame.
+    //
+    // Outside the hitstop branch and outside the `phase === 'battle'` guard on
+    // purpose: the bed has to keep breathing through a freeze — a frozen screen
+    // in silence reads as a dropped frame — and it has to be told when the round
+    // has stopped so it can fade out rather than be abandoned running.
+    if (this.screen === 'battle') this.pumpAudio(dt);
 
     // Keep drawing on every screen so the stadium is never a dead frame.
     // During the finish hold the renderer runs slow; that is what sells it.
