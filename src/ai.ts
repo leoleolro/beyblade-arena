@@ -1,5 +1,5 @@
 import { Battle } from './sim/battle';
-import { MOVES, PERFECT_LAUNCH_MAX, PERFECT_LAUNCH_MIN } from './sim/constants';
+import { AIM_LEAD_LIMIT, MOVES, PERFECT_LAUNCH_MAX, PERFECT_LAUNCH_MIN } from './sim/constants';
 import { buildArchetype, PRESETS } from './sim/parts';
 import type {
   Archetype,
@@ -56,6 +56,33 @@ const PROFILE: Record<
      * it holds a meter lead it can afford to burn.
      */
     bait: number;
+    /**
+     * Half-width, in radians, of the error added to an aimed Charge.
+     *
+     * WHY THE AI AIMS AT ALL. It did not, and that left the game backwards:
+     * the AI's charge homed, so it could never miss, while the player's aimed
+     * charge could. The side with the harder control was the side being
+     * punished for using it.
+     *
+     * Read against `AIM_ASSIST_CONE` (0.44), which is the whole point of the
+     * numbers chosen. A champion's error is comfortably inside the cone, so
+     * its strikes are helped onto the intercept and it plays roughly as well
+     * as the old perfect homing. A rookie's is wider than the cone, so its
+     * charges genuinely go past the target and Block and Dodge become worth
+     * something against it. The tier ladder finally has an axis that is about
+     * AIM rather than about reaction time.
+     */
+    aimError: number;
+    /**
+     * How much of the target's motion this tier accounts for, 0 to 1.
+     *
+     * Separate from `aimError` because they are different mistakes. Error is
+     * imprecision — a shaky hand. This is not knowing that a moving target has
+     * to be led at all, which is the single thing that most separates someone
+     * who has played a lot from someone who has not. A rookie aims where the
+     * opponent IS and arrives behind them every time.
+     */
+    lead: number;
   }
 > = {
   rookie: {
@@ -70,6 +97,9 @@ const PROFILE: Record<
     // have yet.
     mix: 0,
     bait: 0,
+    // Wider than the assist cone, deliberately: a rookie's charges miss.
+    aimError: 0.55,
+    lead: 0,
   },
   blader: {
     counterPick: 0.5,
@@ -80,6 +110,8 @@ const PROFILE: Record<
     launchSkill: 0.55,
     mix: 0.15,
     bait: 0.12,
+    aimError: 0.3,
+    lead: 0.5,
   },
   champion: {
     counterPick: 1,
@@ -93,6 +125,8 @@ const PROFILE: Record<
     // predictable: bait it once and the rest of the round is scripted.
     mix: 0.28,
     bait: 0.3,
+    aimError: 0.12,
+    lead: 1,
   },
 };
 
@@ -266,7 +300,41 @@ export class AiController {
 
     // Misread: pick something else entirely, weighted by difficulty.
     const choice = this.rng() < p.misread ? this.randomMove() : want;
-    battle.activateMove(this.id, choice);
+    battle.activateMove(this.id, choice, choice === 'charge' ? this.aimAt(me, foe, p) : undefined);
+  }
+
+  /**
+   * Where this tier thinks it should send a charge.
+   *
+   * Leads the target by its own `lead`, then adds an error of up to
+   * `aimError`. Both are read against `AIM_ASSIST_CONE` — see the profile
+   * fields for why those particular widths, and why a rookie's charges are
+   * supposed to miss.
+   *
+   * The flight-time estimate deliberately mirrors `intercept` in physics.ts
+   * rather than importing it: the sim's version is the TRUTH the assist
+   * corrects toward, and the AI is a player making a guess at it. Sharing one
+   * function would quietly make every tier a perfect predictor and delete the
+   * `lead` axis entirely.
+   */
+  private aimAt(
+    me: BeyState,
+    foe: BeyState,
+    p: (typeof PROFILE)[Difficulty],
+  ): { x: number; y: number } {
+    const dx = foe.pos.x - me.pos.x;
+    const dy = foe.pos.y - me.pos.y;
+    const speed = Math.hypot(me.vel.x, me.vel.y);
+    const flight = speed < 0.2 ? 0 : Math.min(Math.hypot(dx, dy) / speed, AIM_LEAD_LIMIT);
+    const theta = Math.atan2(
+      dy + foe.vel.y * flight * p.lead,
+      dx + foe.vel.x * flight * p.lead,
+    );
+    // Uniform rather than gaussian, because the property that matters is the
+    // WORST aim a tier can produce, and a gaussian's tail would let a rookie
+    // occasionally out-aim a champion.
+    const err = (this.rng() * 2 - 1) * p.aimError;
+    return { x: Math.cos(theta + err), y: Math.sin(theta + err) };
   }
 
   /**

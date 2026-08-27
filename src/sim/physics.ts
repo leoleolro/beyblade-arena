@@ -438,6 +438,31 @@ function isPerfectBlock(b: BeyState): boolean {
 }
 
 /**
+ * The bearing that would put a charging top where its target is GOING.
+ *
+ * One iteration of the standard lead-pursuit solve, and one is enough here:
+ * guess the flight time from the present gap and the charger's own speed, ask
+ * where the target will be after that long, and take the bearing to that point.
+ * A second pass would buy accuracy the dish immediately spends anyway — the
+ * bowl curves both tracks inside a quarter of a second, which is most of a
+ * charge.
+ *
+ * Falls back to the current bearing when the charger is barely moving, because
+ * a flight time computed from a near-zero speed is meaningless and would fling
+ * the lead point off the dish.
+ */
+function intercept(b: BeyState, foe: BeyState): number {
+  const dx = foe.pos.x - b.pos.x;
+  const dy = foe.pos.y - b.pos.y;
+  const speed = Math.hypot(b.vel.x, b.vel.y);
+  if (speed < 0.2) return Math.atan2(dy, dx);
+  // Capped, so a slow charge at a distant target does not predict half a
+  // second ahead and aim at empty dish.
+  const flight = Math.min(Math.hypot(dx, dy) / speed, C.AIM_LEAD_LIMIT);
+  return Math.atan2(dy + foe.vel.y * flight, dx + foe.vel.x * flight);
+}
+
+/**
  * Steer charging tops at their opponent.
  *
  * This lives in `step` rather than `integrate` because it is the one force that
@@ -472,20 +497,26 @@ function applySeek(beys: BeyState[], dt: number): void {
     const d = Math.hypot(dx, dy);
     if (d < 1e-6) continue;
 
-    // AIMED, IF THE PLAYER AIMED IT.
+    // AIMED, IF IT WAS AIMED.
     //
     // With no aim this is unchanged: the strike goes at the opponent, which is
-    // what the AI gets and what a player who never touches the pointer gets.
-    // With an aim, the player's direction REPLACES the target — you can drive
-    // into open dish, cut someone off, or deliberately miss.
+    // what a player who never touches the pointer gets. With an aim, the
+    // chosen direction REPLACES the target — you can drive into open dish, cut
+    // someone off, or deliberately miss.
     //
-    // The assist only bends an aim that was already close. See
-    // AIM_ASSIST_CONE for why lead correction is necessary at all when
-    // everything on the floor is orbiting.
+    // The assist bends an aim that was already close, and it bends it toward
+    // the INTERCEPT rather than toward the opponent's current position. That
+    // distinction is the whole justification for having an assist at all: a
+    // top that is orbiting at 1.4 units/s has moved most of its own width by
+    // the time a charge crosses to it, so "point at where they are" is a
+    // guaranteed miss behind them. A player aiming honestly and well would
+    // still lose, and would have no way to see why. Correcting to the current
+    // bearing would reproduce exactly that error, only with the game's name on
+    // it.
     if (b.aimX !== 0 || b.aimY !== 0) {
       const want = Math.atan2(b.aimY, b.aimX);
-      const truth = Math.atan2(dy, dx);
-      let off = (truth - want) % (Math.PI * 2);
+      const lead = intercept(b, foe);
+      let off = (lead - want) % (Math.PI * 2);
       if (off > Math.PI) off -= Math.PI * 2;
       if (off < -Math.PI) off += Math.PI * 2;
       const bend = Math.abs(off) <= C.AIM_ASSIST_CONE ? off * C.AIM_ASSIST_PULL : 0;

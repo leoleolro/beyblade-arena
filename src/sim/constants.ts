@@ -391,6 +391,17 @@ export const AIM_ASSIST_CONE = 0.44;
  */
 export const AIM_ASSIST_PULL = 0.55;
 
+/**
+ * Longest flight time the aim assist will predict ahead, in seconds.
+ *
+ * 0.30, which is roughly the measured time from a charge activating to it
+ * landing (0.28s). Past that the prediction is not wrong so much as
+ * irrelevant: the bowl has curved both tracks, and a lead computed from a
+ * straight-line extrapolation points at dish the target was never going to
+ * reach.
+ */
+export const AIM_LEAD_LIMIT = 0.3;
+
 /** Landing a clash banks extra charge, rewarding aggression. */
 export const METER_GAIN_PER_HIT = 0.11;
 
