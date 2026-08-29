@@ -545,3 +545,94 @@ comebacks appeared to fall 14.4% to 5.6%. That was an artifact: equalisation
 shrinks gaps, so fewer rounds passed the ">5% gap" filter at all and the
 denominator was counting rounds that could not qualify. Fixing the denominator
 changed the size of the effect but not its direction.
+
+---
+
+## 6. Gyroscopic stability — real physics, and it does not fix the balance
+
+### The measurement that prompted it
+
+Archetype win rates, champion AI, standard dish, cross-archetype pairings only
+(192 matches for attack and balance, 120 for defense and stamina):
+
+    attack   56.8%
+    balance  48.4%
+    defense  45.8%
+    stamina  30.8%
+
+A 26-point spread, with stamina the clear outlier. The useful question is not
+"how much does stamina lose by" but **how** it loses, so the next measurement was
+the defeat-reason breakdown per archetype:
+
+    attack    knockout 20%   spin-finish 24%   burst  2%   survived 54%
+    balance   knockout  9%   spin-finish 11%   burst 23%   survived 57%
+    defense   knockout  0%   spin-finish 48%   burst  7%   survived 45%
+    stamina   knockout 36%   spin-finish 16%   burst 12%   survived 36%
+
+Stamina is **not losing an attrition race**. It is being thrown out of the
+stadium, at nearly twice the knockout rate of anything else and infinitely more
+than defense, which is never ejected at all. That is the wrong weakness for the
+archetype whose entire identity is lasting.
+
+### The missing term
+
+`resolvePair`'s smash impulse scaled with the attacker's spin, the attacker's
+attack, the impact speed and the **victim's mass** — but never with the victim's
+own spin. A top at full spin was thrown exactly as far as the same top nearly
+dead.
+
+That is not how a gyroscope behaves. Rigidity in space scales with angular
+momentum, so a fast-spinning top genuinely resists lateral displacement more
+than a slow one. And it lines up with the diagnosis exactly: stamina blades are
+the lightest in the catalogue — the mass formula's floor IS a stamina blade —
+and stamina tips are free-running, so stamina was light AND slippery with
+nothing to trade back.
+
+    hold = 1 / (1 + GYRO_STABILITY * spinNorm(victim))
+
+applied after the SMASH_MAX clamp so the cap keeps meaning what it says.
+
+### It does not work, and the shape of the failure is the finding
+
+    GYRO   attack  defense  stamina  balance   spread
+    0.0     56.8     45.8     30.8     48.4     26.0
+    0.5     65.6     51.7     40.8     44.8     24.8
+    1.0     64.6     48.3     39.2     43.8     25.4
+    1.6     64.1     43.3     51.7     38.0     26.1
+
+Stamina rises — and **attack rises just as much**. The spread never moves: 26.0,
+24.8, 25.4, 26.1. Making tops harder to eject raises everybody's floor, and the
+cost lands on balance and defense rather than on the archetype that was already
+winning. At every setting attack ends up MORE dominant than it started, so
+shipping this would be a balance regression bought with correct physics.
+
+A second variant made the resistance depend on spin ADVANTAGE rather than
+absolute spin — `max(0, spinNorm(victim) - spinNorm(attacker))` — on the theory
+that this rewards stamina's actual win condition and cannot help an attacker who
+has burned its spin. It is worse:
+
+    G=0.8   attack 63.0   defense 52.5   stamina 30.0   balance 44.8
+    G=1.6   attack 63.0   defense 48.3   stamina 33.3   balance 47.4
+    G=2.6   attack 64.6   defense 46.7   stamina 31.7   balance 44.3
+
+Stamina does not move at all, and attack still climbs. Reverted, both of them.
+
+### What the measurement actually points at
+
+The interesting part is why stamina is light and wide in the first place. Both
+come from faithful transcription: `mass` is the real gram weight and `radius`
+grows with the published stamina stat, because real stamina blades genuinely are
+wide — WizardArrow's own product copy explains that "two large blades create an
+outward center of gravity, which generates strong centrifugal force".
+
+So **the archetype's weakness here is baked into transcription fidelity**: real
+stamina parts are light and wide, and in this sim light and wide means easy to
+ring out. The real game does not have that problem, which suggests our dish
+ejects tops more readily than a real stadium does relative to how long a round
+lasts.
+
+That makes the next thing to test a global one — ring-out frequency against
+round length — rather than another per-archetype stat nudge. Three of those have
+now been tried and reverted (spin equalisation, passive-decay rebalance, and
+this), and all three failed the same way: they moved the numbers without
+narrowing the spread, because they acted on every archetype at once.
