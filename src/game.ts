@@ -621,6 +621,18 @@ export class Game {
     }
   }
 
+  /**
+   * Is the player currently aiming?
+   *
+   * Exposed for the coaching line, which has to teach the aim by CONTRAST —
+   * "you are not aiming, here is how" against "you are aiming, now fire". A
+   * single static sentence cannot do that, and aiming is invisible until you
+   * happen to move the pointer over the dish.
+   */
+  get aiming(): boolean {
+    return this.resolveAim() !== null;
+  }
+
   get player() {
     return this.battle.beys.find((b) => b.id === PLAYER_ID) ?? null;
   }

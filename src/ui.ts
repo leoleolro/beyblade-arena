@@ -354,7 +354,7 @@ export class Ui {
     el.className = 'moves';
 
     const defs: [MoveKind, string, string, string][] = [
-      ['charge', 'SPACE', 'Charge', 'hunt & smash'],
+      ['charge', 'SPACE', 'Charge', 'aim & smash'],
       ['block', 'A', 'Block', 'absorb a hit'],
       ['dodge', 'S', 'Dodge', 'break away'],
     ];
@@ -453,8 +453,15 @@ export class Ui {
       msg = 'Rival is on the rail — tap A to Block the slingshot';
       tone = 'urgent';
     } else if (you.meter >= 1) {
-      msg = 'Meter full — SPACE to Charge, A to Block, S to Dodge';
-      tone = '';
+      // TEACH THE AIM BY CONTRAST. Charge is aimed now, and an aim is
+      // invisible until the player happens to move the pointer over the dish —
+      // so a single static line naming three keys would leave the game's one
+      // positional control undiscovered. These two messages swap as soon as the
+      // pointer moves, which is the whole lesson in one gesture.
+      msg = g.aiming
+        ? 'Aimed — SPACE sends the Charge along the arrows'
+        : 'Meter full — move the mouse to AIM your Charge, then SPACE';
+      tone = g.aiming ? 'good' : '';
     } else if (you.burst > 0.55) {
       msg = 'Burst gauge is high — tap S to Dodge before the next hit';
       tone = 'urgent';
