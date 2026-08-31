@@ -636,3 +636,61 @@ round length — rather than another per-archetype stat nudge. Three of those ha
 now been tried and reverted (spin equalisation, passive-decay rebalance, and
 this), and all three failed the same way: they moved the numbers without
 narrowing the spread, because they acted on every archetype at once.
+
+### The sampling error underneath all of it
+
+Every measurement above, and every balance measurement in this project before
+it, swept `PRESETS` — **six anchor builds**. The game ships **thirty-seven**.
+
+So "stamina wins 30.8%" was really "Endless Coil wins 30.8%": one
+fafnir/spread/needle build, which is a SPIN-STEALER and therefore the least
+representative stamina bey in the roster. Four experiments were designed against
+that number.
+
+Re-measured across every shipped build, cross-archetype pairings, both seats,
+3736 rounds — see `src/roster.test.ts`, which now guards this permanently and
+costs two seconds:
+
+    attack   50.5% of 1248        defense  43.4% of 528
+    balance  43.2% of 1320        stamina  27.0% of 640
+
+The conclusion survives and hardens: stamina is the outlier by 23 points, on a
+proper sample. Two of its five builds are in the worst three of the whole roster
+(Wizard Arrow 19%, Silver Wolf 14%).
+
+Two further things the wider sweep shows that six builds could not:
+
+- **The roster is lopsided.** 13 attack, 15 balance, 5 stamina, 4 defense. Half
+  the archetypes are represented by a handful of builds, so a single weak bey
+  moves an archetype's average by a fifth.
+- **Cobalt Dragoon 4-60A lands at 72%**, second-best in the game, on the day it
+  was transcribed. That is what an untested addition looks like, and it is the
+  argument for this test existing rather than for hand-checking new beys.
+
+### Where this leaves the archetype gap
+
+Four levers have now been tried and reverted: spin equalisation, the
+passive-decay rebalance, gyroscopic stability, and tank compression. All four
+failed the same way — they act on a mechanism every archetype shares, so they
+move all four and relocate the outlier instead of removing it. Tank compression
+is the clearest case: at 2.6x it lifts stamina from 27% to 52% and drops defense
+from 47% to 22%, a straight swap, while costing 22% of the hits per round.
+
+The measurement that explains why is the attrition clock. With no contact at
+all, builds spin out in:
+
+    attack 58s    defense 57s    balance 71s    stamina 75s+
+
+against a median round length of **7.5 seconds**, with the winner still holding
+**40% of its spin**. Stamina's entire advantage — roughly seventeen extra
+seconds of tank — lives in a window the game never reaches. It is a resource for
+a sixty-second fight in a seven-second one.
+
+So the next thing to try is not another shared-economy constant. It is a win
+route that only stamina can take, the way burst is effectively attack-only
+(attack scores 52% of its wins by burst; stamina scores 0%). The real game's
+answer is spin-stealing, and the sim already models it — but only two layers in
+the entire catalogue have a non-zero `spinSteal` (Fafnir 0.62, Nosferu 0.88),
+so seven of the nine stamina blades have no access to their archetype's
+signature mechanic. That asymmetry, not the spin economy, is the next thing to
+measure.
