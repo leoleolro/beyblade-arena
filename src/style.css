@@ -2253,3 +2253,126 @@ body.theme-anime .coach.on {
   font-size: 0.72rem;
   color: #7fd88f;
 }
+
+/*
+ * The career strip in the garage.
+ *
+ * Two columns rather than a list, because it answers two different questions
+ * that a player asks at different moments: "what should I chase this session"
+ * on the left, "how far in am I" on the right. Stacked into one column on
+ * narrow screens, where side-by-side would make both unreadable.
+ */
+.career {
+  margin: 0.75rem 0 0.5rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: 0.6rem;
+  background: rgba(255, 255, 255, 0.028);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.career-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  margin-bottom: 0.55rem;
+}
+
+.career-label {
+  font-size: 0.58rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #7f8b9c;
+}
+
+/* The equipped title is the one purely expressive thing in here, so it is the
+   only part allowed a warm colour. */
+.career-title {
+  font-size: 0.86rem;
+  color: #f5c451;
+}
+
+.career-title-pick {
+  margin-left: auto;
+  max-width: 14rem;
+  font: inherit;
+  font-size: 0.7rem;
+  color: #cfd8e3;
+  background: rgba(10, 14, 22, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0.35rem;
+  padding: 0.2rem 0.35rem;
+}
+
+.career-grid {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 0.9rem;
+}
+
+@media (max-width: 640px) {
+  .career-grid { grid-template-columns: 1fr; }
+}
+
+.career-col-head {
+  font-size: 0.58rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #7f8b9c;
+  margin-bottom: 0.3rem;
+  display: block;
+}
+
+.career-obj { margin-bottom: 0.4rem; }
+
+.career-obj-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.6rem;
+  font-size: 0.74rem;
+  color: #dbe4ef;
+}
+
+.career-obj-count { color: #7f8b9c; font-variant-numeric: tabular-nums; }
+
+/* A finished objective dims rather than disappears: the set is a checklist,
+   and a checklist that shortens as you go loses the sense of progress. */
+.career-obj.done .career-obj-text { color: #7fd88f; }
+.career-obj.done { opacity: 0.65; }
+
+.career-bar {
+  margin-top: 0.18rem;
+  height: 0.2rem;
+  border-radius: 0.1rem;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.career-bar i {
+  display: block;
+  height: 100%;
+  background: #25d9f0;
+}
+
+.career-obj.done .career-bar i { background: #7fd88f; }
+
+.career-mastery { font-size: 0.82rem; color: #e6edf6; }
+.career-sub { font-size: 0.68rem; color: #7f8b9c; }
+.career-empty { font-size: 0.72rem; color: #7f8b9c; }
+
+.career-nemesis {
+  margin-top: 0.6rem;
+  font-size: 0.78rem;
+  color: #e6edf6;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+/* Only ever coloured when they are actually next. A permanently red panel is
+   wallpaper; one that lights up is a warning. */
+.career-nemesis.due { color: #ff8a7a; }
+.career-due {
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}

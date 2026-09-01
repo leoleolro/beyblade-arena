@@ -140,20 +140,11 @@ describe('objectives', () => {
     const failures: string[] = [];
     const report: string[] = [];
     for (const c of CHALLENGE_POOL) {
-      let best = rounds;
       let rate = rounds.filter((r) => c.counts(r)).length / rounds.length;
       for (const rs of viable) {
-        const r2 = rs.filter((r) => c.counts(r)).length / rs.length;
-        if (r2 > rate) {
-          rate = r2;
-          best = rs;
-        }
+        rate = Math.max(rate, rs.filter((r) => c.counts(r)).length / rs.length);
       }
-      void best;
 
-      // A set objective needs DISTINCT keys, so its cost is coupon-collecting
-      // over the keys that actually occur — not `target / rate`. Approximated
-      // by the rarest key it needs, which is the term that dominates.
       let need: number;
       if (c.key) {
         // A set objective needs distinct keys, so measure it over the WHOLE

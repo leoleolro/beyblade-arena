@@ -10,7 +10,7 @@ import * as C from './sim/constants';
 import { SKINS, skinById } from './render/skins';
 import type { Channel } from './audio/engine';
 import type { RoundOutcome } from './progress';
-import { MASTERY_NAMES } from './career';
+import { MASTERY_NAMES, challengeById, masteryTier, masteryToNext } from './career';
 import { THEMES, themeById } from './render/theme';
 import { MODES, modeById, stadiumsByLook } from './modes';
 import { groupByClass } from './render/beyClass';
@@ -1427,6 +1427,121 @@ export class Ui {
       </div>`;
   }
 
+  /**
+   * The career strip: what to chase, how far in you are, and who is coming.
+   *
+   * WHY IT SITS IN THE GARAGE rather than on its own screen. Every one of these
+   * is a reason to pick a particular bey, and the garage is where a bey gets
+   * picked — an objective saying "win with a left-spin bey" is useless on a
+   * results screen and actionable three inches above the roster. The nemesis is
+   * here for the same reason the next opponent is: a problem you can prepare
+   * for.
+   *
+   * Rebuilt on every render rather than diffed. The garage is not a hot path
+   * and a stale progress bar is a worse bug than a wasted allocation.
+   */
+  private careerSection(): HTMLElement {
+    const g = this.game;
+    const d = g.progress.data;
+    const el = document.createElement('div');
+    el.className = 'career';
+
+    // --- objectives ---------------------------------------------------------
+    const rows: string[] = [];
+    for (const p of [...d.challenges.daily, ...d.challenges.weekly]) {
+      const c = challengeById(p.id);
+      if (!c) continue;
+      const have = c.key ? p.keys.length : p.n;
+      const pctDone = Math.min(100, (have / c.target) * 100);
+      rows.push(
+        `<div class="career-obj${p.paid ? ' done' : ''}">` +
+          `<div class="career-obj-top">` +
+          `<span class="career-obj-text">${escapeHtml(c.text)}</span>` +
+          `<span class="career-obj-count">${p.paid ? '✓' : `${have}/${c.target}`}</span>` +
+          `</div>` +
+          `<div class="career-bar"><i style="width:${pctDone}%"></i></div>` +
+          `</div>`,
+      );
+    }
+
+    // --- mastery on the equipped bey ---------------------------------------
+    const layerId = g.playerBuild.layer.id;
+    const rounds = d.mastery[layerId] ?? 0;
+    const tier = masteryTier(rounds);
+    const toNext = masteryToNext(rounds);
+    const masteryLine =
+      tier > 0
+        ? `${MASTERY_NAMES[tier - 1]} · ${rounds} rounds`
+        : `${rounds} rounds`;
+    const nextLine = toNext > 0 ? `${toNext} to ${MASTERY_NAMES[tier]}` : 'maxed';
+
+    // --- title --------------------------------------------------------------
+    const earned = g.progress.titles();
+    const equipped = g.progress.equippedTitle();
+
+    el.innerHTML = `
+      <div class="career-head">
+        <span class="career-label">Career</span>
+        ${equipped ? `<span class="career-title">${escapeHtml(equipped.text)}</span>` : ''}
+      </div>
+      <div class="career-grid">
+        <div class="career-col">
+          <div class="career-col-head">Objectives</div>
+          ${rows.join('') || '<div class="career-empty">Play a round to get today\'s set.</div>'}
+        </div>
+        <div class="career-col">
+          <div class="career-col-head">${escapeHtml(g.playerBuild.layer.name)} mastery</div>
+          <div class="career-mastery">${escapeHtml(masteryLine)}</div>
+          <div class="career-sub">${escapeHtml(nextLine)}</div>
+          ${this.nemesisMarkup()}
+        </div>
+      </div>`;
+
+    // The title picker is built rather than templated, because it needs
+    // listeners and an option per earned title.
+    if (earned.length) {
+      const pick = document.createElement('select');
+      pick.className = 'career-title-pick';
+      pick.title = 'Choose a title';
+      const none = document.createElement('option');
+      none.value = '';
+      none.textContent = 'No title';
+      pick.appendChild(none);
+      for (const t of earned) {
+        const o = document.createElement('option');
+        o.value = t.id;
+        o.textContent = `${t.text} — ${t.how}`;
+        pick.appendChild(o);
+      }
+      pick.value = d.title;
+      pick.addEventListener('change', () => {
+        g.progress.equipTitle(pick.value);
+        this.render();
+      });
+      el.querySelector('.career-head')?.appendChild(pick);
+    }
+    return el;
+  }
+
+  /**
+   * The nemesis line, or nothing before they have ever turned up.
+   *
+   * Deliberately silent until the first meeting: announcing a rival the player
+   * has not met is a spoiler, and an empty head-to-head reads as a bug.
+   */
+  private nemesisMarkup(): string {
+    const n = this.game.progress.data.nemesis;
+    if (!n.id || n.met === 0) return '';
+    const due = this.game.progress.nemesisIsDue();
+    return (
+      `<div class="career-nemesis${due ? ' due' : ''}">` +
+      `<span class="career-col-head">Nemesis</span>` +
+      `<span>${n.playerWins}–${n.rivalWins} in ${n.met}</span>` +
+      (due ? '<span class="career-due">waiting for you</span>' : '') +
+      `</div>`
+    );
+  }
+
   private garage(): HTMLElement {
     const g = this.game;
     const overlay = document.createElement('div');
@@ -1446,6 +1561,7 @@ export class Ui {
     panel.appendChild(header);
 
     panel.appendChild(this.explodedView());
+    panel.appendChild(this.careerSection());
 
     // Two tabs, because the garage was doing two psychologically opposite
     // jobs at once. Picking a finished bey is choosing an *identity*;
