@@ -45,6 +45,13 @@ export interface BeyEntry {
   };
 }
 
+import { entry as tricerapress } from './tricerapress';
+import { entry as mummycurse } from './mummycurse';
+import { entry as heavensring } from './heavensring';
+import { entry as savagebear } from './savagebear';
+import { entry as clockmirage } from './clockmirage';
+import { entry as ghostcircle } from './ghostcircle';
+import { entry as gillshark } from './gillshark';
 import { entry as phoenixwing } from './phoenixwing';
 import { entry as cobaltdragoon } from './cobaltdragoon';
 import { entry as wizardarrow } from './wizardarrow';
@@ -126,6 +133,13 @@ export const BEY_REGISTRY: BeyEntry[] = [
   leonclaw,
   tyrannobeat,
   vipertail,
+  tricerapress,
+  mummycurse,
+  heavensring,
+  savagebear,
+  clockmirage,
+  ghostcircle,
+  gillshark,
   phoenixwing,
   cobaltdragoon,
   wizardarrow,

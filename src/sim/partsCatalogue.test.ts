@@ -126,14 +126,32 @@ describe('the transcribed Blade catalogue', () => {
   const layer = (id: string) => LAYERS.find((l) => l.id === id)!;
 
   it('lands WizardArrow exactly on the mass mapping’s anchor', () => {
-    // The mapping is `0.44 + (grams - 31.8) / (40.7 - 31.8) * 0.13`, and 31.8 g
-    // is WizardArrow's own published weight — it is the gram figure the low end
-    // of that formula was fitted to. So 0.44 here is not a rounded number, it
-    // is the identity, and it is worth pinning precisely because a later
-    // "tidy the catalogue" pass would see a suspiciously round value and nudge
-    // it. Both ends are pinned: BlackShell's 40.7 g is the other anchor.
+    // The mapping is `0.44 + (grams - 31.8) / 8.9 * 0.13`, and 31.8 g is
+    // WizardArrow's own published weight — the gram figure the low end was
+    // fitted to. So 0.44 is not a rounded number, it is the identity, and it is
+    // worth pinning precisely because a later "tidy the catalogue" pass would
+    // see a suspiciously round value and nudge it.
     expect(layer('wizardarrow').mass).toBe(0.44);
-    expect(layer('blackshell').mass).toBeCloseTo(0.57, 5);
+
+    // THE UPPER ANCHOR WAS NEVER WHAT THIS TEST SAID IT WAS. The 8.9 came from
+    // `40.7 - 31.8`, and 40.7 g is BlackShell 4-60D — the ASSEMBLED bey, blade
+    // plus ratchet plus bit — while 31.8 g is a bare blade. The span was
+    // measured between two different kinds of thing. `Blade - BlackShell` is
+    // 32.4 g, which lands at 0.449, a hair above the anchor rather than at the
+    // top of the range.
+    //
+    // The 8.9 STAYS. Every mass in the catalogue is derived through it and
+    // every balance number was measured against those masses, so refitting it
+    // would move the whole game to make a comment true. It is simply a scale
+    // factor now — 0.13 units of mass per 8.9 grams — and not a principled span
+    // between two anchors, and saying so here is cheaper than someone else
+    // rediscovering it.
+    expect(layer('blackshell').mass).toBeCloseTo(0.449, 3);
+
+    // And the low end is no longer the floor. GhostCircle is 26.7 g, five under
+    // the anchor, which the mapping takes below 0.44 — correct rather than out
+    // of range: its own page says it was the lightest Blade released.
+    expect(layer('ghostcircle').mass).toBeLessThan(layer('wizardarrow').mass);
   });
 
   it('widens a stamina blade and narrows a defence one at equal stamina', () => {

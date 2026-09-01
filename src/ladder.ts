@@ -69,7 +69,7 @@ export const LADDER: Rival[] = [
     skinId: 'venom',
     difficulty: 'rookie',
     line: "Won't chase you and won't die. You have to go and take it.",
-    unlocks: { layers: ['basilisk', 'valkyrie', 'sharkedge', 'rhinohorn'], discs: ['spread', 'r160'], drivers: ['needle', 'ball'], skins: ['venom'] },
+    unlocks: { layers: ['basilisk', 'valkyrie', 'sharkedge', 'rhinohorn', 'savagebear'], discs: ['spread', 'r160'], drivers: ['needle', 'ball'], skins: ['venom'] },
   },
   {
     id: 'vale',
@@ -80,7 +80,7 @@ export const LADDER: Rival[] = [
     skinId: 'solar',
     difficulty: 'blader',
     line: 'No weakness worth naming. Out-read it or lose slowly.',
-    unlocks: { layers: ['fafnir', 'golem', 'magejab', 'knightshield', 'silverwolf'], discs: ['blitz', 'r360', 'r960'], drivers: ['accel'] },
+    unlocks: { layers: ['fafnir', 'golem', 'magejab', 'knightshield', 'silverwolf', 'gillshark'], discs: ['blitz', 'r360', 'r960'], drivers: ['accel'] },
   },
   {
     id: 'kes',
@@ -95,7 +95,7 @@ export const LADDER: Rival[] = [
     // the source data, and the most planted tip in the catalogue. WizardArrow
     // ships on this rung rather than an earlier one because 5-60 does too, and
     // its preset wants both at once.
-    unlocks: { layers: ['aegis', 'wyrm', 'dsycther', 'wizardrod', 'leonclaw', 'wizardarrow'], discs: ['r560'], drivers: ['bastion', 'gearflat', 'dot'], skins: ['void'] },
+    unlocks: { layers: ['aegis', 'wyrm', 'dsycther', 'wizardrod', 'leonclaw', 'wizardarrow', 'tricerapress', 'ghostcircle'], discs: ['r560'], drivers: ['bastion', 'gearflat', 'dot'], skins: ['void'] },
   },
   {
     id: 'rhea',
@@ -106,7 +106,7 @@ export const LADDER: Rival[] = [
     skinId: 'rose',
     difficulty: 'champion',
     line: 'Reads your move before you commit to it. Blocks are not free here.',
-    unlocks: { layers: ['ragnaruk', 'solaris', 'hellsscythe', 'orichalcum', 'tyrannobeat', 'phoenixwing'], discs: ['wall', 'outer', 'r460'], drivers: ['octa'], skins: ['solar'] },
+    unlocks: { layers: ['ragnaruk', 'solaris', 'hellsscythe', 'orichalcum', 'tyrannobeat', 'phoenixwing', 'heavensring'], discs: ['wall', 'outer', 'r460'], drivers: ['octa'], skins: ['solar'] },
   },
   {
     id: 'zeph',
@@ -125,7 +125,7 @@ export const LADDER: Rival[] = [
     // is the roster's only LEFT-SPIN transcribed attacker, so clearing the
     // ladder hands over a new question — every spin-steal layer in the catalog
     // only works against an opposite-spin opponent — rather than a spare part.
-    unlocks: { layers: ['nosferu', 'chimera', 'sphinxcowl', 'vipertail', 'cobaltdragoon'], discs: ['r980'], drivers: ['orbit'], skins: ['rose'] },
+    unlocks: { layers: ['nosferu', 'chimera', 'sphinxcowl', 'vipertail', 'cobaltdragoon', 'mummycurse', 'clockmirage'], discs: ['r980'], drivers: ['orbit'], skins: ['rose'] },
   },
 ];
 

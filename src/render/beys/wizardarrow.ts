@@ -23,9 +23,11 @@ import type { BeyEntry } from './registry';
  * than fins on a hub. The source's "low recoil, smooth perimeter" is exactly
  * that difference.
  *
- * At 31.8 g it is the lightest blade in the source data, which is not a
- * coincidence in the numbers: it is the gram figure the mass mapping's floor
- * was fitted to, so this entry lands on 0.44 exactly.
+ * At 31.8 g it is the gram figure the mass mapping was ANCHORED to, so this
+ * entry lands on 0.44 exactly. It was also the lightest blade in the data when
+ * that was written, and is not any more — GhostCircle is 26.7 g and SavageBear
+ * and GillShark are 29.6 g, all of which the mapping takes below 0.44. The
+ * anchor is still the anchor; it just is not the floor.
  *
  * Gear Chip: a fantasy wizard casting a spell — the only human mark in the
  * emblem set, and the reason `wizardEmblem` leads with a hat rather than a face.

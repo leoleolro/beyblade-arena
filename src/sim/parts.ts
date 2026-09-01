@@ -237,13 +237,33 @@ export const LAYERS: LayerPart[] = [
   // force"), so a high-stamina blade is WIDER; defence blades use CENTRAL
   // distribution, so they are narrower for the same mass.
   //
-  // Sources: BlackShell 4-60D (Defense, 40.7 g, "overall diamond shape with
-  // eight protrusions"), SharkEdge (A60/D25/S15, 34.5 g, two keel fins),
+  // BLACKSHELL WAS TRANSCRIBED FROM THE WRONG PAGE, and it stood for weeks.
+  // Its numbers came off `BlackShell 4-60D`, the ASSEMBLED bey — 40.7 g of
+  // blade plus ratchet plus bit — where every other row here is transcribed
+  // from the BLADE page. A layer's mass is only the blade's share; the ratchet
+  // and bit carry their own. Against `Blade - BlackShell` (A10/D65/S25,
+  // 32.4 g) all five derived values were wrong:
+  //
+  //             was     now    from
+  //   attack    1.00    0.76   A10
+  //   defense   1.68    1.77   D65
+  //   burstRes  0.95    1.01   S25
+  //   mass      0.57    0.449  32.4 g, not the combo's 40.7
+  //   radius    0.0999  0.1013 S25, less the defence deduction
+  //
+  // It had been the heaviest blade in the game by a distance and is in fact a
+  // fairly light one; it now has the joint-highest defence instead, which is
+  // what D65 always said. Every other entry in this block was re-checked
+  // against its own Blade page at the same time and PhoenixWing, the one most
+  // like it, reproduces exactly.
+  //
+  // Sources: BlackShell (A10/D65/S25, 32.4 g, "an overall diamond shape with
+  // eight protrusions as the main points of contact"), SharkEdge (A60/D25/S15, 34.5 g, two keel fins),
   // KnightShield (A20/D55/S25, 32.4 g, "six defensive blades create an impact
   // dampening structure"), WizardRod (A15/D25/S60, 35.3 g, "wide circular
   // shape"), HellsScythe (Balance, 4 blades), SphinxCowl (A35/D55/S10, 32.7 g,
   // nine "Barrage Blade" protrusions).
-  { id: 'blackshell', name: 'Black Shell',    kind: 'layer', archetype: 'defense', mass: 0.57, radius: 0.0999, attack: 1.0, defense: 1.68, burstResist: 0.95, spinSteal: 0.0, blades: 8, colour: 0x14181f },
+  { id: 'blackshell', name: 'Black Shell',    kind: 'layer', archetype: 'defense', mass: 0.449, radius: 0.1013, attack: 0.76, defense: 1.77, burstResist: 1.01, spinSteal: 0.0, blades: 8, colour: 0x14181f },
   { id: 'sharkedge',  name: 'Shark Edge',     kind: 'layer', archetype: 'attack', mass: 0.479, radius: 0.1019, attack: 1.56, defense: 1.05, burstResist: 0.95, spinSteal: 0.0, blades: 2, colour: 0x5b21b6 },
   { id: 'knightshield',name: 'Knight Shield',  kind: 'layer', archetype: 'defense', mass: 0.449, radius: 0.1013, attack: 0.92, defense: 1.59, burstResist: 1.01, spinSteal: 0.30, blades: 6, colour: 0x046c4a },
   { id: 'wizardrod',  name: 'Wizard Rod',     kind: 'layer', archetype: 'stamina', mass: 0.491, radius: 0.1078, attack: 0.84, defense: 1.05, burstResist: 1.22, spinSteal: 0.30, blades: 5, colour: 0x3b2f7a },
@@ -302,6 +322,53 @@ export const LAYERS: LayerPart[] = [
   { id: 'phoenixwing',  name: 'Phoenix Wing',   kind: 'layer', archetype: 'attack',  mass: 0.531, radius: 0.1020, attack: 1.56, defense: 1.05, burstResist: 0.95, spinSteal: 0.0, blades: 3, colour: 0xb91c1c },
   { id: 'cobaltdragoon',name: 'Cobalt Dragoon', kind: 'layer', archetype: 'attack',  mass: 0.528, radius: 0.1033, attack: 1.56, defense: 0.87, burstResist: 1.01, spinSteal: 0.0, blades: 4, colour: 0x0047ab },
   { id: 'wizardarrow',  name: 'Wizard Arrow',   kind: 'layer', archetype: 'stamina', mass: 0.44,  radius: 0.1072, attack: 0.84, defense: 1.14, burstResist: 1.19, spinSteal: 0.30, blades: 2, colour: 0xeab308 },
+
+  // THE DEFENCE AND STAMINA PASS — seven blades, transcribed the same way as
+  // everything above, and chosen for the shape of the ROSTER rather than for a
+  // stat extreme. It ran 13 attack / 15 balance / 5 stamina / 4 defense, so
+  // half the archetypes were represented by a handful of builds and one weak
+  // entry moved an archetype's average by a fifth. This is four defence and
+  // three stamina.
+  //
+  // Sources are the Blade pages: TriceraPress, MummyCurse, HeavensRing,
+  // Savage Bear, ClockMirage, GhostCircle, Gill Shark. Every A/D/S figure and
+  // every gram weight below is the infobox value, run through the same three
+  // formulas as the blocks above.
+  //
+  // TWO OF THEM SIT BELOW THE MASS FORMULA'S REFERENCE WEIGHT, and that is
+  // worth flagging rather than clamping. The formula was fitted with 31.8 g —
+  // WizardArrow — as the lightest blade in the data, so it reads 0.44 there.
+  // GhostCircle is 26.7 g and Savage Bear and Gill Shark are 29.6 g, which the
+  // linear form maps to 0.366 and 0.408. Those are correct and characterful,
+  // not out of range: the source says of GhostCircle that "on its release
+  // GhostCircle was the lightest Blade released". A light blade that gets
+  // thrown further is the trade its own page describes.
+  //
+  // SPIN ABSORPTION follows the same rule as the block above — a value only
+  // where the page's own words describe a round perimeter, because that is the
+  // real-world basis for spin equalisation:
+  //
+  //   heavensring 0.30  "a Defense Type Expand Blade with a circular shape"
+  //   clockmirage 0.30  "a circular Stamina Type Blade with 60 edges around
+  //                      its circumference"
+  //   ghostcircle 0.30  "a Stamina Type Blade with a near perfectly circular
+  //                      shape"
+  //   savagebear  0.15  "a round four-sided Defense Type Blade" — round, but
+  //                      four-sided, which is HellsScythe's wording exactly and
+  //                      so takes HellsScythe's value
+  //   gillshark   0.15  "two large blades acting as the main contact points" —
+  //                      WizardArrow's phrasing WITHOUT its "round", so it does
+  //                      not get WizardArrow's 0.30. The missing adjective is
+  //                      the whole difference.
+  //   tricerapress 0    "5 main contact points", no roundness claimed
+  //   mummycurse   0    "a four-sided shape consisting of thick contact points"
+  { id: 'tricerapress', name: 'Tricera Press', kind: 'layer', archetype: 'defense', mass: 0.509, radius: 0.0999, attack: 0.92, defense: 1.77, burstResist: 0.95, spinSteal: 0.0,  blades: 5, colour: 0x2f7d52 },
+  { id: 'mummycurse',   name: 'Mummy Curse',   kind: 'layer', archetype: 'defense', mass: 0.523, radius: 0.1006, attack: 1.08, defense: 1.68, burstResist: 0.98, spinSteal: 0.0,  blades: 4, colour: 0xd8cbb0 },
+  { id: 'heavensring',  name: 'Heavens Ring',  kind: 'layer', archetype: 'defense', mass: 0.522, radius: 0.1019, attack: 0.76, defense: 1.68, burstResist: 1.04, spinSteal: 0.30, blades: 8, colour: 0xe8e2d4 },
+  { id: 'savagebear',   name: 'Savage Bear',   kind: 'layer', archetype: 'defense', mass: 0.408, radius: 0.1019, attack: 1.0,  defense: 1.41, burstResist: 1.04, spinSteal: 0.15, blades: 4, colour: 0x8a5a33 },
+  { id: 'clockmirage',  name: 'Clock Mirage',  kind: 'layer', archetype: 'stamina', mass: 0.526, radius: 0.1104, attack: 0.76, defense: 0.78, burstResist: 1.34, spinSteal: 0.30, blades: 12, colour: 0x4a5b7a },
+  { id: 'ghostcircle',  name: 'Ghost Circle',  kind: 'layer', archetype: 'stamina', mass: 0.366, radius: 0.1072, attack: 0.68, defense: 1.32, burstResist: 1.19, spinSteal: 0.30, blades: 12, colour: 0xbcc6d6 },
+  { id: 'gillshark',    name: 'Gill Shark',    kind: 'layer', archetype: 'stamina', mass: 0.408, radius: 0.1072, attack: 0.92, defense: 1.05, burstResist: 1.19, spinSteal: 0.15, blades: 2, colour: 0x2a6f8f },
 
   // The vampire. The one layer in the catalog with `sameSteal`: it absorbs in
   // *every* matchup, not only against an opposite-spin opponent, so there is no
