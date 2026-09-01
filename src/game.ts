@@ -24,6 +24,7 @@ import * as C from './sim/constants';
 import { DEFAULT_BUILD, buildArchetype } from './sim/parts';
 import type { RoundOutcome } from './progress';
 import type { CupResult } from './tournament';
+import { aimCharge } from './prefs';
 import type { Opponent } from './career';
 import type { BeyBuild, LaunchParams, MoveKind } from './sim/types';
 import { DIRECT_PRICE, REROLL_COST, REWARDS, crateById, rollCrate, rollOffer } from './economy';
@@ -390,6 +391,11 @@ export class Game {
    * it should reverse the aim, because that is what the player is looking at.
    */
   private resolveAim(): { x: number; y: number } | null {
+    // OFF means the game that shipped before aiming existed, not a worse one.
+    // A null aim makes `applySeek` steer at the opponent — the same homing the
+    // AI gets — so this is a genuine preference rather than a handicap. See
+    // `prefs.ts` for why anyone would want it.
+    if (!aimCharge()) return null;
     if (this.keyAim) return this.keyAim;
     if (!this.pointer) return null;
     const me = this.battle.beys.find((b) => b.id === PLAYER_ID);

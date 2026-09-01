@@ -4,6 +4,19 @@ import { BEY_PRESETS } from './render/beydex';
 import { beyThumb } from './render/beyThumb';
 import { modelThumb } from './render/modelThumb';
 import { setUnlockPreference, unlockPreference } from './devUnlock';
+import { aimCharge, devMode, setAimCharge, setDevMode } from './prefs';
+import {
+  endRound,
+  fillMeter,
+  grantCoins,
+  resetCareer,
+  resetCup,
+  rungOptions,
+  setRung,
+  summonNemesis,
+  winCup,
+} from './dev';
+import { ARENAS } from './sim/arena';
 import { shopSection } from './render/shopSection';
 import { topModelFor } from './render/topModelIndex';
 import * as C from './sim/constants';
@@ -537,7 +550,7 @@ export class Ui {
     el.className = 'moves';
 
     const defs: [MoveKind, string, string, string][] = [
-      ['charge', 'SPACE', 'Charge', 'aim & smash'],
+      ['charge', 'SPACE', 'Charge', aimCharge() ? 'aim & smash' : 'hunt & smash'],
       ['block', 'A', 'Block', 'absorb a hit'],
       ['dodge', 'S', 'Dodge', 'break away'],
     ];
@@ -641,10 +654,18 @@ export class Ui {
       // so a single static line naming three keys would leave the game's one
       // positional control undiscovered. These two messages swap as soon as the
       // pointer moves, which is the whole lesson in one gesture.
-      msg = g.aiming
-        ? 'Aimed — SPACE sends the Charge along the arrows'
-        : 'Meter full — move the mouse to AIM your Charge, then SPACE';
-      tone = g.aiming ? 'good' : '';
+      // The teach-by-contrast line only makes sense while aiming is ON. With
+      // it off there is nothing to point, so naming the keys is the whole
+      // lesson again.
+      if (!aimCharge()) {
+        msg = 'Meter full — SPACE to Charge, A to Block, S to Dodge';
+        tone = '';
+      } else {
+        msg = g.aiming
+          ? 'Aimed — SPACE sends the Charge along the arrows'
+          : 'Meter full — move the mouse to AIM your Charge, then SPACE';
+        tone = g.aiming ? 'good' : '';
+      }
     } else if (you.burst > 0.55) {
       msg = 'Burst gauge is high — tap S to Dodge before the next hit';
       tone = 'urgent';
@@ -1688,6 +1709,145 @@ export class Ui {
     return el;
   }
 
+  /**
+   * The developer panel: reach any state without playing to it.
+   *
+   * Lives in the garage rather than in settings because these are things you
+   * do BETWEEN matches while testing — jump the ladder, then immediately pick a
+   * bey and fight. Making that a two-screen trip is the tax the tool exists to
+   * remove, which is the same argument that moved the unlock switch out of a
+   * URL parameter.
+   *
+   * Rendered as nothing at all when the mode is off, so it costs a hidden
+   * element and no layout.
+   */
+  private devSection(): HTMLElement {
+    const g = this.game;
+    const el = document.createElement('div');
+    if (!devMode()) {
+      el.hidden = true;
+      return el;
+    }
+    el.className = 'devpanel';
+
+    const head = document.createElement('div');
+    head.className = 'dev-head';
+    head.innerHTML =
+      `<span class="lab">Developer</span>` +
+      `<span class="dev-note">nothing here changes the game's rules</span>`;
+    el.appendChild(head);
+
+    const rows = document.createElement('div');
+    rows.className = 'dev-rows';
+    el.appendChild(rows);
+
+    /** One labelled row of controls. */
+    const row = (label: string): HTMLElement => {
+      const r = document.createElement('div');
+      r.className = 'dev-row';
+      r.innerHTML = `<span class="dev-label">${escapeHtml(label)}</span>`;
+      rows.appendChild(r);
+      return r;
+    };
+    const button = (into: HTMLElement, text: string, fn: () => void): void => {
+      const b = document.createElement('button');
+      b.className = 'dev-btn';
+      b.textContent = text;
+      b.addEventListener('click', () => {
+        fn();
+        this.render();
+      });
+      into.appendChild(b);
+    };
+    const select = (
+      into: HTMLElement,
+      options: { value: string; label: string }[],
+      current: string,
+      fn: (v: string) => void,
+    ): void => {
+      const sel = document.createElement('select');
+      sel.className = 'dev-select';
+      for (const o of options) {
+        const opt = document.createElement('option');
+        opt.value = o.value;
+        opt.textContent = o.label;
+        sel.appendChild(opt);
+      }
+      sel.value = current;
+      sel.addEventListener('change', () => {
+        fn(sel.value);
+        this.render();
+      });
+      into.appendChild(sel);
+    };
+
+    // --- arena ---------------------------------------------------------------
+    const arenaRow = row('Arena');
+    select(
+      arenaRow,
+      ARENAS.map((a) => ({ value: a.id, label: a.name })),
+      g.arenaId,
+      (v) => {
+        g.arenaId = v;
+      },
+    );
+
+    // --- ladder --------------------------------------------------------------
+    const rungRow = row('Ladder rung');
+    select(
+      rungRow,
+      rungOptions().map((o) => ({ value: String(o.value), label: o.label })),
+      String(g.progress.data.rung),
+      (v) => setRung(g.progress, Number(v)),
+    );
+
+    // --- difficulty ----------------------------------------------------------
+    const diffRow = row('Rival skill');
+    select(
+      diffRow,
+      (['rookie', 'blader', 'champion'] as const).map((d) => ({ value: d, label: d })),
+      g.difficulty,
+      (v) => g.setDifficulty(v as 'rookie' | 'blader' | 'champion'),
+    );
+
+    // --- economy -------------------------------------------------------------
+    const coinRow = row(`Coins (${g.progress.data.coins})`);
+    button(coinRow, '+1000', () => grantCoins(g.progress, 1000));
+    button(coinRow, '+10000', () => grantCoins(g.progress, 10_000));
+
+    // --- cup -----------------------------------------------------------------
+    const cupRow = row('Cup');
+    button(cupRow, 'Reset today', () => resetCup(g.progress));
+    button(cupRow, 'Win current', () => winCup(g.progress));
+
+    // --- career --------------------------------------------------------------
+    const careerRow = row('Career');
+    button(careerRow, 'Summon nemesis', () => summonNemesis(g.progress));
+    const wipe = document.createElement('button');
+    wipe.className = 'dev-btn danger';
+    wipe.textContent = 'Wipe save';
+    wipe.addEventListener('click', () => {
+      // The confirmation lives here rather than in `dev.ts` deliberately: a
+      // browser dialog inside the action module would make it untestable.
+      if (!window.confirm('Erase the entire career? This cannot be undone.')) return;
+      resetCareer();
+      location.reload();
+    });
+    careerRow.appendChild(wipe);
+
+    // --- in battle -----------------------------------------------------------
+    // Only rendered during a round, because "fill the meter" on the garage
+    // screen is a button that silently does nothing.
+    if (g.screen === 'battle') {
+      const battleRow = row('This round');
+      button(battleRow, 'Fill meter', () => fillMeter(g));
+      button(battleRow, 'Win round', () => endRound(g, true));
+      button(battleRow, 'Lose round', () => endRound(g, false));
+    }
+
+    return el;
+  }
+
   private garage(): HTMLElement {
     const g = this.game;
     const overlay = document.createElement('div');
@@ -1709,6 +1869,7 @@ export class Ui {
     panel.appendChild(this.explodedView());
     panel.appendChild(this.careerSection());
     panel.appendChild(this.cupSection());
+    panel.appendChild(this.devSection());
 
     // Two tabs, because the garage was doing two psychologically opposite
     // jobs at once. Picking a finished bey is choosing an *identity*;
@@ -2115,6 +2276,48 @@ export class Ui {
       location.reload();
     });
     fxChips.appendChild(unlockChip);
+
+    // AIM CHARGE, as a real preference rather than a difficulty setting.
+    // Turning it off is not a handicap — the sim falls back to the homing it
+    // always had, which is what the AI uses. Pointer aiming assumes a mouse;
+    // on a trackpad, on a touchscreen, or for someone who would rather watch
+    // the fight than drive it, the auto-homing charge is the better game.
+    const aimChip = document.createElement('button');
+    const setAim = (): void => {
+      const on = aimCharge();
+      aimChip.className = 'chip' + (on ? ' on' : '');
+      aimChip.innerHTML = `<span>Aim your charge<br><small>${
+        on ? 'point where it should go' : 'it steers itself'
+      }</small></span>`;
+    };
+    setAim();
+    aimChip.addEventListener('click', () => {
+      setAimCharge(!aimCharge());
+      setAim();
+      // Live, no reload: the aim is resolved every frame and the coach and the
+      // move button both read the preference on their next render.
+      this.render();
+    });
+    fxChips.appendChild(aimChip);
+
+    // DEVELOPER MODE. Nothing behind it changes the game's rules — see dev.ts —
+    // it only reaches states that are otherwise behind ladder progress, a day's
+    // wait, or a run of luck.
+    const devChip = document.createElement('button');
+    const setDev = (): void => {
+      const on = devMode();
+      devChip.className = 'chip' + (on ? ' on' : '');
+      devChip.innerHTML = `<span>Developer mode<br><small>${
+        on ? 'testing tools shown' : 'off'
+      }</small></span>`;
+    };
+    setDev();
+    devChip.addEventListener('click', () => {
+      setDevMode(!devMode());
+      setDev();
+      this.render();
+    });
+    fxChips.appendChild(devChip);
 
     fxRow.appendChild(fxChips);
     panel.appendChild(fxRow);

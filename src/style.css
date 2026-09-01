@@ -2531,3 +2531,61 @@ body.theme-anime .coach.on {
 /* Knocked out reads as struck through, not merely dim: a bracket's whole job
    is showing who is gone. */
 .cup-slot.out { color: #667380; text-decoration: line-through; }
+
+/*
+ * The developer panel.
+ *
+ * Deliberately reads as a TOOL rather than as part of the game: a flat mono
+ * face, no rounded chips, a cool grey that belongs to no theme. Someone
+ * screenshotting the game should be able to tell at a glance that this box is
+ * not something a player sees.
+ */
+.devpanel {
+  margin: 0 0 .5rem;
+  padding: .6rem .75rem;
+  border-radius: .3rem;
+  background: rgba(120, 140, 160, .06);
+  border: 1px dashed rgba(140, 160, 180, .35);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+.dev-head { display: flex; align-items: baseline; gap: .6rem; margin-bottom: .5rem; }
+.dev-note { font-size: .6rem; color: #6b7885; margin-left: auto; }
+
+.dev-rows { display: flex; flex-direction: column; gap: .35rem; }
+
+.dev-row {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  flex-wrap: wrap;
+}
+
+.dev-label {
+  font-size: .66rem;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: #7f8b9c;
+  min-width: 7rem;
+}
+
+.dev-btn,
+.dev-select {
+  font: inherit;
+  font-size: .7rem;
+  color: #cfd8e3;
+  background: rgba(10, 14, 22, .7);
+  border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: .25rem;
+  padding: .22rem .5rem;
+  cursor: pointer;
+}
+
+.dev-btn:hover,
+.dev-select:hover { border-color: rgba(255, 255, 255, .3); }
+.dev-btn:focus-visible,
+.dev-select:focus-visible { outline: 2px solid #25d9f0; outline-offset: 1px; }
+
+/* The only irreversible control in here, and the only one coloured. */
+.dev-btn.danger { color: #ff8a7a; border-color: rgba(255, 138, 122, .4); }
+.dev-btn.danger:hover { border-color: rgba(255, 138, 122, .8); }
