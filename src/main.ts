@@ -19,6 +19,7 @@ const game = new Game(canvas, {
   onFinish: (reason, won) => ui.showFinisher(reason, won),
   onImpactFlash: (strength) => ui.impactFlash(strength),
   onPerfectLaunch: () => ui.showPerfectLaunch(),
+  onObjectives: (outcome) => ui.showObjectives(outcome),
 });
 
 // Before the first render, so the garage is built against the granted roster

@@ -21,7 +21,9 @@ import type { ModeId, Stadium } from './modes';
 import { Battle } from './sim/battle';
 import type { Fighter } from './sim/battle';
 import * as C from './sim/constants';
-import { DEFAULT_BUILD } from './sim/parts';
+import { DEFAULT_BUILD, buildArchetype } from './sim/parts';
+import type { RoundOutcome } from './progress';
+import type { Opponent } from './career';
 import type { BeyBuild, LaunchParams, MoveKind } from './sim/types';
 import { DIRECT_PRICE, REROLL_COST, REWARDS, crateById, rollCrate, rollOffer } from './economy';
 import type { CrateResult, OfferSlot, RewardRef } from './economy';
@@ -47,6 +49,13 @@ export interface GameEvents {
   onImpactFlash(strength: number): void;
   /** The player's rip landed in the launch meter's green band. */
   onPerfectLaunch(): void;
+  /**
+   * One or more career objectives finished on the round that just ended.
+   *
+   * Fired only when something was actually completed, so the UI never has to
+   * check for an empty list before deciding whether to say anything.
+   */
+  onObjectives(outcome: RoundOutcome): void;
 }
 
 /** Shared empty array, so the no-hits path allocates nothing per frame. */
@@ -191,6 +200,10 @@ export class Game {
    * distinctly from `rival`, which is the live BeyState during a battle.
    */
   get currentRival(): Rival {
+    // The nemesis cuts in front of whoever was next. It is checked first
+    // because the whole point of a recurring rival is that they turn up when
+    // they decide to, not when the ladder gets around to them.
+    if (this.progress.nemesisIsDue()) return this.progress.nemesis();
     // Past the ladder the opponents keep coming — see `endlessRival`. Before
     // this, `rivalAt` clamped to Zeph forever, so clearing the game left you
     // replaying the same fight with nothing to move.
@@ -198,6 +211,12 @@ export class Game {
       return endlessRival(this.progress.data.endless + 1);
     }
     return rivalAt(this.progress.data.rung);
+  }
+
+  /** Which kind of opponent this match is against, for the career record. */
+  private get opponentKind(): Opponent {
+    if (this.progress.nemesisIsDue()) return 'nemesis';
+    return this.progress.cleared ? 'endless' : 'ladder';
   }
   aiName = 'Rival';
   difficulty: Difficulty = 'blader';
@@ -243,6 +262,17 @@ export class Game {
   private hitstop = 0;
   /** Guards against recording the same match result twice. */
   private matchRecorded = false;
+  /**
+   * Guards the career record against the finish block running twice.
+   *
+   * The same shape as `matchRecorded`, and for the same reason: the finish
+   * hold spans many frames and everything inside it would otherwise fire on
+   * each one. Reset per ROUND rather than per match, since that is the unit
+   * being recorded.
+   */
+  private roundRecorded = false;
+  /** What the last recorded round earned, for the result screen. */
+  lastRoundOutcome: RoundOutcome | null = null;
   /** Previous rail timer per top, for engage/release edge detection. */
   private railWas = new Map<string, number>();
   /**
@@ -407,6 +437,8 @@ export class Game {
   }
 
   private toLaunch(): void {
+    // Per round, not per match: this is the unit `recordRound` records.
+    this.roundRecorded = false;
     this.finishHold = 0;
     this.launchMeter = 0;
     this.meterDir = 1;
@@ -840,6 +872,40 @@ export class Game {
           last?.xtremeFinish ? 'xtreme' : (last?.reason ?? 'timeout'),
           last?.winnerId === PLAYER_ID,
         );
+
+        // Record the ROUND, before the match check below. Objectives and
+        // mastery are about what the player did — which build they brought and
+        // how the round actually went — and a match is far too coarse to see
+        // any of that. See `Progress.recordRound`.
+        const me = this.battle.beys.find((b) => b.id === PLAYER_ID);
+        if (me && !this.roundRecorded) {
+          this.roundRecorded = true;
+          this.lastRoundOutcome = this.progress.recordRound(
+            {
+              won: last?.winnerId === PLAYER_ID,
+              reason: last?.reason ?? 'timeout',
+              decidedMatch: this.battle.phase === 'match-over',
+              layerId: this.playerBuild.layer.id,
+              discId: this.playerBuild.disc.id,
+              driverId: this.playerBuild.driver.id,
+              archetype: buildArchetype(this.playerBuild),
+              spinDir: this.playerSpinDir,
+              hitsLanded: me.hitsLanded,
+              spinStolen: me.spinStolen,
+              // Guarded rather than assumed: a round that ends on the launch
+              // frame would divide by zero and poison every objective that
+              // reads it.
+              spinLeft:
+                me.spinAtLaunch > 0 ? Math.abs(me.spin) / me.spinAtLaunch : 0,
+              seconds: this.battle.roundTime,
+              opponent: this.opponentKind,
+            },
+            Date.now(),
+          );
+          if (this.lastRoundOutcome.completed.length) {
+            this.events.onObjectives(this.lastRoundOutcome);
+          }
+        }
 
         // Record the match exactly once, the moment it is decided.
         if (this.battle.phase === 'match-over' && !this.matchRecorded) {

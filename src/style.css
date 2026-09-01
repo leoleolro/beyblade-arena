@@ -2182,3 +2182,74 @@ body.theme-anime .coach.on {
   font-size: 12px;
   line-height: 1.5;
 }
+
+/*
+ * Objective completion banner.
+ *
+ * Sits where `perfect-launch` sits and behaves the same way, because they are
+ * the same kind of thing: a reward that has to land in the moment it was
+ * earned. It is wider and lives longer only because it has words to read, and
+ * sometimes several of them — a decisive round can close a daily and a weekly
+ * at once.
+ */
+.objectives-pop {
+  position: absolute;
+  left: 50%;
+  top: 22%;
+  transform: translateX(-50%);
+  z-index: 40;
+  pointer-events: none;
+  min-width: 15rem;
+  padding: 0.7rem 1rem;
+  border-radius: 0.6rem;
+  background: rgba(10, 14, 22, 0.9);
+  border: 1px solid rgba(37, 217, 240, 0.5);
+  box-shadow: 0 0.5rem 2rem rgba(0, 0, 0, 0.45);
+  text-align: center;
+  animation: objectives-in 0.24s ease-out both;
+}
+
+@keyframes objectives-in {
+  from { opacity: 0; transform: translate(-50%, -0.5rem); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.objectives-head {
+  font-size: 0.62rem;
+  letter-spacing: 0.16em;
+  color: #25d9f0;
+  margin-bottom: 0.35rem;
+}
+
+.objective-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: baseline;
+  font-size: 0.8rem;
+  color: #e6edf6;
+  padding: 0.1rem 0;
+}
+
+.objective-scope {
+  font-size: 0.58rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #7f8b9c;
+}
+
+/* Mastery is a different KIND of reward, so it reads differently rather than
+   as another row: it is rare, it is about one bey, and it never repeats. */
+.objective-mastery {
+  margin-top: 0.35rem;
+  padding-top: 0.35rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
+  font-size: 0.78rem;
+  color: #f5c451;
+}
+
+.objectives-coins {
+  margin-top: 0.3rem;
+  font-size: 0.72rem;
+  color: #7fd88f;
+}

@@ -9,6 +9,8 @@ import { topModelFor } from './render/topModelIndex';
 import * as C from './sim/constants';
 import { SKINS, skinById } from './render/skins';
 import type { Channel } from './audio/engine';
+import type { RoundOutcome } from './progress';
+import { MASTERY_NAMES } from './career';
 import { THEMES, themeById } from './render/theme';
 import { MODES, modeById, stadiumsByLook } from './modes';
 import { groupByClass } from './render/beyClass';
@@ -355,6 +357,44 @@ export class Ui {
     )}% spin</small>`;
     this.root.appendChild(el);
     window.setTimeout(() => el.remove(), 900);
+  }
+
+  /**
+   * Announce the objectives a round just finished, and any mastery tier it
+   * crossed.
+   *
+   * Deliberately a transient banner rather than a line on the result screen. An
+   * objective is a small, frequent reward and it has to land in the moment it
+   * was earned — a list the player discovers later in a menu teaches them the
+   * menu, not the objective. Same reasoning as `showPerfectLaunch`, which
+   * exists because a bonus applied silently was a bonus nobody knew they had.
+   *
+   * Stacks vertically when several land at once, which is common: a decisive
+   * round can close a daily and a weekly together.
+   */
+  showObjectives(outcome: RoundOutcome): void {
+    const el = document.createElement('div');
+    el.className = 'objectives-pop';
+    const rows = outcome.completed
+      .map(
+        (c) =>
+          `<div class="objective-row"><span class="objective-name">${c.text}</span>` +
+          `<span class="objective-scope">${c.scope}</span></div>`,
+      )
+      .join('');
+    const mastery =
+      outcome.masteryTier > 0
+        ? `<div class="objective-mastery">${MASTERY_NAMES[outcome.masteryTier - 1]} — ${LAYERS.find((l) => l.id === outcome.masteryLayerId)?.name ?? outcome.masteryLayerId}</div>`
+        : '';
+    el.innerHTML =
+      `<div class="objectives-head">OBJECTIVE${outcome.completed.length > 1 ? 'S' : ''} COMPLETE</div>` +
+      rows +
+      mastery +
+      `<div class="objectives-coins">+${outcome.coins} coins</div>`;
+    this.root.appendChild(el);
+    // Longer than the perfect-launch flash: this one has words to read, and
+    // several of them when a weekly lands with a daily.
+    window.setTimeout(() => el.remove(), 2600);
   }
 
   /**
