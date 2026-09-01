@@ -2424,3 +2424,110 @@ body.theme-anime .coach.on {
   text-transform: uppercase;
   color: #7f8b9c;
 }
+
+/*
+ * The daily cup.
+ *
+ * Reads as a bracket rather than a list, because the shape IS the information:
+ * three columns narrowing to one is what a single-elimination tournament looks
+ * like, and a column of names is not. Scrolls sideways in its own container on
+ * narrow screens rather than reflowing — a wrapped bracket stops being a
+ * bracket.
+ */
+.cup {
+  margin: 0 0 .5rem;
+  padding: .7rem .85rem;
+  border-radius: .6rem;
+  background: rgba(245, 196, 81, .05);
+  border: 1px solid rgba(245, 196, 81, .22);
+}
+
+/* Live runs take the warm colour properly. An always-gold panel is wallpaper;
+   one that lights up when you are IN it is a state. */
+.cup.live {
+  background: rgba(245, 196, 81, .09);
+  border-color: rgba(245, 196, 81, .45);
+}
+
+.cup-head {
+  display: flex;
+  align-items: baseline;
+  gap: .6rem;
+  margin-bottom: .45rem;
+}
+
+.cup-record {
+  margin-left: auto;
+  font-size: .66rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: #7f8b9c;
+}
+
+.cup-pitch { margin: 0 0 .6rem; font-size: .8rem; color: #cfd8e3; line-height: 1.5; }
+.cup-pitch strong { color: #f5c451; }
+.cup-spent { color: #7f8b9c; margin-bottom: 0; }
+
+.cup-enter { margin-top: .1rem; }
+
+.cup-now {
+  font-size: .84rem;
+  color: #e6edf6;
+  margin-bottom: .55rem;
+  display: flex;
+  align-items: baseline;
+  gap: .5rem;
+}
+.cup-now strong { color: #f5c451; }
+.cup-round {
+  font-size: .6rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: #7f8b9c;
+}
+
+.cup-bracket-scroll { overflow-x: auto; }
+
+.cup-bracket {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(7.5rem, 1fr);
+  gap: .6rem;
+  min-width: 22rem;
+}
+
+.cup-col { display: flex; flex-direction: column; justify-content: space-around; gap: .35rem; }
+
+.cup-col-head {
+  font-size: .55rem;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: #7f8b9c;
+  margin-bottom: .1rem;
+}
+
+.cup-match {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(255, 255, 255, .09);
+  border-radius: .3rem;
+  overflow: hidden;
+}
+
+/* Your own match is the one you are looking for. */
+.cup-match.mine { border-color: rgba(245, 196, 81, .55); }
+
+.cup-slot {
+  font-size: .68rem;
+  padding: .2rem .4rem;
+  color: #b8c2ce;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cup-slot + .cup-slot { border-top: 1px solid rgba(255, 255, 255, .07); }
+.cup-slot.me { color: #f5c451; font-weight: 600; }
+.cup-slot.through { color: #e6edf6; background: rgba(255, 255, 255, .05); }
+/* Knocked out reads as struck through, not merely dim: a bracket's whole job
+   is showing who is gone. */
+.cup-slot.out { color: #667380; text-decoration: line-through; }

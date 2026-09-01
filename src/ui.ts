@@ -11,6 +11,15 @@ import { SKINS, skinById } from './render/skins';
 import type { Channel } from './audio/engine';
 import type { RoundOutcome } from './progress';
 import { MASTERY_NAMES, challengeById, masteryTier, masteryToNext } from './career';
+import {
+  CUP_PLAYER,
+  CUP_PURSE,
+  CUP_ROUNDS,
+  CUP_ROUND_NAMES,
+  CUP_TBD,
+  cupBracket,
+  cupEntrantById,
+} from './tournament';
 import { THEMES, themeById } from './render/theme';
 import { MODES, modeById, stadiumsByLook } from './modes';
 import { groupByClass } from './render/beyClass';
@@ -1582,6 +1591,103 @@ export class Ui {
     );
   }
 
+  /**
+   * The cup: enter it, or see how far up the bracket you are.
+   *
+   * ONE PANEL FOR BOTH STATES rather than a separate screen, because the cup is
+   * a thing you decide to do from the garage and then a thing you are IN. A
+   * player mid-bracket needs to see the ladder they are climbing at the moment
+   * they are choosing what to bring to the next match, and that moment happens
+   * here.
+   *
+   * Hidden entirely before the unlock rung. An empty box saying "locked" is a
+   * worse first impression than no box.
+   */
+  private cupSection(): HTMLElement {
+    const g = this.game;
+    const el = document.createElement('div');
+    const c = g.progress.data.cup;
+    const live = g.progress.cupRunning;
+    const canEnter = g.progress.canEnterCup(Date.now());
+
+    if (!live && !canEnter && c.entered === 0) {
+      // Never played and not yet available: say nothing at all.
+      el.hidden = true;
+      return el;
+    }
+
+    el.className = `cup${live ? ' live' : ''}`;
+
+    const head =
+      `<div class="cup-head">` +
+      `<span class="lab">Daily cup</span>` +
+      (c.entered > 0
+        ? `<span class="cup-record">${c.won} won &middot; ${c.entered} entered</span>`
+        : '') +
+      `</div>`;
+
+    if (live) {
+      const foe = g.progress.cupOpponent();
+      const rounds = cupBracket(c);
+      // One column per round, so the shape of a bracket is the shape of the
+      // markup. A list of names would not read as a tournament.
+      const cols = rounds
+        .map(
+          (matches, r) =>
+            `<div class="cup-col">` +
+            `<div class="cup-col-head">${escapeHtml(CUP_ROUND_NAMES[r])}</div>` +
+            matches
+              .map((m) => {
+                const nm = (id: string): string =>
+                  id === CUP_PLAYER
+                    ? 'You'
+                    : id === CUP_TBD
+                      ? '&mdash;'
+                      : escapeHtml(cupEntrantById(id)?.name ?? id);
+                const slot = (id: string): string =>
+                  `<span class="cup-slot${id === CUP_PLAYER ? ' me' : ''}` +
+                  `${m.winner && m.winner === id ? ' through' : ''}` +
+                  `${m.winner && m.winner !== id && id !== CUP_TBD ? ' out' : ''}">${nm(id)}</span>`;
+                return `<div class="cup-match${m.player ? ' mine' : ''}">${slot(m.a)}${slot(m.b)}</div>`;
+              })
+              .join('') +
+            `</div>`,
+        )
+        .join('');
+
+      el.innerHTML =
+        head +
+        `<div class="cup-now">Next: <strong>${escapeHtml(foe?.name ?? '')}</strong>` +
+        `<span class="cup-round">${escapeHtml(CUP_ROUND_NAMES[c.wins])}</span></div>` +
+        `<div class="cup-bracket-scroll"><div class="cup-bracket">${cols}</div></div>`;
+      return el;
+    }
+
+    // Not running. Either today's cup is available, or it is spent.
+    const purse = CUP_PURSE[CUP_ROUNDS];
+    if (canEnter) {
+      el.innerHTML =
+        head +
+        `<p class="cup-pitch">Eight blades, three rounds, single elimination. ` +
+        `Win it for <strong>${purse} coins</strong>. One run a day &mdash; the ` +
+        `field is the same for everyone today.</p>`;
+      const btn = document.createElement('button');
+      btn.className = 'primary cup-enter';
+      btn.textContent = 'Enter the cup';
+      btn.addEventListener('click', () => {
+        g.enterCup();
+        this.render();
+      });
+      el.appendChild(btn);
+    } else {
+      el.innerHTML =
+        head +
+        `<p class="cup-pitch cup-spent">Today's run is over. A new field is ` +
+        `drawn tomorrow.</p>`;
+    }
+    return el;
+  }
+
   private garage(): HTMLElement {
     const g = this.game;
     const overlay = document.createElement('div');
@@ -1602,6 +1708,7 @@ export class Ui {
 
     panel.appendChild(this.explodedView());
     panel.appendChild(this.careerSection());
+    panel.appendChild(this.cupSection());
 
     // Two tabs, because the garage was doing two psychologically opposite
     // jobs at once. Picking a finished bey is choosing an *identity*;
