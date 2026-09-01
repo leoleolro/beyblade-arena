@@ -1,5 +1,5 @@
 import type { Game } from './game';
-import { DISCS, DRIVERS, LAYERS, deriveStats, makeBuild } from './sim/parts';
+import { DISCS, DRIVERS, LAYERS, buildArchetype, deriveStats, makeBuild } from './sim/parts';
 import { BEY_PRESETS } from './render/beydex';
 import { beyThumb } from './render/beyThumb';
 import { modelThumb } from './render/modelThumb';
@@ -14,7 +14,7 @@ import { MODES, modeById, stadiumsByLook } from './modes';
 import { groupByClass } from './render/beyClass';
 import { GarageView } from './render/garageView';
 import { LADDER } from './ladder';
-import type { BeyState, MoveKind } from './sim/types';
+import type { BeyBuild, BeyState, MoveKind } from './sim/types';
 
 const hex = (n: number): string => `#${n.toString(16).padStart(6, '0')}`;
 const pct = (n: number): string => `${Math.round(Math.max(0, Math.min(1, n)) * 100)}%`;
@@ -40,10 +40,144 @@ const REASON_TEXT: Record<string, string> = {
   draw: 'Double elimination — no points.',
 };
 
+/** Which pairing a build wants: the two spins the same way, or against. */
+type Pairing = 'same' | 'opposite' | 'either';
+
+interface SpinRead {
+  wants: Pairing;
+  /** The whole build's archetype — layer and driver together, not the layer's. */
+  arch: string;
+  /** Why, in the player's words, read off this build's own numbers. */
+  line: string;
+}
+
+/**
+ * What spin direction is actually worth to a build, read off its own stats.
+ *
+ * THE GAME NEVER SAID. The garage has had a spin toggle since the beginning and
+ * it read `left spin` / `right spin` — a cosmetic label on the largest decision
+ * the game offers. Measured across the whole 37-build roster with the direction
+ * FORCED, so the AI's own policy could not generate the evidence, the two
+ * pairings are ±24 points apart:
+ *
+ *     attack    same 63.8%   opposite 40.2%    -23.6
+ *     balance   same 37.6%   opposite 45.9%     +8.3
+ *     defense   same 31.8%   opposite 56.8%    +25.0
+ *     stamina   same 12.2%   opposite 35.9%    +23.8
+ *
+ * READ OFF THE STAT, NOT THE LABEL, and in that order — because `spinSteal` is
+ * the whole story and the archetype is only its shadow. `resolvePair` pays the
+ * drain in opposite spin alone, so the gain per build tracks the stat and not
+ * the class: Fafnir (stamina, steal 0.62) gains +45.3 from opposite spin while
+ * Silver Wolf (stamina, steal 0.00) gains +1.6. Explaining a stamina build by
+ * its archetype average would therefore promise Silver Wolf twenty-four points
+ * that only Fafnir collects.
+ *
+ * There is deliberately no per-bey table here. A build assembled by hand in the
+ * Workshop has never been seen by anyone and has to be explained exactly as
+ * accurately as a preset, so every sentence below is generated from the parts
+ * the player actually has fitted.
+ */
+function spinRead(build: BeyBuild): SpinRead {
+  const steal = build.layer.spinSteal;
+  const same = build.layer.sameSteal ?? 0;
+  // The BUILD's archetype, which is the layer's only when the driver agrees —
+  // the same rule the AI's own policy and the measured table above both use.
+  const arch = buildArchetype(build);
+
+  // The vampire. One layer in the catalog declares `sameSteal`, and it is the
+  // only build in the game whose drain is not simply switched off by a matched
+  // spin — so it must not be told the same thing as Fafnir.
+  if (steal > 0 && same > 0) {
+    return {
+      wants: 'opposite',
+      arch,
+      line:
+        `Absorbs ${pct(steal)} of every hit it takes, and it is the one layer in the game ` +
+        `that keeps draining in same spin — ${pct(steal * same)} of the rate survives a matched ` +
+        'launch. Opposite spin is still where it does its real work.',
+    };
+  }
+
+  if (steal > 0) {
+    return {
+      wants: 'opposite',
+      arch,
+      line:
+        `Absorbs ${pct(steal)} of every hit it takes and turns it back into its own spin — ` +
+        'but only against a top turning the other way. Match your rival and the drain is ' +
+        'switched off completely, which is what makes this the biggest choice on the screen.',
+    };
+  }
+
+  if (arch === 'attack') {
+    return {
+      wants: 'same',
+      arch,
+      line:
+        'An attack build wants the SAME spin, which surprises most players. Measured across ' +
+        'the roster it wins 24 points more often there — it is the one archetype that loses ' +
+        'by opposing.',
+    };
+  }
+  if (arch === 'defense') {
+    return {
+      wants: 'opposite',
+      arch,
+      line:
+        'A defense build wants the OPPOSITE spin: 25 points better, measured. It has no drain ' +
+        'of its own, so it collects less than an absorber would, but the direction still pays.',
+    };
+  }
+  if (arch === 'stamina') {
+    return {
+      wants: 'opposite',
+      arch,
+      // The honest version of the archetype row. Stamina's +23.8 is real as an
+      // average and misleading as advice: it is earned almost entirely by the
+      // two layers that drain, and this build is not one of them.
+      line:
+        'Stamina prefers the OPPOSITE spin on average, but that average is earned by the ' +
+        'layers that drain — and this one does not. Expect little either way; fit a layer ' +
+        'with a drain stat and the choice starts mattering.',
+    };
+  }
+  return {
+    wants: 'either',
+    arch,
+    line:
+      // Said out loud when it applies, because the layer chips advertise the
+      // LAYER's archetype and a Valtryek on an Atomic driver reads here as
+      // balance. Without this, the two screens look like they disagree.
+      (build.layer.archetype !== build.driver.archetype
+        ? // `An attack layer`, not `A attack layer` — the archetype names are
+          // data, so the article has to be chosen rather than written.
+          `${article(build.layer.archetype)} ${build.layer.archetype} layer on ` +
+          `${article(build.driver.archetype)} ${build.driver.archetype} driver counts as balance. `
+        : '') +
+      'Balance sits between the two: +8 points for opposite spin across the roster, the ' +
+      'narrowest gap of the four archetypes. Either pairing is playable with this build.',
+  };
+}
+
+/** How hard this rival will try to get the pairing its build wants. */
+const RIVAL_SPIN_SKILL: Record<string, string> = {
+  // Tier-gated in `chooseSpinDir` by the AI's `spinRead` profile stat, which is
+  // 0 / 0.5 / 1 across the three tiers — a rookie does not know the matchup
+  // exists, a champion always launches for the pairing it wants.
+  rookie: 'but a rookie does not know this matchup exists — its launch is near a coin flip',
+  blader: 'and it finds that pairing about half the time',
+  champion: 'and a champion launches for it every time',
+};
+
 /**
  * All DOM. Rebuilds the panels on screen changes and does a cheap per-frame
  * pass over just the live bars, so the HUD doesn't thrash the DOM at 60fps.
  */
+
+/** `a` or `an`, for names that come from data rather than from prose. */
+const article = (word: string): string => ('aeiou'.includes(word[0]) ? 'an' : 'a');
+
 export class Ui {
   private root: HTMLElement;
   private live: {
@@ -465,6 +599,21 @@ export class Ui {
     } else if (you.burst > 0.55) {
       msg = 'Burst gauge is high — tap S to Dodge before the next hit';
       tone = 'urgent';
+    } else if (you.spinStolen > 0) {
+      // THE MECHANIC, NAMED AT THE MOMENT IT IS VISIBLE. A drain is the one
+      // thing in this game that looks like a bug while it happens — a top that
+      // was dying climbs back — and the garage's explanation is two screens
+      // away by then. Lowest priority on purpose: it is a lesson, not a prompt,
+      // so it only takes the line when nothing needs pressing.
+      msg = 'You are DRAINING it — that only works because you launched opposite spin';
+      tone = 'good';
+    } else if (
+      g.playerSpinDir === g.rivalSpinDir &&
+      you.build.layer.spinSteal > 0 &&
+      (you.build.layer.sameSteal ?? 0) === 0
+    ) {
+      msg = 'Same spin — your bey’s drain is switched off this round. Oppose it next time.';
+      tone = '';
     } else {
       msg = 'Meter is filling. Watch the rival card for its move.';
       tone = '';
@@ -614,40 +763,98 @@ export class Ui {
    */
 
   /**
-   * Spin direction. Also a match setting — the two pairings measure completely
-   * differently, so this decides what kind of fight you get.
+   * Spin direction — the biggest decision in the game, and the one it never
+   * explained.
+   *
+   * This was two chips reading `clockwise` / `counter-clockwise` and one line
+   * of flavour that was, on the measurements, backwards: it promised stamina an
+   * attrition race it wins by default, when what stamina actually wants is the
+   * pairing where its drain exists at all. A ±24 point decision was dressed as
+   * a cosmetic label.
+   *
+   * So the section now answers the three questions a player has here, in the
+   * order they have them: what does this do for the bey I am holding, what am I
+   * about to walk into, and — for the first two matches only — what is a spin
+   * pairing in the first place.
    */
   private spinSection(): HTMLElement {
     const g = this.game;
-      // Spin direction. Measured, the two pairings play completely differently,
-      // so this is a real decision rather than a cosmetic toggle.
-      const spinRow = document.createElement('div');
-      spinRow.className = 'slot';
-      spinRow.innerHTML = '<h4>Spin direction — decides what kind of fight you get</h4>';
-      const spinChips = document.createElement('div');
-      spinChips.className = 'chips';
-      const spins: [1 | -1, string, string][] = [
-        [1, 'Right spin', 'clockwise'],
-        [-1, 'Left spin', 'counter-clockwise'],
-      ];
-      for (const [dir, label, note] of spins) {
-        const chip = document.createElement('button');
-        chip.className = 'chip' + (g.playerSpinDir === dir ? ' on' : '');
-        chip.innerHTML = `<span>${escapeHtml(label)}<br><small>${escapeHtml(note)}</small></span>`;
-        chip.addEventListener('click', () => {
-          g.playerSpinDir = dir;
-          this.render();
-        });
-        spinChips.appendChild(chip);
-      }
-      spinRow.appendChild(spinChips);
-      const spinNote = document.createElement('p');
-      spinNote.className = 'sub';
-      spinNote.style.margin = '10px 0 0';
-      spinNote.textContent =
-        'Match your rival’s spin for a quieter attrition race that stamina wins. ' +
-        'Oppose it for a longer run of violent exchanges where attack pays off.';
-      spinRow.appendChild(spinNote);
+    const spinRow = document.createElement('div');
+    spinRow.className = 'slot';
+    spinRow.innerHTML = '<h4>Spin direction — the largest decision in the game</h4>';
+
+    const read = spinRead(g.playerBuild);
+
+    const spinChips = document.createElement('div');
+    spinChips.className = 'chips';
+    // The bey's canonical direction, so the toggle stops jumping for no visible
+    // reason when a preset is picked — choosing Fafnir chooses left spin, and
+    // the chip should say so rather than leave the player to notice.
+    const canon = BEY_PRESETS.find((p) => p.layerId === g.playerBuild.layer.id);
+    const spins: [1 | -1, string, string][] = [
+      [1, 'Right spin', 'clockwise'],
+      [-1, 'Left spin', 'counter-clockwise'],
+    ];
+    for (const [dir, label, note] of spins) {
+      const chip = document.createElement('button');
+      chip.className = 'chip' + (g.playerSpinDir === dir ? ' on' : '');
+      const asBuilt = canon?.spinDir === dir ? ' · as designed' : '';
+      chip.innerHTML = `<span>${escapeHtml(label)}<br><small>${escapeHtml(
+        note + asBuilt,
+      )}</small></span>`;
+      chip.addEventListener('click', () => {
+        g.playerSpinDir = dir;
+        this.render();
+      });
+      spinChips.appendChild(chip);
+    }
+    spinRow.appendChild(spinChips);
+
+    // WHAT THIS BEY WANTS. Generated from the fitted parts, so it is as true of
+    // a hand-assembled Workshop build as it is of a preset.
+    const want = document.createElement('p');
+    want.className = 'spin-read';
+    const wantWord =
+      read.wants === 'either'
+        ? '<b class="either">either pairing</b>'
+        : `<b class="${read.wants}">${read.wants} spin</b>`;
+    want.innerHTML =
+      `<span class="spin-read-head">This ${escapeHtml(read.arch)} build wants ${wantWord}</span>` +
+      `<span class="spin-read-body">${escapeHtml(read.line)}</span>`;
+    spinRow.appendChild(want);
+
+    // WHAT YOU ARE WALKING INTO. The rival's build is known here — the ladder
+    // fixes it — so the one thing the player cannot see is which way it will
+    // launch, and that is precisely because it commits blind. Saying so is the
+    // difference between a read and a guess.
+    const rival = g.currentRival;
+    const rivalBuild = rival.build();
+    const rivalRead = spinRead(rivalBuild);
+    const rivalSteal = rivalBuild.layer.spinSteal;
+    const opp = document.createElement('p');
+    opp.className = 'spin-vs';
+    opp.textContent =
+      `${rival.name} brings ${rival.beyName} — ${buildArchetype(rivalBuild)}` +
+      (rivalSteal > 0 ? `, drains ${pct(rivalSteal)}` : ', no drain') +
+      `. It wants ${rivalRead.wants === 'either' ? 'either pairing' : `${rivalRead.wants} spin`}, ` +
+      `${RIVAL_SPIN_SKILL[rival.difficulty] ?? ''}. You both launch at the same moment and ` +
+      'neither of you sees the other choose, so this is a read, not a counter.';
+    spinRow.appendChild(opp);
+
+    // FIRST TIME ONLY, on the same gate as the in-battle coach: two matches,
+    // then it stops. A modal would make the player dismiss the one screen that
+    // explains the mechanic; a line that expires teaches and then gets out of
+    // the way. See `updateCoach`.
+    if (g.battlesPlayed < 2) {
+      const coach = document.createElement('p');
+      coach.className = 'coach-note';
+      coach.textContent =
+        'New here? Both tops spin one way or the other. Turning the SAME way as your rival is a ' +
+        'shoving match; turning against it is a spin-draining one, and only some beys are built ' +
+        'to win that. Nothing else you choose is worth as much.';
+      spinRow.appendChild(coach);
+    }
+
     return spinRow;
   }
 
@@ -756,8 +963,18 @@ export class Ui {
     // so the diagram reads without projecting 3D positions every frame.
     const labels = document.createElement('div');
     labels.className = 'exploded-labels';
+    // The drain belongs on the layer line and nowhere else: it is a property of
+    // the layer, it is the most valuable stat in the game for the builds that
+    // have it, and this label was listing blade COUNT while saying nothing
+    // about it. A bey that drains looked identical to one that does not.
+    const steal = g.playerBuild.layer.spinSteal;
     const rows: [string, string, string][] = [
-      ['layer', g.playerBuild.layer.name, `${g.playerBuild.layer.archetype} · ${g.playerBuild.layer.blades} blades`],
+      [
+        'layer',
+        g.playerBuild.layer.name,
+        `${g.playerBuild.layer.archetype} · ${g.playerBuild.layer.blades} blades` +
+          (steal > 0 ? ` · drains ${pct(steal)} in opposite spin` : ''),
+      ],
       ['disc', g.playerBuild.disc.name, `${g.playerBuild.disc.mass}kg · stability ${g.playerBuild.disc.stability}`],
       ['driver', g.playerBuild.driver.name, `${g.playerBuild.driver.archetype} · spin ${g.playerBuild.driver.spinRetention}`],
     ];
@@ -1421,6 +1638,13 @@ export class Ui {
     }
 
     // Derived stats, so the player can see what a swap actually did.
+    //
+    // SPIN STEAL WAS MISSING FROM THIS ROW. `deriveStats` has returned it since
+    // the mechanic was written and the six numbers listed here did not include
+    // it — so the single most valuable stat in the game, the one that decides a
+    // ±45 point launch choice for the layers that have it, was invisible on the
+    // one screen built to show what a part swap did. Fitting Fafnir changed
+    // nothing anybody could see.
     const s = deriveStats(g.playerBuild);
     const stat = document.createElement('div');
     stat.className = 'statline';
@@ -1430,8 +1654,26 @@ export class Ui {
       <span>Defense <b>${s.defense.toFixed(2)}</b></span>
       <span>Burst resist <b>${s.burstResist.toFixed(2)}</b></span>
       <span>Spin retention <b>${s.spinRetention.toFixed(2)}</b></span>
-      <span>Aggression <b>${s.wander.toFixed(2)}</b></span>`;
+      <span>Aggression <b>${s.wander.toFixed(2)}</b></span>
+      <span>Spin steal <b>${s.spinSteal.toFixed(2)}</b></span>`;
     workshop.appendChild(stat);
+
+    // And the plain-English half, because 0.62 is not a sentence. Shown for a
+    // zero too: "this build cannot do that" is information, and its absence is
+    // why a player would never think to go looking for a layer that can.
+    const stealNote = document.createElement('p');
+    stealNote.className = 'sub stat-note';
+    stealNote.style.margin = '-14px 0 20px';
+    stealNote.textContent =
+      s.spinSteal > 0
+        ? `Spin steal ${s.spinSteal.toFixed(2)} — this bey bites into a top turning the other ` +
+          `way and converts ${pct(s.spinSteal)} of the hit back into its own spin. ` +
+          (s.sameSteal > 0
+            ? `Uniquely, ${pct(s.spinSteal * s.sameSteal)} of that survives a same-spin launch too.`
+            : 'In same spin it does nothing at all — the launch choice is worth more than any move you press.')
+        : 'Spin steal 0.00 — this build drains nothing. Only a layer with a drain stat can win ' +
+          'the opposite-spin fight on spin alone; everything else has to knock its rival out.';
+    workshop.appendChild(stealNote);
 
     // Skins. Purely cosmetic — the rival is always forced to a contrasting hue,
     // which is what makes the two tops readable without ownership markers.

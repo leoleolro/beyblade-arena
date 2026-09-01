@@ -2103,3 +2103,82 @@ body.theme-anime .coach.on {
   outline-offset: 4px;
   border-radius: 999px;
 }
+
+/* ------------------------------------------------------- spin direction */
+
+/* The garage's spin toggle used to be two chips and one line of flavour, for a
+   choice measured at ±24 points — the largest in the game. These three blocks
+   are what it says now: what your bey wants, what you are walking into, and
+   (first two matches only) what a spin pairing even is.
+
+   Deliberately NOT a panel or a callout box. The section already sits inside a
+   `.slot`, and boxing it would make it read as an advertisement for a setting
+   rather than as the explanation of one — the same reason the opponent card is
+   the only framed thing in the garage. Weight comes from the accent rule on the
+   left edge, which is the language the exploded-view labels already use. */
+.spin-read {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 10px 0 0;
+  padding-left: 11px;
+  border-left: 2px solid var(--accent);
+}
+
+.spin-read-head {
+  font-size: 13px;
+  color: var(--text);
+}
+
+/* The pairing word carries the colour, because it is the one word in the block
+   a returning player needs to read. Green for the pairing that pays, orange for
+   the one that costs — the same good/warn pair the HUD uses for spin and burst,
+   so no new colour vocabulary is introduced for this screen. */
+.spin-read-head b {
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.spin-read-head b.opposite { color: var(--good); }
+.spin-read-head b.same { color: var(--warn); }
+.spin-read-head b.either { color: var(--accent); }
+
+.spin-read-body {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--dim);
+}
+
+/* What the next rival brings. Same size and colour as the flavour line on the
+   opponent card above it, without the italic — this is a fact about the fight,
+   not the rival talking. */
+.spin-vs {
+  margin: 10px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--dim);
+}
+
+/* First-time coaching in the garage.
+   Shares the voice of the in-battle `.coach` line and its `battlesPlayed < 2`
+   gate, but not its CSS: that one is absolutely positioned above the move bar
+   and would fall out of the panel here. Yellow is the coach's `urgent` colour
+   and is reserved for it, so this stays on the accent. */
+.coach-note {
+  margin: 12px 0 0;
+  padding: 9px 12px;
+  border-radius: 9px;
+  border: 1px dashed rgba(56, 189, 248, 0.35);
+  background: rgba(56, 189, 248, 0.06);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+/* The sentence under the derived-stat row. Pulled up tight against it so it
+   reads as that row's footnote rather than as a new paragraph. */
+.stat-note {
+  font-size: 12px;
+  line-height: 1.5;
+}

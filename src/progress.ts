@@ -1,6 +1,20 @@
-import { LADDER, STARTING_UNLOCKS } from './ladder';
-import { matchReward } from './economy';
-import type { Unlocks } from './ladder';
+import { LADDER, STARTING_UNLOCKS, nemesisById, nemesisRival, pickNemesis } from './ladder';
+import { CHALLENGE_REWARD, matchReward } from './economy';
+import {
+  earnedTitles,
+  favouriteClass,
+  freshChallenges,
+  freshNemesis,
+  masteryTier,
+  nemesisDue,
+  refreshChallenges as rollChallengePeriod,
+  tickChallenges,
+} from './career';
+import { LAYERS } from './sim/parts';
+import type { NemesisSpec, Rival, Unlocks } from './ladder';
+import type { Challenge, ChallengeState, RoundRecord, Title } from './career';
+import type { NemesisState } from './career';
+import type { Archetype } from './sim/types';
 
 /**
  * Career progress, persisted to localStorage.
@@ -42,6 +56,55 @@ export interface ProgressData {
   endless: number;
   /** Deepest endless run ever reached. The number worth bragging about. */
   bestEndless: number;
+
+  /* ------------------------------------------------------------- career */
+  /*
+   * Everything below was added after the save format shipped, and every one of
+   * them is optional-by-construction rather than optional-by-type: `load`
+   * merges onto a fresh object, so a save written before this block existed
+   * comes back with these at their defaults and nothing downstream sees an
+   * `undefined`. There is deliberately no `.v2` key — bumping it would orphan
+   * every existing career to add a feature that cannot break one.
+   */
+
+  /**
+   * Rounds played with each layer id.
+   *
+   * Usage only. It grants titles and nothing else — see the standing rule at
+   * the top of `career.ts` about why a progression stat bonus is the one thing
+   * this game cannot add.
+   */
+  mastery: Record<string, number>;
+  /**
+   * Rounds played in each build class. Two consumers: the class objectives and
+   * the nemesis's counter-pick, which is the only thing in the game that reads
+   * the player's habits back to them.
+   */
+  classRounds: Record<Archetype, number>;
+  /** The equipped title's id, or '' for none. Re-validated on every read. */
+  title: string;
+  /** Lifetime objectives completed. Feeds the milestone titles. */
+  challengesDone: number;
+  /** Today's and this week's objectives, and how far along they are. */
+  challenges: ChallengeState;
+  /** The recurring rival: who, how often, and the head-to-head. */
+  nemesis: NemesisState;
+}
+
+/** What one recorded round did, for the result screen to announce. */
+export interface RoundOutcome {
+  /** Objectives finished by this round. Each is paid exactly once. */
+  completed: Challenge[];
+  /** Coins those objectives paid. */
+  coins: number;
+  /**
+   * The mastery tier this round crossed, 1-based, or 0 for none. Carried
+   * separately from the title list because the moment is what matters: a title
+   * quietly appearing in a picker is not a reward anyone notices.
+   */
+  masteryTier: number;
+  /** The layer that tier belongs to, when one was crossed. */
+  masteryLayerId: string;
 }
 
 const fresh = (): ProgressData => ({
@@ -62,6 +125,17 @@ const fresh = (): ProgressData => ({
   offer: [],
   endless: 0,
   bestEndless: 0,
+
+  // Career defaults. `load` merges a save onto this object, so a career
+  // written before any of these existed comes back with them filled in and
+  // nothing downstream ever sees an `undefined`. That is the whole reason
+  // there is no save-version bump for this feature.
+  mastery: {},
+  classRounds: { attack: 0, defense: 0, stamina: 0, balance: 0 },
+  title: '',
+  challengesDone: 0,
+  challenges: freshChallenges(),
+  nemesis: freshNemesis(),
 });
 
 export class Progress {
@@ -169,6 +243,131 @@ export class Progress {
    * screen can show it — an unlock the player doesn't notice may as well not
    * have happened.
    */
+  /**
+   * Record one finished round, and report what it earned.
+   *
+   * ROUNDS, NOT MATCHES, and that split is deliberate. Objectives and mastery
+   * are about what the player DID — the builds they brought, how they won —
+   * and a match is too coarse to see any of it. `recordMatch` still owns coins,
+   * unlocks and the ladder; this owns everything that reads the play itself.
+   *
+   * Everything it touches is usage. Nothing here returns a stat: see the
+   * standing rule at the top of `career.ts` about why a progression bonus is
+   * the one thing this game cannot add, given that every balance number in the
+   * repo is measured against a fixed catalogue.
+   */
+  recordRound(r: RoundRecord, now: number): RoundOutcome {
+    const d = this.data;
+
+    // A new day or week deals fresh objectives before the round is counted, so
+    // a round played across midnight pays into the day it belongs to rather
+    // than into a set that is about to be discarded.
+    d.challenges = rollChallengePeriod(d.challenges, now, (kind, id) =>
+      this.owns(kind, id),
+    );
+
+    const before = masteryTier(d.mastery[r.layerId] ?? 0);
+    d.mastery[r.layerId] = (d.mastery[r.layerId] ?? 0) + 1;
+    d.classRounds[r.archetype] = (d.classRounds[r.archetype] ?? 0) + 1;
+    const after = masteryTier(d.mastery[r.layerId]);
+
+    const completed = tickChallenges(d.challenges, r);
+    d.challengesDone += completed.length;
+    // Paid per objective at its own scope's rate — a weekly is worth more than
+    // a daily, and summing here rather than multiplying keeps that true if the
+    // two rates ever diverge further.
+    const coins = completed.reduce((sum, c) => sum + CHALLENGE_REWARD[c.scope], 0);
+    d.coins += coins;
+
+    if (r.opponent === 'nemesis' && r.decidedMatch) {
+      d.nemesis.met += 1;
+      d.nemesis.lastSeenAt = d.wins + d.losses;
+      if (r.won) d.nemesis.playerWins += 1;
+      else d.nemesis.rivalWins += 1;
+    }
+
+    this.save();
+    return {
+      completed,
+      coins,
+      masteryTier: after > before ? after : 0,
+      masteryLayerId: after > before ? r.layerId : '',
+    };
+  }
+
+  /** Does the career own this part? Used to keep objectives achievable. */
+  private owns(kind: 'layers', id: string): boolean {
+    return this.data[kind].includes(id);
+  }
+
+  /**
+   * Every title this career has earned, derived rather than stored.
+   *
+   * See `earnedTitles` for why deriving is the point: a stored list is a second
+   * copy of facts the save already holds, and the two drift the first time a
+   * threshold moves.
+   */
+  titles(): Title[] {
+    return earnedTitles({
+      mastery: this.data.mastery,
+      bestStreak: this.data.bestStreak,
+      bestEndless: this.data.bestEndless,
+      challengesDone: this.data.challengesDone,
+      nemesisWins: this.data.nemesis.playerWins,
+      layerName: (id) => LAYERS.find((l) => l.id === id)?.name ?? id,
+    });
+  }
+
+  /**
+   * Equip a title, or '' for none.
+   *
+   * Silently declines a title that is not earned rather than throwing: the
+   * thresholds can move, and a save that equipped something now unearned should
+   * quietly fall back rather than break the garage.
+   */
+  equipTitle(id: string): void {
+    if (id !== '' && !this.titles().some((t) => t.id === id)) return;
+    this.data.title = id;
+    this.save();
+  }
+
+  /** The equipped title, re-validated on read. */
+  equippedTitle(): Title | null {
+    return this.titles().find((t) => t.id === this.data.title) ?? null;
+  }
+
+  /** Is the recurring rival due to show up instead of the ladder opponent? */
+  nemesisIsDue(): boolean {
+    return nemesisDue({
+      rung: this.data.rung,
+      wins: this.data.wins,
+      losses: this.data.losses,
+      nemesis: this.data.nemesis,
+    });
+  }
+
+  /**
+   * The recurring rival, choosing one on first meeting.
+   *
+   * The pick is made from the class the player brings MOST, which is the only
+   * thing in the game that reads a habit back to them — the same idea as the
+   * spin-direction read in `ai.ts`, one layer up.
+   */
+  nemesis(): Rival & { spec: NemesisSpec } {
+    const played = this.data.wins + this.data.losses;
+    if (!this.data.nemesis.id) {
+      // Fixed at the first meeting and stored, because a nemesis who changes
+      // identity is a stranger with the same name.
+      this.data.nemesis.id = pickNemesis(played).id;
+      this.save();
+    }
+    const spec = nemesisById(this.data.nemesis.id) ?? pickNemesis(played);
+    // The counter-pick reads the class the player brings MOST — the only place
+    // besides the spin read in `ai.ts` where the game plays a habit back.
+    const favourite = favouriteClass(this.data.classRounds);
+    return { ...nemesisRival(spec, this.data.nemesis, favourite), spec };
+  }
+
   recordMatch(won: boolean): Unlocks {
     const gained: Unlocks = {};
     // The offer refreshes free on every finished match, win or lose. That is

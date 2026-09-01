@@ -175,6 +175,132 @@ describe('the transcribed Blade catalogue', () => {
   });
 });
 
+describe('the transcribed spin-absorber set', () => {
+  const layer = (id: string) => LAYERS.find((l) => l.id === id)!;
+  const steal = (id: string) => layer(id).spinSteal;
+
+  /**
+   * `spinSteal` used to be two hand-placed numbers; it is now a ladder read off
+   * beyblade.fandom.com/wiki/Spin_Absorption — roundness qualifies, rubber
+   * amplifies. See the block above LAYERS for the quotes.
+   *
+   * These pin the ORDER and the ZEROES, never the magnitudes, for the reason
+   * this file's header already gives: the magnitudes are honest tuning and will
+   * move; which parts absorb and which do not is a fact about the source.
+   *
+   * The zeroes matter more than the non-zeroes. Absorption is worth roughly ten
+   * points of win rate to a stamina build, so every future balance pass will be
+   * tempted to hand it to the next struggling bey. These tests are the thing
+   * that makes doing so require deleting a citation.
+   */
+
+  it('puts the rubber layer above every layer that only has a round shape', () => {
+    // The source's own hierarchy: roundness is the qualifier, rubber is the
+    // amplifier. Drain Fafnir is the only transcribed layer here whose official
+    // description names absorption as the part's gimmick — "absorbs the attack
+    // of a clockwise spinning opponent with a rubber blade" — so nothing
+    // sourced on shape alone may reach it.
+    for (const id of ['wizardrod', 'wizardarrow', 'silverwolf', 'knightshield',
+      'hellsscythe', 'sphinxcowl', 'orichalcum', 'luinor']) {
+      expect(steal(id), `${id} vs fafnir`).toBeLessThan(steal('fafnir'));
+    }
+  });
+
+  it('ranks a clean round perimeter above a round one the source calls recoily', () => {
+    // WizardRod "wide circular shape", WizardArrow "round... lower recoil",
+    // SilverWolf "an overall round shape", KnightShield "a round Defense Type
+    // Blade" — against HellsScythe, which is round but "suffers from high
+    // recoil due to the gaps in its four blades", SphinxCowl's "rugged
+    // perimeter", and Orichalcum's gimmick that "creates a much more aggressive
+    // elliptical shape". A round blade that also recoils cannot stay in contact
+    // long enough to gear with the opponent, which is the whole mechanism.
+    for (const clean of ['wizardrod', 'wizardarrow', 'silverwolf', 'knightshield']) {
+      for (const rough of ['hellsscythe', 'sphinxcowl', 'orichalcum']) {
+        expect(steal(clean), `${clean} vs ${rough}`).toBeGreaterThan(steal(rough));
+      }
+    }
+  });
+
+  it('keeps Lost Longinus the weakest absorber in the catalogue', () => {
+    // "it allows for some degree of Spin-Equalization, however not enough to be
+    // the primary focus for Combinations" — the source's own hedge, and the
+    // floor of the ladder. It predates this pass; the number was already right
+    // and only the citation was missing, so an ordering test is what proves the
+    // new rows were fitted around it rather than over it.
+    const absorbers = LAYERS.filter((l) => l.spinSteal > 0 && l.id !== 'nosferu');
+    for (const l of absorbers) {
+      if (l.id === 'luinor') continue;
+      expect(l.spinSteal, `${l.id} vs luinor`).toBeGreaterThan(steal('luinor'));
+    }
+    expect(steal('luinor')).toBeGreaterThan(0);
+  });
+
+  it('ties KnightShield to WizardRod, because the source ties them', () => {
+    // "WizardRod, which had a similar shape and use, eventually replaced both
+    // KnightShield and HellsScythe." Two blades the source calls the same shape
+    // must not drift apart here, even though one is a defender and one is the
+    // stamina blade this whole pass was chasing — which is exactly the pressure
+    // that would separate them.
+    expect(steal('knightshield')).toBe(steal('wizardrod'));
+  });
+
+  it('gives nothing to a blade whose wiki entry was never written', () => {
+    // All four carry the same placeholder: "In-depth information for the X
+    // Blade will be placed here once drafting has been completed for it."
+    //
+    // ViperTail is the one that costs something. It is a STAMINA blade sitting
+    // near the bottom of the roster, the archetype this pass was opened to
+    // help, and handing it the round-blade value would have been a free eight
+    // points. There is no sentence in the source to hang that on, so it gets
+    // nothing — and this test is here so that stays a decision someone has to
+    // argue with rather than one they can quietly reverse.
+    for (const id of ['vipertail', 'leonclaw', 'tyrannobeat', 'rhinohorn']) {
+      expect(steal(id), `${id} has no sourced shape`).toBe(0);
+    }
+  });
+
+  it('gives nothing to any attack blade, or to the elliptical balance one', () => {
+    // Every attack entry in the source data is described by its edges —
+    // "three upward slanting blades", "an overall blocky shape", "two large
+    // blades... very aggressive shapes", "Launcher Hooks protrude past the
+    // perimeter", "four upward slanting blades". An edge deflects instead of
+    // gearing, which is the same reason docs/PHYSICS.md gives.
+    //
+    // Storm Spryzen rides with them: "a rather elliptical Layer" with an
+    // "aggressive design". Spriggan REQUIEM is the rubber spin-equalizer of
+    // that line — a different product, not in this catalogue — and confusing
+    // the two is the single most likely way this row gets "corrected" later.
+    for (const l of LAYERS) {
+      if (l.archetype !== 'attack') continue;
+      expect(l.spinSteal, `${l.id} is an attack blade`).toBe(0);
+    }
+    expect(steal('spryzen'), 'Storm Spryzen is elliptical').toBe(0);
+    expect(steal('blackshell'), 'BlackShell is a diamond').toBe(0);
+  });
+
+  it('leaves the invented lines out of it entirely', () => {
+    // The player-designed and imported blades are authored to archetype
+    // anchors, not transcribed, so there is no perimeter to read. Two of them
+    // are stamina and both are near the bottom of the roster, which is the
+    // temptation this pins shut: the fix for an invented bey is to invent a
+    // better one, not to cite a source it does not have.
+    for (const id of ['basilisk', 'magejab', 'chimera', 'solaris', 'drake', 'dsycther']) {
+      expect(steal(id), `${id} is invented`).toBe(0);
+    }
+  });
+
+  it('still leaves stamina the archetype with the least access to it', () => {
+    // The honest scoreboard for this pass. Nine stamina blades; four now
+    // absorb, five do not, and the five include the two the source cannot
+    // justify. If a later change makes this ratio look healthy, check whether
+    // the reason is a new citation or a quiet hand on the dial.
+    const stamina = LAYERS.filter((l) => l.archetype === 'stamina');
+    const absorbing = stamina.filter((l) => l.spinSteal > 0);
+    expect(stamina.length).toBeGreaterThanOrEqual(9);
+    expect(absorbing.length).toBeLessThan(stamina.length);
+  });
+});
+
 describe('blade / ratchet alignment', () => {
   it('matches a nine-blade layer to the nine-protrusion ratchet', () => {
     // The real rule, from SphinxCowl: its nine Barrage Blades are "intended to

@@ -1,6 +1,8 @@
 import type { Difficulty } from './ai';
+import { counterPreset, nemesisGrudge } from './career';
+import type { NemesisState } from './career';
 import { makeBuild, PRESETS } from './sim/parts';
-import type { BeyBuild } from './sim/types';
+import type { Archetype, BeyBuild } from './sim/types';
 
 /**
  * The career ladder.
@@ -206,6 +208,138 @@ export function endlessRival(n: number): Rival {
     skinId: skins[(i - 1) % skins.length],
     difficulty,
     line: ENDLESS_LINES[(i - 1) % ENDLESS_LINES.length],
+    unlocks: {},
+  };
+}
+
+/* --------------------------------------------------------------- nemesis */
+
+/**
+ * The rival who keeps coming back.
+ *
+ * WHY THIS EXISTS, next to a ladder and an endless run that both already
+ * produce opponents. Both of those produce *strangers*. `rivalAt` hands you the
+ * next name on a list and `endlessRival` cycles a name pool by round index —
+ * neither has ever heard of you, and the endless doc comment above claiming it
+ * "counter-picks" is, on inspection of the code, not true: it selects a preset
+ * from `n` and never reads a single thing the player did. This is the opponent
+ * that does.
+ *
+ * Three properties, and all three are things the rest of the file does not do:
+ *
+ *  1. **It recurs.** One person, met every `NEMESIS_INTERVAL` matches, with a
+ *     head-to-head record that persists. The ladder's rivals are beaten once
+ *     and gone; this one is a running score.
+ *  2. **It remembers.** The line it opens with is drawn from the actual record,
+ *     so the fourth meeting cannot say what the first one said.
+ *  3. **It counter-picks.** Past a grudge of two it stops bringing its
+ *     signature bey and brings the preset measured to beat whatever class the
+ *     player brings most — see `counterPreset` for the numbers and for the two
+ *     places the measured argmax was deliberately not taken.
+ *
+ * The rules it does NOT break are the ladder's own. It grants no unlocks (the
+ * catalog is distributed by the ladder exactly once and `progress.test.ts`
+ * asserts it). It only ever fields one of the six PRESETS, so it is provably
+ * beatable by the same sweeps that cover every other opponent. And it escalates
+ * in skill and matchup, never in stats.
+ */
+export interface NemesisSpec {
+  id: string;
+  name: string;
+  title: string;
+  /** What they bring before the grudge is personal enough to adapt. */
+  signature: string;
+  skinId: string;
+}
+
+export const NEMESES: NemesisSpec[] = [
+  {
+    id: 'ryn',
+    name: 'Ryn',
+    title: 'The One Who Waits',
+    // Endless Coil: the stamina anchor. A first meeting that punishes
+    // impatience, which is the lesson the ladder's early rungs skip.
+    signature: 'Endless Coil',
+    skinId: 'venom',
+  },
+  {
+    id: 'calder',
+    name: 'Calder',
+    title: 'Old Debt',
+    signature: 'Iron Bastion',
+    skinId: 'void',
+  },
+  {
+    id: 'sora',
+    name: 'Sora',
+    title: 'Unfinished Business',
+    signature: 'Blitz Striker',
+    skinId: 'rose',
+  },
+];
+
+/**
+ * Which nemesis a career gets, fixed at the first meeting and stored after.
+ *
+ * Derived from the match count rather than `Math.random` so a test can name the
+ * answer, and so two saves that reached the trigger at different times do not
+ * always meet the same person. It is picked ONCE — `NemesisState.id` is what is
+ * read from then on, because a nemesis who changes identity is a stranger with
+ * a familiar counter.
+ */
+export const pickNemesis = (matchesPlayed: number): NemesisSpec =>
+  NEMESES[Math.abs(Math.floor(matchesPlayed)) % NEMESES.length];
+
+export const nemesisById = (id: string): NemesisSpec | undefined =>
+  NEMESES.find((n) => n.id === id);
+
+/**
+ * What they say, given how it has gone.
+ *
+ * Ordered most-specific first. A losing streak against them has to be
+ * acknowledged before a generic "we meet again", or the memory reads as a
+ * decoration on a rival that does not actually have one.
+ */
+function nemesisLine(spec: NemesisSpec, n: NemesisState): string {
+  if (n.met === 0) return `You do not know me yet. That changes today.`;
+  if (n.playerWins === 0) return `Still nothing. ${n.met} times now.`;
+  if (n.rivalWins === 0) return `Every one of those, I have gone back and watched.`;
+  if (n.playerWins > n.rivalWins) {
+    return `${n.playerWins}–${n.rivalWins}. I have stopped bringing what you expect.`;
+  }
+  if (n.rivalWins > n.playerWins) return `${n.rivalWins}–${n.playerWins}. Say when.`;
+  return `${spec.name} again. Level. Let us fix that.`;
+}
+
+/**
+ * Build this meeting's rival.
+ *
+ * `favourite` is the build class the player has spent the most rounds in — the
+ * thing being remembered. It is only read past grudge 2, so a player who has
+ * not yet beaten this rival twice never sees the counter-pick and the first
+ * meetings stay a fixed, learnable problem.
+ */
+export function nemesisRival(spec: NemesisSpec, n: NemesisState, favourite: Archetype): Rival {
+  const grudge = nemesisGrudge(n);
+  const preset =
+    grudge >= 2
+      ? counterPreset(favourite)
+      : (PRESETS.find((p) => p.name === spec.signature) ?? PRESETS[0]);
+  return {
+    id: `nemesis-${spec.id}`,
+    name: n.met === 0 ? spec.name : `${spec.name} · ${n.playerWins}–${n.rivalWins}`,
+    title: spec.title,
+    beyName: preset.name,
+    build: preset.build,
+    skinId: spec.skinId,
+    // The one escalation, and it is the AI's reaction time rather than a
+    // number on the bey. A first meeting at champion would make the nemesis a
+    // difficulty spike that happens to have a name.
+    difficulty: grudge === 0 ? 'blader' : 'champion',
+    line: nemesisLine(spec, n),
+    // Never. Same reason as `endlessRival`: the ladder distributes the catalog
+    // exactly once, and a second source would either duplicate a grant or break
+    // a test in a file that does not mention this one.
     unlocks: {},
   };
 }

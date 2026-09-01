@@ -22,6 +22,152 @@ import type {
  *   defense beats attack  — attack burns itself out against a wall
  */
 
+/**
+ * SPIN ABSORPTION ACROSS THE CATALOGUE — transcribed, not balanced.
+ *
+ * The problem this block answers: for a long time exactly two layers here had a
+ * non-zero `spinSteal` — Fafnir 0.62 and the invented vampire — so seven of the
+ * nine stamina blades had no access to their own archetype's signature
+ * mechanic, while stamina sat 23 points below attack on the roster sweep. The
+ * tempting fix is to hand the archetype a stat. That is not what this is. Every
+ * number below is decided by what the source says about ONE named part, and
+ * where the source says nothing the value stays at zero even when a number
+ * would have been convenient.
+ *
+ * THE SOURCE RULE — beyblade.fandom.com/wiki/Spin_Absorption, which is the
+ * wiki's own definition page for the mechanic rather than a part entry:
+ *
+ *   "an interaction between two Beyblades spinning in opposite directions...
+ *    1 Beyblade will 'absorb' spin from the opposing Beyblade"
+ *   "This is most effective with Beyblades that have a round, circular shape.
+ *    The effect can also be bolstered with the addition of rubber contact
+ *    points."
+ *   "the contact points of two opposite-spinning Beyblades work akin to gears,
+ *    increasing friction and equally distributing their spin"
+ *
+ * and, in its own trivia, the line that kills the obvious shortcut:
+ *
+ *   "A longstanding myth is that only left-spin Beyblades can absorb spin,
+ *    and/or that rubber is required."
+ *
+ * So ROUNDNESS is the qualifier and RUBBER is only the amplifier. That is worth
+ * stating loudly because this codebase had already derived the same rule from
+ * the other direction — docs/PHYSICS.md section 2: "round, smooth layer shapes,
+ * which stay in contact instead of deflecting. Absorber layers are round for
+ * this reason and attackers are not" — and because it is the reason
+ * `resolvePair` gates the whole mechanic on `opposite` and nothing else.
+ *
+ * THE LADDER. The magnitudes are halvings of the Fafnir anchor and are honest
+ * tuning; only the ORDER is a claim about the source. That split is the same
+ * one partsCatalogue.test.ts's header already makes for the rest of the
+ * catalogue, and it is why the tests pin ordering rather than values.
+ *
+ *   0.62  rubber contact points AND absorption is the part's named gimmick
+ *   0.30  the source calls the perimeter round or circular, and does not also
+ *         name recoil
+ *   0.15  round, but the source also names high recoil, a rugged perimeter, or
+ *         a shape that turns elliptical in play
+ *   0.12  absorption stated outright, but "not enough to be the primary focus"
+ *   0.00  an angular, bladed or elliptical perimeter — or the source's
+ *         Description section is still an unwritten placeholder
+ *
+ * WHO LANDS WHERE, with the sentence that put them there:
+ *
+ *   fafnir       0.62  "absorbs the attack of a clockwise spinning opponent
+ *                       with a rubber blade and increases its rotational
+ *                       power" (Drain Fafnir, official description; the
+ *                       "Drain Spin" God Ability). Unchanged — it is the anchor
+ *                       every other row is measured against.
+ *   wizardrod    0.30  "a Stamina Type Blade with a wide circular shape";
+ *                       "wider diameter than previously released Blades"
+ *   wizardarrow  0.30  "a round Stamina Type Blade with two large blades";
+ *                       "higher Stamina and lower recoil" than its contemporaries
+ *   silverwolf   0.30  "an overall round shape consisting of three main contact
+ *                       points"
+ *   knightshield 0.30  "a round Defense Type Blade with six main contact
+ *                       points" — and WizardRod, "which had a similar shape and
+ *                       use, eventually replaced both KnightShield and
+ *                       HellsScythe", so the two must land together
+ *   hellsscythe  0.15  "a round four-sided Balance Type Blade"; "The round
+ *                       shape creates excellent Stamina" — but in the same
+ *                       paragraph, "it suffers from high recoil due to the gaps
+ *                       in its four blades"
+ *   sphinxcowl   0.15  "a round Defense Type Blade with a rugged perimeter"
+ *   orichalcum   0.15  "features a round design"; "a very round design" — but
+ *                       the gimmick "creates a much more aggressive elliptical
+ *                       shape" with "high amounts of recoil"
+ *   luinor       0.12  "it allows for some degree of Spin-Equalization, however
+ *                       not enough to be the primary focus for Combinations"
+ *                       (Lost Longinus, which is the preset's "Lost Luinor").
+ *                       Unchanged — the value was already right; only the
+ *                       citation was missing.
+ *
+ * AND WHO GETS NOTHING, which is the half that makes this transcription rather
+ * than balancing:
+ *
+ *   spryzen      Storm Spriggan is "a rather elliptical Layer" with an
+ *                "aggressive design". Spriggan REQUIEM is the rubber
+ *                spin-equalizer of that line and is a different product that
+ *                this catalogue does not carry, so `spryzen` gets nothing.
+ *   blackshell   "overall diamond shape with eight protrusions"
+ *   vipertail    the wiki Description is still the unwritten placeholder,
+ *   leonclaw     "In-depth information ... will be placed here once drafting
+ *   tyrannobeat  has been completed for it." Four parts, no shape sentence, no
+ *   rhinohorn    number. ViperTail is a STAMINA blade and would have been the
+ *                easiest win available here; it stays at zero.
+ *   dransword    every attack blade in the data is explicitly angular —
+ *   dranbuster   "three upward slanting blades", "an overall blocky shape",
+ *   sharkedge    "two large blades ... very aggressive shapes", "Launcher Hooks
+ *   phoenixwing  protrude past the perimeter", "four upward slanting blades".
+ *   cobaltdragoon
+ *   basilisk     the player-designed and imported lines are invented rather
+ *   magejab      than transcribed (see the blocks below), so there is no source
+ *   chimera      to read a perimeter off. Two of them are stamina.
+ *   ...          Same for the six archetype anchors except Fafnir.
+ *
+ * MEASURED, before and after, on the roster sweep — every shipped build, both
+ * seats, cross-archetype pairings only (src/roster.test.ts, 3736 rounds):
+ *
+ *     attack   50.5% -> 48.6%      balance  43.2% -> 43.5%
+ *     defense  43.4% -> 41.9%      stamina  27.0% -> 32.2%
+ *
+ * Re-run at four times the seeds (14944 rounds) with the seven new values
+ * A/B'd in one process, to check the small deltas were not sampling noise:
+ * attack -2.5, defense -0.9, balance +0.3, stamina +4.9. Per changed build, at
+ * that resolution:
+ *
+ *     Wizard Arrow 5-60B   15.4% -> 29.9%   +14.5
+ *     Silver Wolf          15.6% -> 28.3%   +12.7
+ *     Wizard Rod           23.9% -> 33.0%    +9.1
+ *     Knight Shield        66.8% -> 74.7%    +8.0
+ *     Orichalcum O3        29.5% -> 37.5%    +8.0
+ *     Sphinx Cowl          63.3% -> 66.9%    +3.6
+ *     Hells Scythe         54.3% -> 57.7%    +3.4
+ *
+ * Hells Scythe is worth a note because at the roster suite's own four seeds it
+ * moved by EXACTLY 0.0, which in this project is treated as a disconnected
+ * lever rather than a null result. It was neither: a direct probe has it
+ * absorbing 93.2 spin, 9.7% of its launch total, against a Ragnaruk in
+ * opposite spin. 176 fights per build simply cannot resolve three points.
+ *
+ * THE OTHER HALF OF THE STAT, which the absorbed totals hide. `resolvePair`
+ * spends `spinSteal` twice: `gainA = lossB * steal * SPIN_STEAL_GAIN` converts
+ * damage dealt into spin, and `netLossA = (lossA + reflectToA) * (1 - steal *
+ * SPIN_STEAL_MITIGATION)` cuts what the absorber takes. For a blade with real
+ * attack the first term dominates; for a low-attack stamina blade the second
+ * one does, and it is invisible in `spinStolen`. Wizard Rod is the proof:
+ * 8.6 spin absorbed in the same probe, under 1% of its launch, and +9.1 points
+ * on the roster — because attack 0.84 deals almost nothing to convert, while
+ * 0.30 steal still shaves 16.5% off every hit it receives.
+ *
+ * Stamina moves +5.2 and remains the outlier by 16 points rather than 24. It
+ * does not close, and it is not supposed to: the two stamina blades that would
+ * have moved it furthest are MageJab, which is invented and has no source, and
+ * ViperTail, whose wiki entry is an unwritten placeholder. Both stay at zero.
+ * Faithful and still unbalanced is the honest outcome here, and it is written
+ * down so the next person does not read the remaining gap as an oversight.
+ */
+
 export const LAYERS: LayerPart[] = [
   // Attack: hits hard, folds fast.
   { id: 'valtryek',  name: 'Valtryek',  kind: 'layer', archetype: 'attack',  mass: 0.42, radius: 0.1066, attack: 1.42, defense: 0.80, burstResist: 0.88, spinSteal: 0.0, blades: 3, colour: 0x3b82f6 },
@@ -99,16 +245,16 @@ export const LAYERS: LayerPart[] = [
   // nine "Barrage Blade" protrusions).
   { id: 'blackshell', name: 'Black Shell',    kind: 'layer', archetype: 'defense', mass: 0.57, radius: 0.0999, attack: 1.0, defense: 1.68, burstResist: 0.95, spinSteal: 0.0, blades: 8, colour: 0x14181f },
   { id: 'sharkedge',  name: 'Shark Edge',     kind: 'layer', archetype: 'attack', mass: 0.479, radius: 0.1019, attack: 1.56, defense: 1.05, burstResist: 0.95, spinSteal: 0.0, blades: 2, colour: 0x5b21b6 },
-  { id: 'knightshield',name: 'Knight Shield',  kind: 'layer', archetype: 'defense', mass: 0.449, radius: 0.1013, attack: 0.92, defense: 1.59, burstResist: 1.01, spinSteal: 0.0, blades: 6, colour: 0x046c4a },
-  { id: 'wizardrod',  name: 'Wizard Rod',     kind: 'layer', archetype: 'stamina', mass: 0.491, radius: 0.1078, attack: 0.84, defense: 1.05, burstResist: 1.22, spinSteal: 0.0, blades: 5, colour: 0x3b2f7a },
-  { id: 'hellsscythe',name: 'Hells Scythe',   kind: 'layer', archetype: 'balance', mass: 0.487, radius: 0.1033, attack: 1.24, defense: 1.23, burstResist: 1.01, spinSteal: 0.0, blades: 4, colour: 0x7f1d1d },
-  { id: 'sphinxcowl', name: 'Sphinx Cowl',    kind: 'layer', archetype: 'defense', mass: 0.453, radius: 0.0993, attack: 1.16, defense: 1.59, burstResist: 0.92, spinSteal: 0.0, blades: 9, colour: 0x8a6a2f },
+  { id: 'knightshield',name: 'Knight Shield',  kind: 'layer', archetype: 'defense', mass: 0.449, radius: 0.1013, attack: 0.92, defense: 1.59, burstResist: 1.01, spinSteal: 0.30, blades: 6, colour: 0x046c4a },
+  { id: 'wizardrod',  name: 'Wizard Rod',     kind: 'layer', archetype: 'stamina', mass: 0.491, radius: 0.1078, attack: 0.84, defense: 1.05, burstResist: 1.22, spinSteal: 0.30, blades: 5, colour: 0x3b2f7a },
+  { id: 'hellsscythe',name: 'Hells Scythe',   kind: 'layer', archetype: 'balance', mass: 0.487, radius: 0.1033, attack: 1.24, defense: 1.23, burstResist: 1.01, spinSteal: 0.15, blades: 4, colour: 0x7f1d1d },
+  { id: 'sphinxcowl', name: 'Sphinx Cowl',    kind: 'layer', archetype: 'defense', mass: 0.453, radius: 0.0993, attack: 1.16, defense: 1.59, burstResist: 0.92, spinSteal: 0.15, blades: 9, colour: 0x8a6a2f },
 
   // ORICHALCUM O3 — Stamina, and the layer half of the first WHOLE bey
   // transcribed here: Layer, Disc and Driver all from one documented product.
   // Burst-era rather than Beyblade X, which is why its parts are a Disc and a
   // Driver rather than a Ratchet and a Bit.
-  { id: 'orichalcum', name: 'Orichalcum', kind: 'layer', archetype: 'stamina', mass: 0.475, radius: 0.1118, attack: 0.84, defense: 1.14, burstResist: 1.28, spinSteal: 0.0, blades: 3, colour: 0xc9a227 },
+  { id: 'orichalcum', name: 'Orichalcum', kind: 'layer', archetype: 'stamina', mass: 0.475, radius: 0.1118, attack: 0.84, defense: 1.14, burstResist: 1.28, spinSteal: 0.15, blades: 3, colour: 0xc9a227 },
 
   // Four more transcriptions, chosen to push the archetype range rather than
   // fill it in. DranBuster is the attack ceiling at A70 and the roster's only
@@ -118,7 +264,7 @@ export const LAYERS: LayerPart[] = [
   // Same mapping as the block above.
   { id: 'dranbuster', name: 'Dran Buster',    kind: 'layer', archetype: 'attack', mass: 0.509, radius: 0.1013, attack: 1.72, defense: 0.96, burstResist: 0.92, spinSteal: 0.0, blades: 1, colour: 0x1e40af },
   { id: 'rhinohorn',  name: 'Rhino Horn',     kind: 'layer', archetype: 'defense', mass: 0.453, radius: 0.1019, attack: 0.92, defense: 1.5, burstResist: 1.04, spinSteal: 0.0, blades: 5, colour: 0x374151 },
-  { id: 'silverwolf', name: 'Silver Wolf',    kind: 'layer', archetype: 'stamina', mass: 0.513, radius: 0.1085, attack: 0.84, defense: 1.14, burstResist: 1.25, spinSteal: 0.0, blades: 3, colour: 0x475569 },
+  { id: 'silverwolf', name: 'Silver Wolf',    kind: 'layer', archetype: 'stamina', mass: 0.513, radius: 0.1085, attack: 0.84, defense: 1.14, burstResist: 1.25, spinSteal: 0.30, blades: 3, colour: 0x475569 },
   { id: 'leonclaw',   name: 'Leon Claw',      kind: 'layer', archetype: 'balance', mass: 0.434, radius: 0.1026, attack: 1.24, defense: 1.32, burstResist: 0.98, spinSteal: 0.0, blades: 4, colour: 0x9a3412 },
 
   // Two more, both chosen for a shape the roster lacked. TyrannoBeat is attack
@@ -155,7 +301,7 @@ export const LAYERS: LayerPart[] = [
   // widens the radius rather than narrowing it.
   { id: 'phoenixwing',  name: 'Phoenix Wing',   kind: 'layer', archetype: 'attack',  mass: 0.531, radius: 0.1020, attack: 1.56, defense: 1.05, burstResist: 0.95, spinSteal: 0.0, blades: 3, colour: 0xb91c1c },
   { id: 'cobaltdragoon',name: 'Cobalt Dragoon', kind: 'layer', archetype: 'attack',  mass: 0.528, radius: 0.1033, attack: 1.56, defense: 0.87, burstResist: 1.01, spinSteal: 0.0, blades: 4, colour: 0x0047ab },
-  { id: 'wizardarrow',  name: 'Wizard Arrow',   kind: 'layer', archetype: 'stamina', mass: 0.44,  radius: 0.1072, attack: 0.84, defense: 1.14, burstResist: 1.19, spinSteal: 0.0, blades: 2, colour: 0xeab308 },
+  { id: 'wizardarrow',  name: 'Wizard Arrow',   kind: 'layer', archetype: 'stamina', mass: 0.44,  radius: 0.1072, attack: 0.84, defense: 1.14, burstResist: 1.19, spinSteal: 0.30, blades: 2, colour: 0xeab308 },
 
   // The vampire. The one layer in the catalog with `sameSteal`: it absorbs in
   // *every* matchup, not only against an opposite-spin opponent, so there is no

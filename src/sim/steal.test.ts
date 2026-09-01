@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Battle } from './battle';
 import type { Fighter } from './battle';
-import { LAYERS, makeBuild } from './parts';
+import { LAYERS, deriveStats, makeBuild } from './parts';
 import type { LaunchParams } from './types';
 
 /**
@@ -117,5 +117,100 @@ describe('spin absorption', () => {
       `\n  absorber survival — opposite ${(oppTime / 20).toFixed(1)}s vs same ${(sameTime / 20).toFixed(1)}s`,
     );
     expect(oppTime).toBeGreaterThan(sameTime);
+  });
+});
+
+/**
+ * The tests above pin the MECHANIC on one layer. These pin the SET.
+ *
+ * `spinSteal` stopped being two hand-placed numbers when the catalogue was
+ * checked against beyblade.fandom.com/wiki/Spin_Absorption — roundness
+ * qualifies, rubber amplifies, opposite spin gates. Nine layers now carry a
+ * non-zero value where two used to, which turns a stat that was effectively
+ * one bey's gimmick into something the sim runs across a third of the roster.
+ *
+ * Two things have to hold for that to be safe, and neither was previously
+ * tested because neither could previously fail:
+ *
+ *   1. Every absorber really absorbs. A row can be edited to 0.30 and still be
+ *      dead — the value only reaches physics through `deriveStats`, and a build
+ *      that never trades spin never spends it. This is measured per layer, not
+ *      asserted from the table.
+ *   2. The opposite-spin gate holds for ALL of them. It used to be checkable by
+ *      eye on one row; now it is a property of a set, and one row with a stray
+ *      `sameSteal` would delete the spin-direction decision that spin.test.ts
+ *      and `chooseSpinDir` are both built on.
+ */
+describe('the absorber set', () => {
+  /** Every layer the catalogue says can absorb, in table order. */
+  const absorbers = LAYERS.filter((l) => l.spinSteal > 0);
+
+  it('has more than the two layers it started with', () => {
+    // Guards the direction of travel. If this ever drops back to two, the
+    // transcription block above LAYERS was reverted rather than argued with.
+    expect(absorbers.length).toBeGreaterThan(2);
+  });
+
+  it('gives every absorber real absorption in opposite spin', () => {
+    // Measured, not read off the table. A value that is present in the data and
+    // absent in the fight is the failure mode this whole suite exists for, and
+    // it is exactly what happened on the four-seed roster sweep, where Hells
+    // Scythe moved by 0.0 and looked disconnected. It was not: it absorbs 9.7%
+    // of its launch spin here. The sweep just could not resolve it.
+    const rows: string[] = [];
+    for (const l of absorbers) {
+      let stolen = 0;
+      let frac = 0;
+      for (let seed = 0; seed < 12; seed++) {
+        const r = run(true, seed * 313 + 11, l.id);
+        stolen += r.stolen;
+        frac += r.stolen / (r.stolen + 1e-9);
+      }
+      const avg = stolen / 12;
+      rows.push(`${l.id.padEnd(13)} steal ${l.spinSteal.toFixed(2)}  absorbed ${avg.toFixed(1)}`);
+      expect(avg, `${l.id} absorbs nothing despite spinSteal ${l.spinSteal}`).toBeGreaterThan(0);
+      expect(frac).toBeGreaterThan(0);
+    }
+    console.log(`\n  ${rows.join('\n  ')}`);
+  });
+
+  it('keeps the opposite-spin gate absolute for every absorber but the vampire', () => {
+    // The catalogue-wide version of "absorbs nothing from a same-spin
+    // opponent". Widening the set is what makes this worth pinning: a single
+    // extra `sameSteal` anywhere in the table and the launch decision the whole
+    // spin suite measures stops being a decision.
+    for (const l of absorbers) {
+      if (l.id === VAMPIRE) continue;
+      expect(run(false, 5, l.id).stolen, `${l.id} in a same-spin matchup`).toBe(0);
+    }
+  });
+
+  it('leaves every non-absorber on exactly zero', () => {
+    // The other half of the set, and the one that keeps this a transcription:
+    // absorption is worth roughly ten points of win rate to a stamina build, so
+    // the pressure is always toward one more row. `deriveStats` is the thing
+    // asserted on rather than the table, because a driver or disc that started
+    // contributing steal would pass a table check and fail this.
+    for (const l of LAYERS) {
+      if (l.spinSteal > 0) continue;
+      const stats = deriveStats(makeBuild(l.id, 'spread', 'needle'));
+      expect(stats.spinSteal, `${l.id} leaked steal through deriveStats`).toBe(0);
+      expect(stats.sameSteal, `${l.id} leaked sameSteal`).toBe(0);
+    }
+  });
+
+  it('still ranks the rubber layer above everything sourced on shape alone', () => {
+    // The measured version of the ordering partsCatalogue.test.ts pins in the
+    // data. Fafnir's rubber is the source's amplifier, so it must out-absorb
+    // the round blades in the fight and not merely on paper.
+    const absorbed = (id: string): number => {
+      let t = 0;
+      for (let seed = 0; seed < 12; seed++) t += run(true, seed * 313 + 11, id).stolen;
+      return t / 12;
+    };
+    const fafnir = absorbed('fafnir');
+    for (const id of ['wizardrod', 'wizardarrow', 'silverwolf', 'knightshield']) {
+      expect(fafnir, `fafnir vs ${id}`).toBeGreaterThan(absorbed(id));
+    }
   });
 });

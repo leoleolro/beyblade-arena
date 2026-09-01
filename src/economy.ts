@@ -319,3 +319,31 @@ export function matchReward(won: boolean, streak: number): number {
   const bonus = won ? Math.min(4, streak) * 15 : 0;
   return base + bonus;
 }
+
+/**
+ * Coins for finishing a daily or weekly objective.
+ *
+ * Sized against the two numbers already in this file rather than picked to feel
+ * generous. A match pays 75–135, and the measured objectives take about four
+ * matches each (see `career.ts`, where every target is derived from a per-round
+ * rate measured in the real sim). So a daily pays roughly what one extra match
+ * pays — a bonus on top of play, never a replacement for it. That ratio is the
+ * whole design: an objective worth more than the matches it takes would turn
+ * the game into a checklist you tick and close.
+ *
+ * WHY THIS CANNOT BE FARMED, structurally rather than by promise. Objectives
+ * are dealt per UTC day and per UTC week and each is paid at most once (see
+ * `ChallengeProgress.paid`), so the ceiling is 3 × 150 + 400 = 850 a day and it
+ * is enforced by the calendar rather than by a counter someone could reset. The
+ * honest caveat, written down in `refreshChallenges` too: the calendar comes
+ * from the player's own clock, and this game has no server to check it against.
+ *
+ * The weekly is 400 rather than 420 on purpose. A Relic Crate costs 420, so a
+ * weekly buys *nearly* the best crate and not quite — the last twenty coins
+ * come from playing, which keeps the crate something a session pays for rather
+ * than something the calendar hands over.
+ */
+export const CHALLENGE_REWARD: Record<'daily' | 'weekly', number> = {
+  daily: 150,
+  weekly: 400,
+};
