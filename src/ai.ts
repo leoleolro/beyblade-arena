@@ -74,6 +74,15 @@ const PROFILE: Record<
      */
     aimError: number;
     /**
+     * How well this tier reads the spin-direction matchup, 0 to 1.
+     *
+     * 0 flips a coin; 1 plays the measured best answer for its build. It is a
+     * separate axis from `aimError` because it is a different KIND of knowing —
+     * aim is execution, this is preparation, and it is decided before the round
+     * starts rather than during it.
+     */
+    spinRead: number;
+    /**
      * How much of the target's motion this tier accounts for, 0 to 1.
      *
      * Separate from `aimError` because they are different mistakes. Error is
@@ -100,6 +109,7 @@ const PROFILE: Record<
     // Wider than the assist cone, deliberately: a rookie's charges miss.
     aimError: 0.55,
     lead: 0,
+    spinRead: 0,
   },
   blader: {
     counterPick: 0.5,
@@ -112,6 +122,7 @@ const PROFILE: Record<
     bait: 0.12,
     aimError: 0.3,
     lead: 0.5,
+    spinRead: 0.5,
   },
   champion: {
     counterPick: 1,
@@ -127,6 +138,7 @@ const PROFILE: Record<
     bait: 0.3,
     aimError: 0.12,
     lead: 1,
+    spinRead: 1,
   },
 };
 
@@ -182,15 +194,55 @@ export class AiController {
   /**
    * Choose which way to spin.
    *
-   * Measured, the two pairings play completely differently: same-spin runs
-   * ~8s and is decided by stamina, opposite-spin runs ~14s of repeated violent
-   * exchanges. Aggressive builds want the exchanges; stamina builds want the
-   * quiet attrition race they win by default.
+   * THIS WAS BACKWARDS, for both archetypes it named. The old policy sent
+   * attack into opposite spin 85% of the time and stamina into it 15% of the
+   * time, on the reasoning that "aggressive builds want the exchanges; stamina
+   * builds want the quiet attrition race they win by default". Measured across
+   * the whole roster with the spin direction FORCED rather than chosen — so the
+   * policy could not generate its own evidence — the truth is the exact
+   * opposite:
+   *
+   *     attack    same 63.8%   opposite 40.2%    -23.6
+   *     balance   same 37.6%   opposite 45.9%     +8.3
+   *     defense   same 31.8%   opposite 56.8%    +25.0
+   *     stamina   same 12.2%   opposite 35.9%    +23.8
+   *
+   * The stamina half of the old rationale rested on an attrition race that does
+   * not exist: builds spin out in 57-75s and the median round lasts 7.5s, so
+   * nobody is ever outlasted. What stamina actually wants is the matchup where
+   * its signature mechanic works.
+   *
+   * AND THE MECHANIC IS THE WHOLE STORY. `spinSteal` only pays in opposite
+   * spin — `resolvePair` gates it exactly that way — and per stamina build the
+   * gain tracks it almost perfectly:
+   *
+   *     Drain Fafnir       steal 0.62   12.5% -> 57.8%   +45.3
+   *     Sanguine Nosferu   steal 0.88   10.9% -> 64.1%   +53.1
+   *     Wizard Arrow       steal 0.00   12.5% -> 23.4%   +10.9
+   *     Viper Tail         steal 0.00   14.1% -> 21.9%    +7.8
+   *     Silver Wolf        steal 0.00   10.9% -> 12.5%    +1.6
+   *
+   * The two stealers go from worst-in-game to best-in-game on the launch
+   * decision alone. So the preference is read off the BUILD — its archetype
+   * plus how much it can actually steal — rather than off a label.
    */
   chooseSpinDir(build: BeyBuild, playerSpinDir: 1 | -1): 1 | -1 {
+    const p = PROFILE[this.difficulty];
     const archetype = buildArchetype(build);
-    const wantOpposite =
-      archetype === 'attack' ? 0.85 : archetype === 'stamina' ? 0.15 : 0.5;
+    const base =
+      archetype === 'attack'
+        ? 0.15
+        : archetype === 'defense'
+          ? 0.85
+          : archetype === 'stamina'
+            ? 0.75
+            : 0.55;
+    // A stealer wants the opposite-spin matchup almost regardless of what else
+    // it is, because that is the only place its stat exists.
+    const want = Math.min(0.95, base + Math.min(0.2, build.layer.spinSteal * 0.3));
+    // Tier-gated: a rookie does not know this matchup exists, so its preference
+    // is blended back to a coin flip. See `spinRead`.
+    const wantOpposite = 0.5 + (want - 0.5) * p.spinRead;
     const opposite = this.rng() < wantOpposite;
     return (opposite ? -playerSpinDir : playerSpinDir) as 1 | -1;
   }
