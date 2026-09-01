@@ -1,4 +1,16 @@
 import { LADDER, STARTING_UNLOCKS, nemesisById, nemesisRival, pickNemesis } from './ladder';
+import {
+  cupAvailable,
+  cupFinished,
+  cupInProgress,
+  cupRival,
+  cupSeedForDay,
+  freshCup,
+  mergeCup,
+  recordCupMatch,
+  startCup,
+} from './tournament';
+import type { CupResult, CupState } from './tournament';
 import { CHALLENGE_REWARD, matchReward } from './economy';
 import {
   earnedTitles,
@@ -10,6 +22,7 @@ import {
   refreshChallenges as rollChallengePeriod,
   tickChallenges,
 } from './career';
+import { dayIndex } from './career';
 import { LAYERS } from './sim/parts';
 import type { NemesisSpec, Rival, Unlocks } from './ladder';
 import type { Challenge, ChallengeState, RoundRecord, Title } from './career';
@@ -89,6 +102,8 @@ export interface ProgressData {
   challenges: ChallengeState;
   /** The recurring rival: who, how often, and the head-to-head. */
   nemesis: NemesisState;
+  /** The daily cup: the bracket, how far in, and the lifetime record. */
+  cup: CupState;
 }
 
 /** What one recorded round did, for the result screen to announce. */
@@ -136,6 +151,7 @@ const fresh = (): ProgressData => ({
   challengesDone: 0,
   challenges: freshChallenges(),
   nemesis: freshNemesis(),
+  cup: freshCup(),
 });
 
 export class Progress {
@@ -183,6 +199,12 @@ export class Progress {
         discs: union(base.discs, parsed.discs),
         drivers: union(base.drivers, parsed.drivers),
         skins: union(base.skins, parsed.skins),
+        // A spread cannot repair a cup: a save from before the cup existed has
+        // no `cup` at all, and one written mid-run can hold a bracket whose
+        // entrants no longer exist in the catalogue. `mergeCup` is the only
+        // thing that decides whether a saved run is still playable, so it runs
+        // on the raw value rather than trusting the spread.
+        cup: mergeCup((parsed as { cup?: unknown }).cup),
       };
     } catch {
       return fresh();
@@ -334,6 +356,59 @@ export class Progress {
   /** The equipped title, re-validated on read. */
   equippedTitle(): Title | null {
     return this.titles().find((t) => t.id === this.data.title) ?? null;
+  }
+
+  /* -------------------------------------------------------------- the cup */
+
+  /** Can a cup be entered right now? One run a day, past the unlock rung. */
+  canEnterCup(now: number): boolean {
+    return cupAvailable(this.data.cup, this.data.rung, now);
+  }
+
+  /** True while a bracket is part-played and waiting to be resumed. */
+  get cupRunning(): boolean {
+    return cupInProgress(this.data.cup);
+  }
+
+  /** True once this run is over, won or knocked out. */
+  get cupOver(): boolean {
+    return cupFinished(this.data.cup);
+  }
+
+  /**
+   * Draw a bracket and enter it.
+   *
+   * The seed comes from the DAY rather than from the clock, so everyone
+   * playing on the same date meets the same field — which is what makes a
+   * daily cup a thing players can compare, and what stops a reload rerolling a
+   * bad draw.
+   */
+  enterCup(now: number): void {
+    // REFUSED MID-RUN, and this guard is load-bearing. `cupAvailable` answers
+    // "is the cup playable", which is deliberately TRUE while a bracket is
+    // half-played so a run can be resumed — but `startCup` redraws
+    // unconditionally, so gating a new draw on that predicate would silently
+    // eat a player's live bracket and count it as a second entry.
+    if (this.cupRunning || !this.canEnterCup(now)) return;
+    this.data.cup = startCup(this.data.cup, cupSeedForDay(dayIndex(now)));
+    this.save();
+  }
+
+  /** The cup opponent to fight next, or null when no run is live. */
+  cupOpponent(): ReturnType<typeof cupRival> {
+    return cupRival(this.data.cup);
+  }
+
+  /** Record a finished cup match and bank whatever the run has now earned. */
+  recordCup(won: boolean, now: number): CupResult {
+    // `recordCupMatch` MUTATES the state and marks the purse paid itself —
+    // deliberately, for the reason `tickChallenges` gives: the only way to be
+    // certain a reward is handed over exactly once is for the thing that
+    // decides it to also record it. So there is nothing to assign back here.
+    const out = recordCupMatch(this.data.cup, won, now);
+    this.data.coins += out.coins;
+    this.save();
+    return out;
   }
 
   /** Is the recurring rival due to show up instead of the ladder opponent? */

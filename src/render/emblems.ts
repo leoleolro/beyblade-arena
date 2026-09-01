@@ -839,3 +839,662 @@ export const wizardEmblem: EmblemDraw = (ctx, s, design) => {
     ctx.fill();
   }
 };
+
+/**
+ * EIGHT MARKS FOR THE DEFENCE-AND-STAMINA PASS.
+ *
+ * Every one of them is the Gear Chip its own source page describes, and where
+ * the page does not describe one the mark is drawn from the part's NAME and
+ * says so at the top of the function. That distinction is the same one
+ * `sim/parts.ts` draws between a transcribed number and an invented one, and it
+ * matters more here than it looks: a beast mark is the thing a player uses to
+ * tell two tops apart at battle distance, so an invented one is a design
+ * decision rather than a decoration.
+ *
+ * All eight respect the r = 84 bound stated above `seiryuEmblem`, and all eight
+ * capture the caller's cel line rather than hard-setting `ink`, so each works
+ * under either chip treatment. The older marks get away with hard-setting ink
+ * only because every bey using them happens to be a sticker chip.
+ */
+
+export const triceratopsEmblem: EmblemDraw = (ctx, s, design) => {
+  // "The Gear Chip features the side profile of a green triceratops."
+  //
+  // SIDE PROFILE, which is what makes it drawable at chip size at all. Frontal,
+  // a triceratops is a disc with three spikes on it and reads as a sun; from the
+  // side the frill is a great scalloped fan behind a low skull, and the two brow
+  // horns rake forward past the beak. That silhouette is unmistakable at 40 px.
+  //
+  // Drawn frill-first so the skull pins its near edge, the same ordering
+  // `seiryuEmblem` uses for its coil.
+  const line = ctx.strokeStyle;
+
+  // The frill: a fan sweeping up and back, its rim broken into seven scallops
+  // (the osteoderms). Scalloped rather than smooth because a smooth fan reads
+  // as a shield, and this roster already has three shields.
+  ctx.fillStyle = hex(design.accent);
+  ctx.beginPath();
+  ctx.moveTo(6 * s, 24 * s);
+  ctx.quadraticCurveTo(-46 * s, 30 * s, -68 * s, -14 * s);
+  for (const [cx, cy, ex, ey] of [
+    [-74, -34, -58, -44],
+    [-58, -58, -40, -58],
+    [-36, -70, -18, -64],
+    [-8, -70, 6, -58],
+  ] as const) {
+    ctx.quadraticCurveTo(cx * s, cy * s, ex * s, ey * s);
+  }
+  ctx.quadraticCurveTo(18 * s, -44 * s, 16 * s, -10 * s);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // Skull and beak, a step lighter so the head separates from the frill —
+  // the trick the lion, the bat and the dragon all use. The beak is a parrot
+  // hook, which is the second thing after the frill that says triceratops.
+  ctx.fillStyle = lighten(design.accent, 0.26);
+  ctx.beginPath();
+  ctx.moveTo(-2 * s, -46 * s);
+  ctx.quadraticCurveTo(40 * s, -40 * s, 58 * s, -12 * s);
+  ctx.lineTo(72 * s, 2 * s); // beak tip
+  ctx.quadraticCurveTo(56 * s, 12 * s, 44 * s, 6 * s);
+  ctx.quadraticCurveTo(20 * s, 26 * s, -4 * s, 20 * s);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // Two brow horns raked forward, the far one shorter and darker so the pair
+  // reads as depth rather than as a fork. Nose horn last, short and blunt.
+  ctx.fillStyle = hex(design.secondary);
+  for (const [bx, by, tx, ty, w] of [
+    [10, -44, 62, -60, 9],
+    [22, -36, 70, -44, 8],
+  ] as const) {
+    ctx.beginPath();
+    ctx.moveTo(bx * s, by * s);
+    ctx.quadraticCurveTo((bx + tx) * 0.5 * s, (by + ty) * 0.5 * s - 8 * s, tx * s, ty * s);
+    ctx.lineTo((bx + w) * s, (by + w) * s);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
+  ctx.beginPath();
+  ctx.moveTo(50 * s, -14 * s);
+  ctx.lineTo(64 * s, -30 * s);
+  ctx.lineTo(60 * s, -8 * s);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // Eye: a narrow wedge under the brow, raked back for the glare.
+  ctx.fillStyle = ink;
+  ctx.strokeStyle = line;
+  ctx.beginPath();
+  ctx.ellipse(24 * s, -22 * s, 8 * s, 5 * s, -0.3, 0, Math.PI * 2);
+  ctx.fill();
+};
+
+export const mummyEmblem: EmblemDraw = (ctx, s, design) => {
+  // "The Gear Chip features a mummy."
+  //
+  // The whole read is the WRAPPING, not the face. A bandaged head is an oval
+  // with two lit eyes; what makes it a mummy is that the oval is crossed by
+  // bands running at an angle and that two loose ends trail off it. So the
+  // bands are cut out of the head as strokes in the chip's own dark, rather
+  // than drawn on top in a third colour that would muddy at chip size.
+  const line = ctx.strokeStyle;
+
+  // Trailing bandage ends first, so the head covers where they attach. Two,
+  // different lengths, both curling — a symmetric pair would read as ribbons.
+  ctx.lineCap = 'round';
+  ctx.lineWidth = 11 * s;
+  ctx.strokeStyle = hex(design.accent);
+  ctx.beginPath();
+  ctx.moveTo(-24 * s, 24 * s);
+  ctx.quadraticCurveTo(-58 * s, 44 * s, -46 * s, 72 * s);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(26 * s, 26 * s);
+  ctx.quadraticCurveTo(62 * s, 34 * s, 58 * s, 58 * s);
+  ctx.stroke();
+
+  // The head: a tall wrapped oval, wider at the crown than the jaw.
+  ctx.lineWidth = 5 * s;
+  ctx.strokeStyle = line;
+  ctx.fillStyle = hex(design.accent);
+  ctx.beginPath();
+  ctx.moveTo(0, -74 * s);
+  ctx.quadraticCurveTo(46 * s, -66 * s, 44 * s, -8 * s);
+  ctx.quadraticCurveTo(42 * s, 44 * s, 0, 50 * s);
+  ctx.quadraticCurveTo(-42 * s, 44 * s, -44 * s, -8 * s);
+  ctx.quadraticCurveTo(-46 * s, -66 * s, 0, -74 * s);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // Six bands raked across the head. Clipped to the head so they cannot spill
+  // past the silhouette, which is what separates "wrapped" from "scribbled on".
+  ctx.save();
+  ctx.clip();
+  ctx.strokeStyle = ink;
+  ctx.lineWidth = 5 * s;
+  for (const y of [-58, -40, -22, 2, 20, 38] as const) {
+    ctx.beginPath();
+    ctx.moveTo(-56 * s, y * s);
+    ctx.lineTo(56 * s, (y - 16) * s);
+    ctx.stroke();
+  }
+  // The eye slot: one dark band left deliberately wide, which is where the
+  // eyes sit. Cutting the slot rather than drawing a face is the whole idea.
+  ctx.fillStyle = ink;
+  ctx.beginPath();
+  ctx.moveTo(-52 * s, -6 * s);
+  ctx.lineTo(52 * s, -22 * s);
+  ctx.lineTo(52 * s, -2 * s);
+  ctx.lineTo(-52 * s, 14 * s);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+
+  // Two lit eyes in the slot. The design's secondary, because they have to
+  // survive being painted on near-black and a jewel tone would vanish.
+  ctx.fillStyle = hex(design.secondary);
+  for (const [dx, dy] of [
+    [-19, 0],
+    [19, -6],
+  ] as const) {
+    ctx.beginPath();
+    ctx.ellipse(dx * s, dy * s, 9 * s, 5 * s, -0.14, 0, Math.PI * 2);
+    ctx.fill();
+  }
+};
+
+export const haloEmblem: EmblemDraw = (ctx, s, design) => {
+  // "The Gear Chip features an angel halo and wings, along with a ring in the
+  // background."
+  //
+  // Three elements and the source names all three, which is rarer than it
+  // sounds — most Gear Chip lines in the data name one beast and stop. So this
+  // mark is drawn strictly to that sentence: background ring, then wings, then
+  // the halo floating clear above them with nothing between.
+  //
+  // NO BODY. Every winged mark already in this file hangs its wings off a
+  // torso (the bat, both phoenixes), and repeating that would make this the
+  // fourth bird. An empty space where the figure should be is what makes it
+  // read as a halo rather than as an angel — and it is also what the part is:
+  // a Blade whose centre is a ring.
+  const line = ctx.strokeStyle;
+
+  // The background ring: a wide open annulus, drawn first and left unfilled so
+  // the wings cross in front of it.
+  ctx.strokeStyle = hex(design.secondary);
+  ctx.lineWidth = 9 * s;
+  ctx.beginPath();
+  ctx.arc(0, 4 * s, 66 * s, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Wings: four primaries a side, each a long taper, the outer ones sweeping
+  // further back. Drawn root-outward so each feather overlaps the one behind.
+  ctx.lineWidth = 4.5 * s;
+  ctx.strokeStyle = line;
+  ctx.fillStyle = hex(design.accent);
+  for (const dir of [-1, 1] as const) {
+    for (const [tx, ty, root] of [
+      [78, 30, 22],
+      [76, 8, 14],
+      [66, -14, 6],
+      [48, -34, -2],
+    ] as const) {
+      ctx.beginPath();
+      ctx.moveTo(dir * 10 * s, root * s);
+      ctx.quadraticCurveTo(dir * tx * 0.66 * s, (ty - 18) * s, dir * tx * s, ty * s);
+      ctx.quadraticCurveTo(dir * tx * 0.44 * s, (ty + 14) * s, dir * 8 * s, (root - 14) * s);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+  }
+
+  // Coverts: a short second rank at the shoulder, a step lighter, so the wing
+  // has a near edge instead of reading as one flat sheet of primaries.
+  ctx.fillStyle = lighten(design.accent, 0.3);
+  for (const dir of [-1, 1] as const) {
+    ctx.beginPath();
+    ctx.moveTo(dir * 8 * s, 20 * s);
+    ctx.quadraticCurveTo(dir * 40 * s, 6 * s, dir * 42 * s, -14 * s);
+    ctx.quadraticCurveTo(dir * 26 * s, -2 * s, dir * 6 * s, 2 * s);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  // The halo, floating clear above the wing roots: an ellipse in perspective,
+  // struck as a ring rather than filled.
+  ctx.strokeStyle = hex(design.accent);
+  ctx.lineWidth = 9 * s;
+  ctx.beginPath();
+  ctx.ellipse(0, -52 * s, 30 * s, 11 * s, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.strokeStyle = line;
+  ctx.lineWidth = 3 * s;
+  ctx.beginPath();
+  ctx.ellipse(0, -52 * s, 34 * s, 14 * s, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.ellipse(0, -52 * s, 26 * s, 8 * s, 0, 0, Math.PI * 2);
+  ctx.stroke();
+};
+
+export const bearEmblem: EmblemDraw = (ctx, s, design) => {
+  // Savage Bear's own page does not describe its Gear Chip — its Description is
+  // two sentences about which other Blade shares its mold. So this mark comes
+  // from the part's NAME rather than from a sentence, and that is stated here
+  // rather than buried: it is the one invented mark in this batch.
+  //
+  // Frontal, and deliberately so. Every profile head already in this file (the
+  // dragon, the drake, the triceratops, the shark) faces right; a fifth would
+  // make the emblem set look like one drawing at different zooms. A bear seen
+  // head-on is two round ears on a broad skull, which is a shape nothing else
+  // here owns.
+  const line = ctx.strokeStyle;
+
+  // Ears first, so the skull covers their bases and they read as behind it.
+  ctx.fillStyle = hex(design.accent);
+  for (const dir of [-1, 1] as const) {
+    ctx.beginPath();
+    ctx.arc(dir * 44 * s, -44 * s, 22 * s, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
+  // Inner ear, a step lighter — without it the ears are two flat coins.
+  ctx.fillStyle = lighten(design.accent, 0.32);
+  for (const dir of [-1, 1] as const) {
+    ctx.beginPath();
+    ctx.arc(dir * 44 * s, -42 * s, 11 * s, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Skull: broad across the brow, narrowing to a heavy muzzle.
+  ctx.fillStyle = hex(design.accent);
+  ctx.beginPath();
+  ctx.moveTo(0, -62 * s);
+  ctx.quadraticCurveTo(56 * s, -56 * s, 56 * s, -6 * s);
+  ctx.quadraticCurveTo(56 * s, 44 * s, 0, 56 * s);
+  ctx.quadraticCurveTo(-56 * s, 44 * s, -56 * s, -6 * s);
+  ctx.quadraticCurveTo(-56 * s, -56 * s, 0, -62 * s);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // Muzzle, lighter again, so the face has three tones and separates at size.
+  ctx.fillStyle = lighten(design.accent, 0.34);
+  ctx.beginPath();
+  ctx.ellipse(0, 22 * s, 30 * s, 22 * s, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  // Nose and the open jaw beneath it, both cut in ink so they punch through.
+  ctx.fillStyle = ink;
+  ctx.beginPath();
+  ctx.moveTo(-14 * s, 10 * s);
+  ctx.lineTo(14 * s, 10 * s);
+  ctx.quadraticCurveTo(12 * s, 26 * s, 0, 28 * s);
+  ctx.quadraticCurveTo(-12 * s, 26 * s, -14 * s, 10 * s);
+  ctx.closePath();
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(-20 * s, 36 * s);
+  ctx.quadraticCurveTo(0, 52 * s, 20 * s, 36 * s);
+  ctx.quadraticCurveTo(0, 44 * s, -20 * s, 36 * s);
+  ctx.closePath();
+  ctx.fill();
+  // Two lower fangs hung off the jaw, bone white — the detail that turns a
+  // bear into a SAVAGE bear, which is the half of the name doing the work.
+  ctx.fillStyle = '#f2f0ea';
+  ctx.strokeStyle = ink;
+  ctx.lineWidth = 2.5 * s;
+  for (const dir of [-1, 1] as const) {
+    ctx.beginPath();
+    ctx.moveTo(dir * 8 * s, 38 * s);
+    ctx.lineTo(dir * 16 * s, 38 * s);
+    ctx.lineTo(dir * 12 * s, 52 * s);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  // Eyes: small, deep-set and angled down toward the muzzle for the scowl.
+  ctx.fillStyle = hex(design.secondary);
+  ctx.strokeStyle = line;
+  for (const dir of [-1, 1] as const) {
+    ctx.beginPath();
+    ctx.moveTo(dir * 12 * s, -18 * s);
+    ctx.lineTo(dir * 32 * s, -24 * s);
+    ctx.lineTo(dir * 32 * s, -10 * s);
+    ctx.lineTo(dir * 12 * s, -8 * s);
+    ctx.closePath();
+    ctx.fill();
+  }
+};
+
+export const clockEmblem: EmblemDraw = (ctx, s, design) => {
+  // "The Gear Chip features a pendulum clock representing Horologium, one of the
+  // 88 constellations in space."
+  //
+  // A PENDULUM clock, not a wristwatch, and the difference is the whole mark:
+  // the dial is only the top half, and the bob swinging under it on a rod is
+  // what the eye actually reads at chip size. Drawn off-vertical so it is
+  // caught mid-swing — a bob hanging straight down reads as a plumb line.
+  //
+  // The dial's rim is cut into sixty teeth. That is not decoration: the Blade
+  // itself has "60 edges around its circumference", and this is the one mark in
+  // the set whose ornament is a transcription of the part's own geometry.
+  const line = ctx.strokeStyle;
+
+  // Sixty teeth, struck as short radial ticks rather than drawn as a gear
+  // outline. A filled 60-tooth gear at this size turns into a grey ring.
+  ctx.strokeStyle = hex(design.accent);
+  ctx.lineWidth = 2.5 * s;
+  for (let i = 0; i < 60; i++) {
+    const ang = (i / 60) * Math.PI * 2;
+    const long = i % 5 === 0;
+    const r0 = long ? 50 : 55;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(ang) * r0 * s, (-26 + Math.sin(ang) * r0) * s);
+    ctx.lineTo(Math.cos(ang) * 62 * s, (-26 + Math.sin(ang) * 62) * s);
+    ctx.stroke();
+  }
+
+  // The pendulum, under the dial and drawn before it so the case covers the
+  // rod's pivot. Off-vertical by 0.28 rad: mid-swing.
+  const swing = 0.28;
+  const px = Math.sin(swing);
+  const py = Math.cos(swing);
+  ctx.strokeStyle = line;
+  ctx.lineWidth = 4.5 * s;
+  ctx.beginPath();
+  ctx.moveTo(0, -26 * s);
+  ctx.lineTo(px * 96 * s, (-26 + py * 96) * s);
+  ctx.stroke();
+  ctx.fillStyle = hex(design.accent);
+  ctx.beginPath();
+  ctx.ellipse(px * 74 * s, (-26 + py * 74) * s, 15 * s, 12 * s, swing, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  // The dial: a filled disc a step lighter than the teeth, so the face reads as
+  // paper behind machined brass.
+  ctx.fillStyle = lighten(design.accent, 0.3);
+  ctx.beginPath();
+  ctx.arc(0, -26 * s, 48 * s, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  // Hands at 10:08 — the angle every clock is photographed at, because it
+  // frames the dial's centre instead of hiding it, and reads as a clock faster
+  // than any other setting.
+  ctx.strokeStyle = ink;
+  ctx.lineCap = 'round';
+  ctx.lineWidth = 7 * s;
+  ctx.beginPath();
+  ctx.moveTo(0, -26 * s);
+  ctx.lineTo(-22 * s, -48 * s);
+  ctx.stroke();
+  ctx.lineWidth = 5 * s;
+  ctx.beginPath();
+  ctx.moveTo(0, -26 * s);
+  ctx.lineTo(26 * s, -54 * s);
+  ctx.stroke();
+  ctx.fillStyle = ink;
+  ctx.beginPath();
+  ctx.arc(0, -26 * s, 6 * s, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Four constellation stars scattered off the dial — Horologium, which is what
+  // the source says the clock represents. Small, unstroked, and in the
+  // secondary so they sit behind the mark rather than competing with it.
+  ctx.fillStyle = hex(design.secondary);
+  for (const [cx, cy, rad] of [
+    [-64, -66, 5],
+    [-40, -78, 3.5],
+    [58, -70, 4],
+    [70, -40, 3],
+  ] as const) {
+    ctx.beginPath();
+    ctx.arc(cx * s, cy * s, rad * s, 0, Math.PI * 2);
+    ctx.fill();
+  }
+};
+
+export const pteranodonEmblem: EmblemDraw = (ctx, s, design) => {
+  // "The Gear Chip features a pteranodon."
+  //
+  // The head is the mark. A pteranodon in flight is a pair of triangles and
+  // reads as a paper dart; the head — a long spear beak forward and a long bony
+  // crest raked back, almost the same length — is a shape nothing else in
+  // nature has, and it survives being 40 px across.
+  //
+  // So: head in profile, large, with the wings reduced to two swept membranes
+  // behind it. The reverse of `firebirdEmblem`, which is all wing and a small
+  // skull, so the two do not read as the same bird twice.
+  const line = ctx.strokeStyle;
+
+  // Wings first and darker, so the head lands on top of them.
+  ctx.fillStyle = hex(design.secondary);
+  for (const [dir, ty] of [
+    [-1, -6],
+    [1, 26],
+  ] as const) {
+    ctx.beginPath();
+    ctx.moveTo(-6 * s, 14 * s);
+    ctx.quadraticCurveTo(-46 * s, (ty - 28) * s, -78 * s, ty * s);
+    ctx.quadraticCurveTo(-44 * s, (ty + 16) * s, -20 * s, (14 + dir * 10) * s);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  // The crest: a long backswept blade off the back of the skull, as long as the
+  // beak is. Drawn before the skull so the skull pins its root.
+  ctx.fillStyle = hex(design.accent);
+  ctx.beginPath();
+  ctx.moveTo(-4 * s, -34 * s);
+  ctx.quadraticCurveTo(-34 * s, -56 * s, -70 * s, -44 * s);
+  ctx.quadraticCurveTo(-40 * s, -30 * s, -6 * s, -16 * s);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // Skull and the spear beak, a step lighter, running the other way. The beak
+  // is straight and needle-fine — a curved one is a pelican.
+  ctx.fillStyle = lighten(design.accent, 0.26);
+  ctx.beginPath();
+  ctx.moveTo(-10 * s, -36 * s);
+  ctx.quadraticCurveTo(24 * s, -40 * s, 34 * s, -22 * s);
+  ctx.lineTo(80 * s, -4 * s); // beak tip
+  ctx.lineTo(34 * s, 6 * s);
+  ctx.quadraticCurveTo(4 * s, 14 * s, -12 * s, -6 * s);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // The lower mandible, dropped open a few degrees so the head is calling
+  // rather than gliding — the same choice `seiryuEmblem` makes with its jaw.
+  ctx.beginPath();
+  ctx.moveTo(18 * s, 4 * s);
+  ctx.lineTo(70 * s, 6 * s);
+  ctx.lineTo(20 * s, 18 * s);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // Eye, set high and forward under the crest root.
+  ctx.fillStyle = ink;
+  ctx.strokeStyle = line;
+  ctx.beginPath();
+  ctx.ellipse(8 * s, -20 * s, 7 * s, 5 * s, 0.15, 0, Math.PI * 2);
+  ctx.fill();
+};
+
+export const ghostEmblem: EmblemDraw = (ctx, s, design) => {
+  // "The Gear Chip features a stylized ghost."
+  //
+  // STYLIZED is the operative word and the source uses it, so this is the sheet
+  // ghost — a domed head over a scalloped hem — rather than an attempt at a
+  // spectre. The hem is three lobes with the gaps cut UP into the body, which
+  // is what makes the bottom edge read as cloth rather than as a rounded base.
+  //
+  // It is also the one mark here whose shape is the Blade's shape: GhostCircle
+  // is "a Stamina Type Blade with a near perfectly circular shape", and the
+  // ghost's dome is drawn as a true arc for the same reason.
+  const line = ctx.strokeStyle;
+
+  // Two trailing wisps behind the body, drawn first. They are what stops the
+  // silhouette sitting dead still on the chip.
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = hex(design.secondary);
+  ctx.lineWidth = 7 * s;
+  for (const [dir, ey] of [
+    [-1, 18],
+    [1, 34],
+  ] as const) {
+    ctx.beginPath();
+    ctx.moveTo(dir * 40 * s, 0);
+    ctx.quadraticCurveTo(dir * 72 * s, (ey - 22) * s, dir * 66 * s, ey * s);
+    ctx.stroke();
+  }
+
+  // The body: a true semicircular dome, then straight sides, then three hem
+  // lobes with gaps cut up between them.
+  ctx.lineWidth = 5 * s;
+  ctx.strokeStyle = line;
+  ctx.fillStyle = hex(design.accent);
+  ctx.beginPath();
+  ctx.arc(0, -12 * s, 46 * s, Math.PI, 0);
+  ctx.lineTo(46 * s, 24 * s);
+  // Hem, right to left: lobe, notch, lobe, notch, lobe.
+  ctx.quadraticCurveTo(46 * s, 54 * s, 26 * s, 54 * s);
+  ctx.quadraticCurveTo(20 * s, 34 * s, 14 * s, 50 * s);
+  ctx.quadraticCurveTo(4 * s, 66 * s, -6 * s, 50 * s);
+  ctx.quadraticCurveTo(-14 * s, 34 * s, -22 * s, 52 * s);
+  ctx.quadraticCurveTo(-34 * s, 62 * s, -46 * s, 40 * s);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // Eyes and mouth as HOLES in the sheet — filled in the chip's own dark rather
+  // than in a colour, because a hole is what a sheet ghost's face is.
+  ctx.fillStyle = ink;
+  for (const dir of [-1, 1] as const) {
+    ctx.beginPath();
+    ctx.ellipse(dir * 19 * s, -18 * s, 10 * s, 13 * s, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.beginPath();
+  ctx.ellipse(0, 14 * s, 12 * s, 9 * s, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // A pale catchlight in each eye, which is the difference between a ghost and
+  // two holes. Pale rather than the secondary, for the reason `wizardEmblem`
+  // records: a jewel tone on near-black is two dark shapes with no edge.
+  ctx.fillStyle = lighten(design.accent, 0.6);
+  for (const dir of [-1, 1] as const) {
+    ctx.beginPath();
+    ctx.ellipse((dir * 19 + 3) * s, -22 * s, 3.5 * s, 4.5 * s, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+};
+
+export const sharkheadEmblem: EmblemDraw = (ctx, s, design) => {
+  // "The Gear Chip features a shark head, and its name refers to the gill slits
+  // on sharks."
+  //
+  // The gill slits are named in the source, so they are the mark's subject
+  // rather than a texture on it: five raked slits, cut in ink, sized so they
+  // are the second thing read after the jaw. Without them this is a generic
+  // shark and the part is called Gill Shark.
+  //
+  // Head-on-the-diagonal rather than flat profile, so the open jaw is visible
+  // as a shape instead of as a line — a shark drawn in true profile has its
+  // teeth edge-on and loses them.
+  const line = ctx.strokeStyle;
+
+  // Pectoral fin behind, darker, giving the head something to sit against.
+  ctx.fillStyle = hex(design.secondary);
+  ctx.beginPath();
+  ctx.moveTo(-18 * s, 10 * s);
+  ctx.quadraticCurveTo(-58 * s, 22 * s, -76 * s, 52 * s);
+  ctx.quadraticCurveTo(-40 * s, 44 * s, -12 * s, 34 * s);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  // Dorsal fin, the shark's one unmistakable shape, above and behind.
+  ctx.beginPath();
+  ctx.moveTo(-24 * s, -18 * s);
+  ctx.quadraticCurveTo(-46 * s, -50 * s, -74 * s, -58 * s);
+  ctx.quadraticCurveTo(-52 * s, -28 * s, -46 * s, -6 * s);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // The head: a blunt wedge driving down and right, snout over a dropped jaw.
+  ctx.fillStyle = hex(design.accent);
+  ctx.beginPath();
+  ctx.moveTo(-40 * s, -22 * s);
+  ctx.quadraticCurveTo(16 * s, -34 * s, 62 * s, -2 * s); // snout ridge
+  ctx.quadraticCurveTo(52 * s, 16 * s, 30 * s, 18 * s);
+  ctx.quadraticCurveTo(48 * s, 34 * s, 40 * s, 52 * s); // the jaw, dropped
+  ctx.quadraticCurveTo(-4 * s, 46 * s, -34 * s, 22 * s);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // The gape, cut in ink between snout and jaw, with teeth left standing in it.
+  ctx.fillStyle = ink;
+  ctx.beginPath();
+  ctx.moveTo(26 * s, 14 * s);
+  ctx.quadraticCurveTo(46 * s, 26 * s, 38 * s, 46 * s);
+  ctx.quadraticCurveTo(6 * s, 40 * s, -8 * s, 24 * s);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#f2f0ea';
+  for (const [tx, ty, bx, by] of [
+    [24, 16, 16, 28],
+    [8, 20, 2, 32],
+    [-6, 22, -12, 33],
+    [32, 30, 22, 38],
+  ] as const) {
+    ctx.beginPath();
+    ctx.moveTo(tx * s, ty * s);
+    ctx.lineTo((tx - 9) * s, (ty + 3) * s);
+    ctx.lineTo(bx * s, by * s);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // FIVE GILL SLITS, raked back off the jaw hinge. Five is the count on the
+  // sharks the name points at, and they get the ink line rather than a tint so
+  // they survive the plated accent behind them.
+  ctx.strokeStyle = ink;
+  ctx.lineCap = 'round';
+  ctx.lineWidth = 4.5 * s;
+  for (let i = 0; i < 5; i++) {
+    const x = (-30 + i * 9) * s;
+    ctx.beginPath();
+    ctx.moveTo(x, -8 * s);
+    ctx.quadraticCurveTo(x - 5 * s, 6 * s, x - 2 * s, 20 * s);
+    ctx.stroke();
+  }
+
+  // Eye: small, black, set high on the snout — a shark's eye is a bead, and
+  // drawing it any larger turns the head into a dolphin.
+  ctx.strokeStyle = line;
+  ctx.fillStyle = ink;
+  ctx.beginPath();
+  ctx.arc(14 * s, -14 * s, 7 * s, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = lighten(design.accent, 0.55);
+  ctx.beginPath();
+  ctx.arc(16 * s, -16 * s, 2.5 * s, 0, Math.PI * 2);
+  ctx.fill();
+};

@@ -23,6 +23,7 @@ import type { Fighter } from './sim/battle';
 import * as C from './sim/constants';
 import { DEFAULT_BUILD, buildArchetype } from './sim/parts';
 import type { RoundOutcome } from './progress';
+import type { CupResult } from './tournament';
 import type { Opponent } from './career';
 import type { BeyBuild, LaunchParams, MoveKind } from './sim/types';
 import { DIRECT_PRICE, REROLL_COST, REWARDS, crateById, rollCrate, rollOffer } from './economy';
@@ -200,6 +201,11 @@ export class Game {
    * distinctly from `rival`, which is the live BeyState during a battle.
    */
   get currentRival(): Rival {
+    // A live cup outranks everything. Once a bracket is running the player is
+    // IN it — the ladder and the nemesis both wait, because a tournament you
+    // can wander out of halfway through is not a tournament.
+    const cup = this.progress.cupOpponent();
+    if (cup) return cup;
     // The nemesis cuts in front of whoever was next. It is checked first
     // because the whole point of a recurring rival is that they turn up when
     // they decide to, not when the ladder gets around to them.
@@ -215,9 +221,22 @@ export class Game {
 
   /** Which kind of opponent this match is against, for the career record. */
   private get opponentKind(): Opponent {
+    // Mirrors `currentRival`'s order exactly. A cup match is recorded as
+    // ladder work for objectives — the cup is a place to play, not a separate
+    // kind of opponent — while the nemesis is its own thing because the career
+    // keeps a head-to-head against them.
+    if (this.progress.cupOpponent()) return 'ladder';
     if (this.progress.nemesisIsDue()) return 'nemesis';
     return this.progress.cleared ? 'endless' : 'ladder';
   }
+
+  /** Draw a bracket and enter today's cup. Safe to call when unavailable. */
+  enterCup(): void {
+    this.progress.enterCup(Date.now());
+  }
+
+  /** What the last finished cup match paid, for the result screen. */
+  lastCupResult: CupResult | null = null;
   aiName = 'Rival';
   difficulty: Difficulty = 'blader';
 
@@ -910,9 +929,18 @@ export class Game {
         // Record the match exactly once, the moment it is decided.
         if (this.battle.phase === 'match-over' && !this.matchRecorded) {
           this.matchRecorded = true;
-          this.lastUnlocks = this.progress.recordMatch(
-            this.battle.matchWinnerId === PLAYER_ID,
-          );
+          const won = this.battle.matchWinnerId === PLAYER_ID;
+          // The cup advances BEFORE the ladder is touched, because
+          // `recordMatch` reads `cleared` and the rung to decide unlocks, and a
+          // cup match must never move the ladder. Recording the cup first also
+          // means `currentRival` has already stopped pointing at the beaten
+          // entrant by the time anything asks it again.
+          this.lastCupResult = this.progress.cupRunning
+            ? this.progress.recordCup(won, Date.now())
+            : null;
+          this.lastUnlocks = this.lastCupResult
+            ? {}
+            : this.progress.recordMatch(won);
         }
       }
     }
