@@ -34,6 +34,7 @@ const RIGHT_SPIN_NORM: 1 | -1 = 1;
  */
 const OBSERVE_RATE = 0.35;
 
+
 const PROFILE: Record<
   Difficulty,
   {
@@ -386,6 +387,37 @@ export class AiController {
     // better, which would have to be arena-aware — bank on a plain dish, flat
     // on a rail floor. Recorded rather than shipped on the assumption.
 
+    // WHERE TO ENTER — and this mirror is the best value tested, which is not
+    // what a first look suggested.
+    //
+    // Forcing the offset across the roster and sweeping it says the far side is
+    // the least eventful geometry in the game:
+    //
+    //     offset    hits/round   adjacency   round
+    //        0deg      6.75        35.9%     10.68s
+    //      180deg      5.42        27.4%      9.06s
+    //
+    // THAT SWEEP IS MISLEADING, and the reason is worth keeping. It forces both
+    // entry ANGLES while leaving each side's chosen entry DEPTH alone — and the
+    // two are coupled, since stamina enters deep at 0.35 and everything else
+    // shallow at 0.05. So it measures launch geometry the game never actually
+    // produces. Re-measured on the real path, with each side choosing its own
+    // launch and only this formula changing:
+    //
+    //     mirror (this)        round  9.91s   hits 6.19   adjacency 33.9%
+    //     archetype, mid       round 11.46s   hits 5.61   adjacency 28.9%
+    //     archetype, closer    round 10.35s   hits 5.99   adjacency 34.1%
+    //     archetype, closest   round 11.71s   hits 6.45   adjacency 32.1%
+    //
+    // The closest variant lands the most hits, but over an 18% longer round —
+    // 0.551 hits per second against the mirror's 0.625. Every variant spreads
+    // the same action more thinly. Reverted, all of them.
+    //
+    // What the sweep DID establish and is worth having: the offset is not a
+    // win-rate lever at all. First-launcher win rate runs 46.8% to 54.4% across
+    // the full range, which at n=79 is noise. It changes the texture of a round
+    // and not who takes it, so anyone retuning this is trading pacing against
+    // pacing and nothing else.
     return {
       power,
       // Launch opposite the player so the round doesn't open on a collision.
