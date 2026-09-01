@@ -711,6 +711,45 @@ export class Ui {
     return el;
   }
 
+  /**
+   * What the round just paid, on the screen the player is actually looking at.
+   *
+   * The banner that fires mid-round is the reward LANDING — it has to be in the
+   * moment or it teaches nothing. This is the receipt, and both are needed:
+   * the banner is transient by design and a player watching the tops is exactly
+   * the player who missed it. A reward nobody can confirm afterwards may as
+   * well not have been paid.
+   *
+   * Silent when the round earned nothing, rather than showing a row of zeroes.
+   * "You earned: nothing" is worse than no line at all.
+   */
+  private earnedHtml(): string {
+    const o = this.game.lastRoundOutcome;
+    if (!o || (!o.completed.length && o.masteryTier === 0)) return '';
+
+    const rows = o.completed
+      .map(
+        (c) =>
+          `<li><span class="earned-tick">✓</span>${escapeHtml(c.text)}` +
+          `<span class="earned-scope">${escapeHtml(c.scope)}</span></li>`,
+      )
+      .join('');
+    const layer = LAYERS.find((l) => l.id === o.masteryLayerId);
+    const mastery =
+      o.masteryTier > 0
+        ? `<li><span class="earned-tick">★</span>${escapeHtml(
+            MASTERY_NAMES[o.masteryTier - 1],
+          )} with ${escapeHtml(layer?.name ?? o.masteryLayerId)}` +
+          `<span class="earned-scope">mastery</span></li>`
+        : '';
+
+    return `
+      <div class="earned">
+        <div class="earned-head">Earned this round${o.coins > 0 ? ` · +${o.coins} coins` : ''}</div>
+        <ul>${rows}${mastery}</ul>
+      </div>`;
+  }
+
   private result(): HTMLElement {
     const g = this.game;
     const r = g.battle.lastRound;
@@ -787,6 +826,7 @@ export class Ui {
       )}</p>
       <p class="sub">You ${g.playerScore} — ${g.rivalScore} ${escapeHtml(g.aiName)}</p>
       ${breakdown}
+      ${this.earnedHtml()}
       ${matchOver ? this.unlockHtml() : ''}
       <div class="row">
         <button class="primary" data-next>${matchOver ? 'Back to garage' : 'Next round'}</button>

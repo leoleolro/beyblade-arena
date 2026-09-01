@@ -2376,3 +2376,51 @@ body.theme-anime .coach.on {
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
+
+/*
+ * The "earned this round" receipt on the result screen.
+ *
+ * Companion to `.objectives-pop`, not a replacement: the banner is the reward
+ * landing in the moment, this is the confirmation afterwards. A player watching
+ * the tops is exactly the player who missed the banner.
+ */
+.earned {
+  margin: 0.6rem 0 0.2rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 0.5rem;
+  background: rgba(37, 217, 240, 0.06);
+  border: 1px solid rgba(37, 217, 240, 0.22);
+  text-align: left;
+}
+
+.earned-head {
+  font-size: 0.58rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #25d9f0;
+  margin-bottom: 0.3rem;
+}
+
+.earned ul { margin: 0; padding: 0; list-style: none; }
+
+.earned li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: #dbe4ef;
+  padding: 0.08rem 0;
+}
+
+.earned-tick { color: #7fd88f; }
+
+/* Mastery uses the same warm colour it has in the garage strip, so the two
+   places it can appear read as the same kind of thing. */
+.earned li .earned-tick:not(:empty) ~ .earned-scope { margin-left: auto; }
+.earned-scope {
+  margin-left: auto;
+  font-size: 0.58rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #7f8b9c;
+}
