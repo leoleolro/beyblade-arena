@@ -359,7 +359,12 @@ export class Game {
     // Both directions used to be hardcoded opposite. That guaranteed a head-on
     // inside half an orbit and made the median round 1.2 seconds; now each side
     // chooses, and the pairing is a genuine strategic dial.
-    const aiSpin = this.ai.chooseSpinDir(aiBuild, this.playerSpinDir);
+    // The rival commits without seeing this launch — but it remembers the last
+    // one. See `observePlayerSpin`: a player who always brings left spin gets
+    // read, which is what stops the counter from being a permanently correct
+    // answer.
+    const aiSpin = this.ai.chooseSpinDir(aiBuild);
+    this.ai.observePlayerSpin(this.playerSpinDir);
     this.rivalSpinDir = aiSpin;
     const fighters: Fighter[] = [
       { id: PLAYER_ID, name: 'You', build: playerBuild, spinDir: this.playerSpinDir },

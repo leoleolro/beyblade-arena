@@ -12,6 +12,28 @@ import type {
 export type Difficulty = 'rookie' | 'blader' | 'champion';
 
 /** What each difficulty is allowed to do well. */
+/**
+ * The spin direction the field is assumed to bring.
+ *
+ * Measured on our own roster: 60 of 77 declared spin directions are right, and
+ * the left-spin minority is exactly the interesting set — Fafnir, Nosferu,
+ * Cobalt Dragoon, Luinor, Wyrm. That mirrors the real game, where the famous
+ * absorbers are left-spin precisely SO they meet the right-spin majority in
+ * opposite spin. Committing against this norm is therefore a real read rather
+ * than an arbitrary default, and being wrong about it is what makes bringing a
+ * left-spin bey a genuine counter.
+ */
+const RIGHT_SPIN_NORM: 1 | -1 = 1;
+
+/**
+ * How fast a rival's expectation drifts toward what it has just seen.
+ *
+ * 0.35 means a player who switches to left spin has moved the rival most of the
+ * way across in three matches — fast enough that a habit is punished inside a
+ * ladder run, slow enough that one off-pick does not flip the read.
+ */
+const OBSERVE_RATE = 0.35;
+
 const PROFILE: Record<
   Difficulty,
   {
@@ -165,6 +187,22 @@ export class AiController {
   private rng: () => number;
   /** Counts down to the next decision; see reactionTime. */
   private reactionTimer = 0;
+  /**
+   * What this rival expects the player to launch, as a probability of right
+   * spin. Starts at the field norm and drifts toward what it has actually seen.
+   *
+   * WHY IT EXISTS. Making the AI commit blind handed the player a real
+   * decision — measured, choosing left spin instead of right is worth 9.4
+   * points — but a decision with a permanently correct answer is a fact, not a
+   * choice. If the rival never notices, the player picks left forever and the
+   * mechanic collapses into a checkbox everyone ticks.
+   *
+   * So the rival watches. Keep bringing left-spin and a champion starts
+   * expecting it and commits accordingly, which takes the edge back; mix, and
+   * it stays wrong often enough for the edge to survive. That is the loop the
+   * whole thing needed to be a real read rather than a solved one.
+   */
+  private expectRight = 0.5 + (RIGHT_SPIN_NORM === 1 ? 0.28 : -0.28);
 
   constructor(id: string, difficulty: Difficulty, rng: () => number = Math.random) {
     this.id = id;
@@ -174,6 +212,18 @@ export class AiController {
 
   setDifficulty(d: Difficulty): void {
     this.difficulty = d;
+  }
+
+  /**
+   * Tell the rival what the player actually brought last time.
+   *
+   * An exponential drift rather than a tally, because a habit is recent
+   * behaviour, not a lifetime average: a player who switches should get credit
+   * for switching within a couple of matches rather than after twenty.
+   */
+  observePlayerSpin(dir: 1 | -1): void {
+    const seen = dir === 1 ? 1 : 0;
+    this.expectRight += (seen - this.expectRight) * OBSERVE_RATE;
   }
 
   /** Choose a build, optionally countering what the player brought. */
@@ -207,6 +257,20 @@ export class AiController {
    *     defense   same 31.8%   opposite 56.8%    +25.0
    *     stamina   same 12.2%   opposite 35.9%    +23.8
    *
+   * IT ALSO USED TO SEE THE PLAYER'S SPIN FIRST, and that was the worse half of
+   * the bug. The old signature took `playerSpinDir` and returned
+   * `opposite ? -playerSpinDir : playerSpinDir`, which means the AI alone
+   * decided whether the pairing was same or opposite. The player's spin toggle
+   * could not affect the matchup AT ALL — whatever they picked, the AI simply
+   * mirrored or matched it to get the pairing it wanted. A garage control worth
+   * 24 points on paper was, in play, worth exactly nothing.
+   *
+   * So the AI now commits BLIND, against the field rather than against the
+   * player. That is also what the real game does: both blades are launched at
+   * once, and nobody gets to answer. It hands the player the counterplay the
+   * toggle always implied — bring a left-spin bey against a rival that expected
+   * the majority and the whole matchup flips.
+   *
    * The stamina half of the old rationale rested on an attrition race that does
    * not exist: builds spin out in 57-75s and the median round lasts 7.5s, so
    * nobody is ever outlasted. What stamina actually wants is the matchup where
@@ -226,7 +290,7 @@ export class AiController {
    * decision alone. So the preference is read off the BUILD — its archetype
    * plus how much it can actually steal — rather than off a label.
    */
-  chooseSpinDir(build: BeyBuild, playerSpinDir: 1 | -1): 1 | -1 {
+  chooseSpinDir(build: BeyBuild): 1 | -1 {
     const p = PROFILE[this.difficulty];
     const archetype = buildArchetype(build);
     const base =
@@ -244,7 +308,13 @@ export class AiController {
     // is blended back to a coin flip. See `spinRead`.
     const wantOpposite = 0.5 + (want - 0.5) * p.spinRead;
     const opposite = this.rng() < wantOpposite;
-    return (opposite ? -playerSpinDir : playerSpinDir) as 1 | -1;
+    // AGAINST WHAT IT EXPECTS, NOT AGAINST WHAT IT SEES. Still a blind commit —
+    // it never reads the player's actual choice — but a tier that reads the
+    // matchup at all also remembers what this player keeps bringing. See
+    // `expectRight`. A rookie ignores the read entirely and assumes the field.
+    const guessRight = 0.5 + (this.expectRight - 0.5) * p.spinRead;
+    const expected: 1 | -1 = this.rng() < guessRight ? 1 : -1;
+    return (opposite ? -expected : expected) as 1 | -1;
   }
 
   /**

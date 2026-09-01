@@ -155,12 +155,22 @@ describe('spin direction', () => {
   it('the policy sends stealers to opposite spin and attackers to same', () => {
     // Guards the inversion specifically. A champion knows the matchup; a rookie
     // does not and must sit near a coin flip.
+    //
+    // NOTE THE `observePlayerSpin` PRIMING. The rival commits BLIND — it never
+    // reads the launch it is answering — so its realised pairing depends on
+    // what it expects the player to bring. Against a player it has learnt is
+    // right-spin, its intent and its outcome coincide, and that is the only
+    // condition under which this assertion is measuring the preference rather
+    // than the uncertainty. Without the priming a stealer lands in opposite
+    // spin about 75% of the time purely because it is unsure, which is correct
+    // behaviour and a useless thing to assert on.
     const pick = (layerId: string, discId: string, driverId: string, tier: 'champion' | 'rookie'): number => {
       const build = makeBuild(layerId, discId, driverId);
       let opp = 0;
       for (let s = 0; s < 400; s++) {
         const ai = new AiController('b', tier, makeRng(s * 977 + 5));
-        if (ai.chooseSpinDir(build, 1) === -1) opp++;
+        for (let m = 0; m < 8; m++) ai.observePlayerSpin(1);
+        if (ai.chooseSpinDir(build) === -1) opp++;
       }
       return opp / 400;
     };
